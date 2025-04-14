@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "self-order",
+    "slug": "self-order",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/images/icon.png",
+    "scheme": "qmenu-self-order",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mn.qmenu.selforder",
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
+    },
+    "android": {
+      "bundleIdentifier": "com.mn.qmenu.selforder",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.mn.qmenu.selforder",
+      "runtimeVersion": "1.0.0"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "1a851a81-ff4a-437b-9509-daa6c6ed91e0",
+        "buildId": "c457594d-54da-45fa-84f4-abfa3ced70b1"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1a851a81-ff4a-437b-9509-daa6c6ed91e0"
+    }
+  }
+}
