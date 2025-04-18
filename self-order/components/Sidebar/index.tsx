@@ -20,7 +20,6 @@ const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
         <View style={styles.logoContainer}>
           <Image source={{ uri: participant?.branch?.logo }} style={styles.logo} resizeMode="contain" />
         </View>
-
         {categories.map((item, idx) => {
           const isActive = activeIndex === idx;
           return (
@@ -28,11 +27,11 @@ const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
               key={idx}
               onPress={() => onSelect(idx)}
               style={[styles.itemContainer, isActive && styles.activeItem]}
+              activeOpacity={0.8}
             >
               <View style={styles.itemContent}>
-                <Text style={[isActive ? styles.activeLabel : styles.label]}>{item.name}</Text>
+                <Text style={[styles.label, isActive && styles.activeLabel]}>{item.name}</Text>
               </View>
-              {/* {isActive && <View style={styles.arrow} />} */}
             </TouchableOpacity>
           );
         })}
@@ -43,7 +42,7 @@ const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
 
 const styles = StyleSheet.create({
   sidebar: {
-    width: 110,
+    width: 140,
     backgroundColor: '#f3f4f6',
   },
   scroll: {
@@ -91,13 +90,13 @@ const styles = StyleSheet.create({
   label: {
     color: '#333',
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 14,
     textAlign: 'center',
   },
   activeLabel: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 14,
     textAlign: 'center',
   },
   arrow: {

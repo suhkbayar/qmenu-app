@@ -9,6 +9,7 @@ export type Payload = {
   role: string;
   exp: number;
   features: string[];
+  sub: string;
 };
 
 const getAccessToken = async () => {

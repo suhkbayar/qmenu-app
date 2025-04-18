@@ -2,12 +2,16 @@ import { useCallStore } from '@/cache/cart.store';
 import Loader from '@/components/Loader';
 import PaymentModal from '@/components/Modal/PendingTransaction';
 import QpayForm from '@/components/PaymentForms/qpay';
-import { PAYMENT_TYPE } from '@/constants';
+import { emptyOrder, PAYMENT_TYPE } from '@/constants';
 import { defaultColor } from '@/constants/Colors';
 import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/graphql/mutation/order';
-import { GET_ORDER } from '@/graphql/query';
+import { GET_ORDER, GET_ORDERS } from '@/graphql/query';
+import { ON_UPDATED_ORDER } from '@/graphql/subscription';
+import { getPayload } from '@/providers/auth';
+import { useDraw } from '@/providers/drawerProvider';
+import { useOrder } from '@/providers/OrderProvider';
 import { IOrder, ITransaction } from '@/types';
-import { useLazyQuery, useMutation } from '@apollo/client';
+import { useMutation, useQuery, useSubscription } from '@apollo/client';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
@@ -18,11 +22,110 @@ const Payment = () => {
   const { orderId } = useLocalSearchParams();
   const [order, setOrder] = useState<IOrder>();
   const toast = useToast();
+  const { setOrderState } = useOrder();
+  const { setDrawerVisible } = useDraw();
   const [transaction, setTransaction] = useState<ITransaction>();
   const [visiblePending, setVisiblePending] = useState(false);
   const { participant } = useCallStore();
+  const [customerId, setCustomerId] = useState<string | null>(null);
 
-  const [getOrder, { loading }] = useLazyQuery(GET_ORDER, {
+  useEffect(() => {
+    const fetchPayload = async () => {
+      const payload = await getPayload();
+      setCustomerId(payload?.sub ?? null);
+    };
+
+    fetchPayload();
+  }, []);
+
+  useEffect(() => {
+    console.log('customerId', customerId);
+  }, [customerId]);
+
+  useSubscription(ON_UPDATED_ORDER, {
+    variables: { customer: customerId },
+    skip: !customerId,
+    onData: ({ client, data }) => {
+      console.log('📡 Subscription Data:', data);
+
+      const updatedData = data?.data?.onUpdatedOrder;
+      if (!updatedData) return;
+
+      const { event, order: subscriptionOrder } = updatedData;
+
+      try {
+        // 1️⃣ Update GET_ORDERS (list)
+        const cacheList = client.readQuery<{ getOrders: IOrder[] }>({
+          query: GET_ORDERS,
+        });
+
+        if (cacheList?.getOrders) {
+          let updatedOrders = [...cacheList.getOrders];
+          const index = updatedOrders.findIndex((order) => order.id === subscriptionOrder.id);
+          const exists = index !== -1;
+
+          switch (event) {
+            case 'CREATED':
+              if (!exists) {
+                updatedOrders.push(subscriptionOrder);
+              }
+              break;
+
+            case 'UPDATED':
+              if (exists) {
+                updatedOrders[index] = subscriptionOrder;
+              } else {
+                updatedOrders.push(subscriptionOrder);
+              }
+              break;
+
+            case 'DELETE':
+              updatedOrders = updatedOrders.filter((order) => order.id !== subscriptionOrder.id);
+              break;
+          }
+
+          client.writeQuery({
+            query: GET_ORDERS,
+            data: { getOrders: updatedOrders },
+          });
+        }
+
+        // 2️⃣ Update GET_ORDER (single)
+        if (event === 'UPDATED' || event === 'CREATED') {
+          client.writeQuery({
+            query: GET_ORDER,
+            variables: { id: subscriptionOrder.id },
+            data: { getOrder: subscriptionOrder },
+          });
+        } else if (event === 'DELETE') {
+          // Optionally clear GET_ORDER if needed
+          client.writeQuery({
+            query: GET_ORDER,
+            variables: { id: subscriptionOrder.id },
+            data: { getOrder: null },
+          });
+        }
+        if (subscriptionOrder.id === orderId) {
+          setVisiblePending(false);
+          router.push({
+            pathname: '/private/payment-success',
+            params: { orderId: orderId },
+          });
+        }
+
+        console.log('✅ Cache updated for both getOrders and getOrder');
+      } catch (err) {
+        console.error('❌ Cache update failed:', err);
+      }
+    },
+    onError: (err) => {
+      console.error('❌ Subscription error:', err.message);
+    },
+  });
+
+  const { loading } = useQuery(GET_ORDER, {
+    variables: { id: orderId },
+    skip: !orderId,
     onCompleted: (data) => {
       setOrder(data.getOrder);
 
@@ -84,16 +187,6 @@ const Payment = () => {
       });
     },
   });
-
-  useEffect(() => {
-    if (orderId) {
-      getOrder({
-        variables: {
-          id: orderId,
-        },
-      });
-    }
-  }, [orderId]);
 
   const onSubmit = async (paymentId: string) => {
     if (!order) return;
@@ -169,6 +262,8 @@ const Payment = () => {
           style={styles.footerButton}
           onPress={() => {
             router.push('/');
+            setOrderState(emptyOrder);
+            setDrawerVisible(false);
           }}
         >
           <Text style={styles.footerButtonText}>Шинэ захиалга</Text>

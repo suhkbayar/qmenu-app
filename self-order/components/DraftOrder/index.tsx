@@ -12,6 +12,7 @@ import { GET_ORDERS } from '@/graphql/query';
 import { router } from 'expo-router';
 import { isEmpty } from 'lodash';
 import { useCallStore } from '@/cache/cart.store';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   visible: boolean;
@@ -21,6 +22,7 @@ type Props = {
 };
 
 const DraftOrder = ({ order, visible, onClose, setOrder }: Props) => {
+  const { t } = useTranslation('language');
   const { participant } = useCallStore();
   const [createOrder, { loading }] = useMutation(CREATE_ORDER, {
     update(cache, { data: { createOrder } }) {
@@ -33,10 +35,14 @@ const DraftOrder = ({ order, visible, onClose, setOrder }: Props) => {
       }
     },
     onCompleted: async (data) => {
+      // if (participant?.vat) {
+      //   router.push('/private/vat');
+      // } else {
       router.push({
         pathname: '/private/payment',
         params: { orderId: data.createOrder.id },
       });
+      // }
     },
   });
 
@@ -112,7 +118,7 @@ const DraftOrder = ({ order, visible, onClose, setOrder }: Props) => {
           paddingHorizontal: 14,
         }}
       >
-        <Text style={{ fontWeight: 'bold', fontSize: 18 }}>Таны захиалга</Text>
+        <Text style={{ fontWeight: 'bold', fontSize: 18 }}>{t('mainPage.YourOrder')}</Text>
         <TouchableOpacity onPress={onClose}>
           <Icon source="close" color={defaultColor} size={22} />
         </TouchableOpacity>
@@ -120,9 +126,9 @@ const DraftOrder = ({ order, visible, onClose, setOrder }: Props) => {
       <DraftList items={order.items} decrease={decrease} increase={increase} />
       <View style={styles.addButtonContainer}>
         <TouchableOpacity style={styles.smallButton} onPress={() => onSubmit()}>
-          <Text style={styles.smallButtonText}>Захиалах</Text>
+          <Text style={styles.smallButtonText}>{t('mainPage.Order')}</Text>
           <Text style={styles.price}>
-            {order.totalAmount} {CURRENCY}
+            {order.totalAmount.toLocaleString()} {CURRENCY}
           </Text>
         </TouchableOpacity>
       </View>
@@ -136,12 +142,12 @@ const styles = StyleSheet.create({
   },
   price: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '700',
   },
   smallButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '500',
   },
   smallButton: {
@@ -150,8 +156,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     borderColor: defaultColor,
-    borderRadius: 8,
-    paddingVertical: 8,
+    borderRadius: 999,
+    paddingVertical: 16,
     paddingHorizontal: 1,
     alignItems: 'center',
     justifyContent: 'center',

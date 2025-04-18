@@ -1,4 +1,5 @@
 import { TableState } from '@/constants';
+import { IMenuProduct, IOrderItem } from '@/types';
 import { isEmpty } from 'lodash';
 import { Dimensions } from 'react-native';
 
@@ -78,3 +79,33 @@ export function generateUUID() {
     return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
   });
 }
+
+export const isConfigurable = (product: IMenuProduct): boolean => {
+  if (!product.variants) {
+    return false;
+  }
+
+  if (product.variants.length > 1) {
+    return true;
+  }
+  for (const item of product.variants) {
+    if (item.options?.length > 0) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+export const calculateOrderItem = (item: IOrderItem) => {
+  if (!item) return 0;
+
+  let totalAmount = 0;
+
+  let optionPrices = isEmpty(item.options) ? [] : item.options?.map((option) => option.price);
+  const itemTotal = Math.abs((optionPrices?.reduce((a: any, b: any) => a + b, 0) || 0) + item.price) * item.quantity;
+
+  totalAmount += itemTotal;
+
+  return totalAmount.toLocaleString();
+};

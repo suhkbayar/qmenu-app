@@ -55,4 +55,5 @@ export interface IMenuOption extends BaseEntity {
   price: number;
   values: any[];
   state: MenuItemState;
+  mandatory: boolean;
 }

@@ -2,14 +2,20 @@ import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { ScrollView, View, StyleSheet, FlatList, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
-import { ICustomerOrder, IMenuCategory, IMenuProduct, IOrderItem, IParticipant } from '@/types';
+import { IMenuCategory, IMenuProduct, IOrderItem, IParticipant } from '@/types';
 import { isEmpty } from 'lodash';
 import ProductCard from '@/components/Card/ProductCard';
 import { emptyOrder } from '@/constants';
 import OrderFloatingButton from '@/components/FloatingButton/OrderFloatingButton';
 import DraftOrder from '@/components/DraftOrder';
+import { fetchTranslations } from '@/tools';
+import { useTranslation } from 'react-i18next';
+import { useOrder } from '@/providers/OrderProvider';
+import { useDraw } from '@/providers/drawerProvider';
+import { generateUUID } from '@/utils';
+import { useQuery } from '@apollo/client';
+import { GET_ORDERS } from '@/graphql/query';
 
-// Memoized category component for better performance
 const CategorySection = memo(
   ({
     category,
@@ -56,13 +62,15 @@ type Props = {
 
 const ContainerContent = ({ participant }: Props) => {
   const scrollRef = useRef<ScrollView>(null);
+  const { data } = useQuery(GET_ORDERS);
+  const { orderState, setOrderState } = useOrder(); // Use the context here
   const sectionLayouts = useRef<{ [key: string]: number }>({});
   const [categories, setCategories] = useState<IMenuCategory[]>([]);
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const productQuantities = useRef<Record<string, number>>({});
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [orderState, setOrderState] = useState<ICustomerOrder>();
+  const { drawerVisible, setDrawerVisible } = useDraw();
 
+  const { i18n } = useTranslation();
   useEffect(() => {
     if (!participant || isEmpty(participant.menu)) return;
 
@@ -74,8 +82,45 @@ const ContainerContent = ({ participant }: Props) => {
       return isEmpty(category.children) ? hasActiveProducts : hasActiveProducts || hasActiveChildren;
     });
 
-    setCategories(filtered);
-  }, [participant]);
+    const translateAndSetCategories = async () => {
+      try {
+        const translatedCategories = await Promise.all(
+          filtered.map(async (category) => {
+            const translatedCategoryName = await fetchTranslations(category.name);
+
+            const translatedProducts = category.products
+              ? await Promise.all(
+                  category.products.map(async (product) => {
+                    const [translatedProductName, translatedProductDescription] = await Promise.all([
+                      fetchTranslations(product.name),
+                      fetchTranslations(product.description),
+                    ]);
+
+                    return {
+                      ...product,
+                      name: translatedProductName,
+                      description: translatedProductDescription,
+                    };
+                  }),
+                )
+              : [];
+
+            return {
+              ...category,
+              name: translatedCategoryName,
+              products: translatedProducts,
+            };
+          }),
+        );
+
+        setCategories(translatedCategories);
+      } catch (error) {
+        console.error('Error translating categories:', error);
+      }
+    };
+
+    translateAndSetCategories();
+  }, [participant, i18n.language]);
 
   const scrollToCategory = useCallback(
     (index: number) => {
@@ -98,7 +143,9 @@ const ContainerContent = ({ participant }: Props) => {
       if (!variant) return;
 
       setOrderState((prev) => {
-        if (!prev) return undefined;
+        if (!prev) {
+          return prev; // Ensure we return the previous state if it's undefined
+        }
 
         const newItems = [...prev.items];
         const existingIndex = newItems.findIndex((item) => item.productId === product.productId);
@@ -106,7 +153,7 @@ const ContainerContent = ({ participant }: Props) => {
         if (quantity > 0) {
           const item = {
             id: variant.id,
-            uuid: existingIndex >= 0 ? newItems[existingIndex].uuid : variant.id,
+            uuid: generateUUID(),
             productId: product.productId,
             name: variant.name,
             reason: '',
@@ -228,6 +275,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 10,
     color: '#333',
+  },
+  itemContent: {
+    alignItems: 'center',
   },
 });
 

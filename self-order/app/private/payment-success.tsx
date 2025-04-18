@@ -6,10 +6,14 @@ import { useLazyQuery } from '@apollo/client';
 import { GET_ORDER } from '@/graphql/query';
 import { IOrder } from '@/types';
 import Loader from '@/components/Loader';
+import { useOrder } from '@/providers/OrderProvider';
+import { useDraw } from '@/providers/drawerProvider';
+import { emptyOrder } from '@/constants';
 
 const PaymentSuccess = () => {
   const { orderId } = useLocalSearchParams();
-
+  const { setOrderState } = useOrder();
+  const { setDrawerVisible } = useDraw();
   const [order, setOrder] = useState<IOrder>();
 
   const [getOrder, { loading }] = useLazyQuery(GET_ORDER, {
@@ -33,7 +37,7 @@ const PaymentSuccess = () => {
   return (
     <View style={styles.container}>
       <View style={styles.iconWrap}>
-        <Icon source="check-circle" size={80} color="#4ade80" />
+        <Icon source="check-circle" size={180} color="#4ade80" />
       </View>
 
       <Text style={styles.title}>Төлбөр амжилттай</Text>
@@ -45,7 +49,15 @@ const PaymentSuccess = () => {
         Төлсөн дүн: <Text style={styles.value}>{Number(order.paidAmount).toFixed(2)} MNT</Text>
       </Text>
 
-      <Button mode="contained" style={styles.newOrderBtn} onPress={() => router.push('/')}>
+      <Button
+        mode="contained"
+        style={styles.newOrderBtn}
+        onPress={() => {
+          router.push('/');
+          setOrderState(emptyOrder);
+          setDrawerVisible(false);
+        }}
+      >
         Шинэ захиалга
       </Button>
     </View>
@@ -66,13 +78,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    fontSize: 22,
+    fontSize: 32,
     fontWeight: '700',
     color: '#4B5563',
     marginBottom: 24,
   },
   label: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#6B7280',
     marginBottom: 8,
   },

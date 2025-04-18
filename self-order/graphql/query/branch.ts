@@ -37,6 +37,11 @@ export const GET_BRANCH = gql`
       branch {
         ...BranchFields
       }
+      table {
+        id
+        name
+        code
+      }
       payments {
         type
         id

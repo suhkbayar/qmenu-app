@@ -2,6 +2,7 @@ import { IBranch } from './branch';
 import { IChannelConfig } from './channel.config';
 import { IMenu } from './menu';
 import { IPayment } from './payment';
+import { ITable } from './table';
 
 export interface IParticipant {
   advancePayment: boolean;
@@ -12,6 +13,7 @@ export interface IParticipant {
   waiter: boolean;
   orderable: boolean;
   payments: IPayment[];
+  table: ITable;
   services: string[];
   vat: boolean;
   configs?: IChannelConfig[];

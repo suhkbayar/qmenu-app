@@ -56,6 +56,20 @@ export interface ICustomerOrder {
   grandTotal: number;
   totalQuantity: number;
   state: string;
+  type?: string;
+  buyer?: string;
+  register?: string;
+  vatType?: string;
+}
+
+export interface ICustomerTable {
+  id: string;
+  branchName: string;
+  branchId: string;
+  branchLogo: string;
+  tableName: string;
+  tableId: string;
+  code: string;
 }
 
 export interface IVats {

@@ -38,7 +38,7 @@ const HelpFloatingButton = () => {
           color: 'white',
           label: 'Зөөгч дуудах',
           labelStyle: { color: defaultColor, bottom: 60 },
-          onPress: () => call(),
+          onPress: () => call({ variables: { message: 'Зөөгч дуудах' } }),
         },
         {
           icon: 'file-document-outline',
@@ -46,7 +46,7 @@ const HelpFloatingButton = () => {
           color: 'white',
           labelStyle: { color: defaultColor, bottom: 70 },
           style: { backgroundColor: defaultColor, bottom: 70 },
-          onPress: () => call(),
+          onPress: () => call({ variables: { message: 'Тооцоо авах' } }),
         },
       ]}
     />

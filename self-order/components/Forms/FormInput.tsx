@@ -1,7 +1,7 @@
 // components/FormInput.tsx
 import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
-import { TextInput } from 'react-native-paper';
+import { Icon, TextInput } from 'react-native-paper';
 import { Controller, Control, FieldValues, RegisterOptions } from 'react-hook-form';
 
 interface FormInputProps {
@@ -13,6 +13,7 @@ interface FormInputProps {
   defaultColor?: string;
   placeholder?: string;
   keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
+  right?: React.ReactNode;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -24,6 +25,7 @@ const FormInput: React.FC<FormInputProps> = ({
   defaultColor = '#1ecb84',
   placeholder,
   keyboardType = 'default',
+  right,
 }) => {
   return (
     <Controller
@@ -38,6 +40,7 @@ const FormInput: React.FC<FormInputProps> = ({
             onChangeText={onChange}
             onBlur={onBlur}
             mode={mode}
+            right={right}
             textColor={defaultColor}
             selectionColor={defaultColor}
             underlineColor={defaultColor}

@@ -1,7 +1,7 @@
 import create from 'zustand';
 import { persist, StateStorage } from 'zustand/middleware';
 import { IParticipant } from '../types/participant';
-import { ICustomerOrder, IOrderItem } from '../types/order';
+import { ICustomerOrder, ICustomerTable, IOrderItem } from '../types/order';
 import { IMenuVariant } from '../types/menu';
 import { isEmpty } from 'lodash';
 import { IConfig } from '../types';
@@ -26,6 +26,8 @@ const storage: StateStorage = {
 interface ICallStore {
   order: ICustomerOrder | null;
   config: IConfig | null;
+  tables: ICustomerTable[];
+  setTables: (tables: ICustomerTable[]) => void;
   user: IUser | null;
   setUser: (user: IUser) => void;
   participant: IParticipant | null;
@@ -37,6 +39,7 @@ interface ICallStore {
   add: (variant: IMenuVariant, productId?: string) => void;
   remove: (variant: IMenuVariant) => void;
   load: (order: ICustomerOrder) => void;
+  deleteTable: (code: string) => void;
   setParticipant: (participant: IParticipant) => void;
 }
 
@@ -46,6 +49,7 @@ export const useCallStore = create<ICallStore>(
       order: null,
       user: null,
       config: null,
+      tables: [],
       participant: null,
       calculate: () => {
         const order = get().order;
@@ -109,7 +113,30 @@ export const useCallStore = create<ICallStore>(
 
         get().calculate();
       },
+      setTables: (newTables: ICustomerTable[]) => {
+        set((state) => {
+          const existingTables = state.tables || [];
+          const mergedTables = [...existingTables];
 
+          newTables.forEach((newTable) => {
+            const index = mergedTables.findIndex((t) => t.code === newTable.code);
+            if (index > -1) {
+              // Update existing table
+              mergedTables[index] = newTable;
+            } else {
+              // Add new table
+              mergedTables.push(newTable);
+            }
+          });
+
+          return { tables: mergedTables };
+        });
+      },
+      deleteTable: (code: string) => {
+        set((state) => ({
+          tables: state.tables.filter((table) => table.code !== code),
+        }));
+      },
       addOrderItemComment: (item, comment) => {
         const currentOrder = get().order;
         if (!currentOrder) return;

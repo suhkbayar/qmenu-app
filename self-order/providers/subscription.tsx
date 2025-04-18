@@ -1,4 +1,4 @@
-import React, { useContext, ReactNode, useEffect } from 'react';
+import React, { useContext, ReactNode, useEffect, useState } from 'react';
 import { useSubscription } from '@apollo/client';
 import { ON_UPDATED_ORDER } from '../graphql/subscription/order';
 import { GET_ORDERS } from '../graphql/query';
@@ -12,7 +12,18 @@ interface Props {
 const SubscriptionProvider: React.FC<Props> = ({ children }) => {
   const { isAuthenticated } = useContext(AuthContext);
 
-  const customerId = isAuthenticated ? getPayload()?.sub : undefined;
+  const [customerId, setCustomerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPayload = async () => {
+      const payload = await getPayload();
+      setCustomerId(payload?.sub ?? null);
+    };
+
+    if (isAuthenticated) {
+      fetchPayload();
+    }
+  }, [isAuthenticated]);
 
   useSubscription(ON_UPDATED_ORDER, {
     variables: { customer: customerId },

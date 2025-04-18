@@ -6,6 +6,7 @@ import { emptyOrder } from '@/constants';
 import { GET_BRANCH } from '@/graphql/query';
 import { AuthContext } from '@/providers/auth';
 import Container from '@/template/container';
+import { ICustomerTable } from '@/types';
 import { useLazyQuery } from '@apollo/client';
 import { router } from 'expo-router';
 import { isEmpty } from 'lodash';
@@ -15,14 +16,32 @@ import { SafeAreaView, StyleSheet } from 'react-native';
 const Private = () => {
   const [loading, setLoading] = useState(true);
   const { signOut } = useContext(AuthContext);
-  const { setParticipant, order, load } = useCallStore();
+  const { setParticipant, order, load, setTables } = useCallStore();
 
   const [getBranch, { loading: loadBranch, data }] = useLazyQuery(GET_BRANCH, {
-    pollInterval: 180000,
+    fetchPolicy: 'network-only',
     onCompleted(data) {
       setParticipant(data.getParticipant);
       if (data.getParticipant.orderable && isEmpty(order)) {
         load(emptyOrder);
+      }
+
+      let incomingTables: ICustomerTable[] = [];
+
+      if (data.getParticipant.table) {
+        incomingTables = [
+          {
+            id: data.getParticipant.id,
+            branchName: data.getParticipant.branch.name,
+            branchId: data.getParticipant.branch.id,
+            branchLogo: data.getParticipant.branch.logo,
+            tableName: data.getParticipant.table.name,
+            tableId: data.getParticipant.table.id,
+            code: data.getParticipant.table.code,
+          },
+        ];
+
+        setTables(incomingTables);
       }
     },
     onError(err) {

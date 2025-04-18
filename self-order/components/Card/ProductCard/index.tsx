@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity, Button } from 'react-native';
+import { View, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Icon, Text } from 'react-native-paper';
 import { IMenuProduct, IOrderItem } from '@/types';
 import { CalculateProductPrice } from '@/tools/calculate';
 import { defaultColor } from '@/constants/Colors';
-
+import { useTranslation } from 'react-i18next';
+import { router } from 'expo-router';
+import { useCallStore } from '@/cache/cart.store';
+import { isConfigurable } from '@/utils';
 interface Props {
   product: IMenuProduct;
   orderItem?: IOrderItem;
@@ -13,28 +16,30 @@ interface Props {
 }
 
 const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQuantityChange }) => {
-  const [visible, setVisible] = useState(false);
   const [quantity, setQuantity] = useState(0);
+  const { participant } = useCallStore();
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation('language');
 
   const increase = () => {
+    if (loading) return;
+
     const { variants } = product;
     if (!variants || variants.length === 0) return;
-
     if (variants.length > 1) {
-      setVisible(true);
+      goProductInfo();
     } else {
       variants.forEach((item) => {
         if (item?.options?.length > 0) {
-          setVisible(true);
+          goProductInfo();
           return;
+        } else {
+          const newQty = quantity + 1;
+          setQuantity(newQty);
+          onQuantityChange(product, newQty);
         }
       });
     }
-
-    const newQty = quantity + 1;
-    setQuantity(newQty);
-
-    onQuantityChange(product, newQty);
   };
 
   useEffect(() => {
@@ -54,58 +59,115 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQua
     onQuantityChange(product, newQty);
   };
 
+  const goProductInfo = async () => {
+    if (loading) return;
+
+    try {
+      setLoading(true);
+      await router.push({
+        pathname: '/private/product-info',
+        params: { product: JSON.stringify(product) },
+      });
+    } catch (error) {
+      console.error('Navigation error:', error);
+    } finally {
+      // Use setTimeout to ensure the navigation has time to complete
+      // before allowing another navigation attempt
+      setTimeout(() => {
+        setLoading(false);
+      }, 300);
+    }
+  };
+
   return (
-    <View style={styles.card}>
-      <TouchableOpacity onPress={increase}>
-        <Image
-          source={product.image ? { uri: product.image } : require('../../../assets/images/noImage.jpg')}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      </TouchableOpacity>
+    <>
+      <View style={styles.card}>
+        <TouchableOpacity onPress={increase}>
+          <Image
+            source={product.image ? { uri: product.image } : require('../../../assets/images/noImage.jpg')}
+            style={styles.image}
+            resizeMode="cover"
+          />
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: 6,
+              right: 6,
+            }}
+            onPress={() => {
+              goProductInfo();
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.4)', // semi-transparent white background
+                borderRadius: 4,
+                padding: 6,
+              }}
+            >
+              <Icon source="eye" size={20} color="#bababa" />
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
 
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>
-          {product.name}
-        </Text>
+        <View style={styles.info}>
+          <Text style={styles.name} numberOfLines={1}>
+            {product.name}
+          </Text>
 
-        <Text style={styles.description} numberOfLines={2}>
-          {product.description}
-        </Text>
-        {product.variants && <CalculateProductPrice variants={product.variants} />}
+          <Text style={styles.description} numberOfLines={2}>
+            {product.description}
+          </Text>
+          {product.variants && <CalculateProductPrice variants={product.variants} />}
+        </View>
+
+        {participant?.orderable && (
+          <>
+            {isConfigurable(product) ? (
+              <View style={styles.addButtonContainer}>
+                <TouchableOpacity style={styles.smallButton} onPress={() => goProductInfo()}>
+                  <Icon source="cart-outline" color={defaultColor} size={16} />
+                  <Text style={styles.smallButtonText}>{t('mainPage.Enter')}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                {quantity > 0 ? (
+                  <View style={styles.buttonContainer}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        decrease();
+                      }}
+                      style={[styles.button, styles.buttonWhite]}
+                    >
+                      <Icon source="minus" color={defaultColor} size={16} />
+                    </TouchableOpacity>
+
+                    <Text style={styles.quantityText}>{quantity}</Text>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        increase();
+                      }}
+                      style={styles.fullAddButton}
+                    >
+                      <Icon source="plus" color="#fff" size={16} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.addButtonContainer}>
+                    <TouchableOpacity style={styles.smallButton} onPress={increase}>
+                      <Icon source="cart-outline" color={defaultColor} size={16} />
+                      <Text style={styles.smallButtonText}>{t('mainPage.Order')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            )}
+          </>
+        )}
       </View>
-
-      {quantity > 0 ? (
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            onPress={() => {
-              decrease();
-            }}
-            style={[styles.button, styles.buttonWhite]}
-          >
-            <Icon source="minus" color={defaultColor} size={16} />
-          </TouchableOpacity>
-
-          <Text style={styles.quantityText}>{quantity}</Text>
-
-          <TouchableOpacity
-            onPress={() => {
-              increase();
-            }}
-            style={styles.fullAddButton}
-          >
-            <Icon source="plus" color="#fff" size={16} />
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.addButtonContainer}>
-          <TouchableOpacity style={styles.smallButton} onPress={increase}>
-            <Icon source="cart-outline" color={defaultColor} size={16} />
-            <Text style={styles.smallButtonText}>Захиалах</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+    </>
   );
 };
 

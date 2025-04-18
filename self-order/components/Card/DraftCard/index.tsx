@@ -29,7 +29,7 @@ export default function DraftList({ items, increase, decrease }: Props) {
       <View style={{ flex: 1 }}>
         <Text style={{ fontWeight: 'bold', fontSize: 16 }}>{item.name}</Text>
         <Text style={{ color: '#374151', fontSize: 16 }}>
-          {item.price} {CURRENCY}
+          {item.price.toLocaleString()} {CURRENCY}
         </Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
