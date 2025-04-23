@@ -1,8 +1,9 @@
-// components/FormInput.tsx
+// components/RegisterForm.tsx
 import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { Controller, Control, FieldValues, RegisterOptions } from 'react-hook-form';
+import { defaultColor } from '@/constants/Colors';
 
 interface FormInputProps {
   name: string;
@@ -10,22 +11,24 @@ interface FormInputProps {
   label: string;
   rules?: RegisterOptions;
   mode?: 'outlined' | 'flat';
-  defaultColor?: string;
   placeholder?: string;
+  style?: any;
   keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
   right?: React.ReactNode;
+  isRead?: boolean;
 }
 
-const FormInput: React.FC<FormInputProps> = ({
+const RegisterForm: React.FC<FormInputProps> = ({
   name,
   control,
   label,
   rules,
   mode,
-  defaultColor = '#1ecb84',
+  style,
   placeholder,
   keyboardType = 'default',
   right,
+  isRead = false,
 }) => {
   return (
     <Controller
@@ -40,22 +43,23 @@ const FormInput: React.FC<FormInputProps> = ({
             onChangeText={onChange}
             onBlur={onBlur}
             mode={mode}
-            right={right}
-            textColor={defaultColor}
-            selectionColor={defaultColor}
-            underlineColor={defaultColor}
-            activeUnderlineColor={defaultColor}
-            activeOutlineColor={defaultColor}
-            outlineColor={defaultColor}
-            placeholderTextColor={defaultColor}
             autoComplete="off"
+            right={right}
+            readOnly={isRead}
             textContentType="none"
             autoCorrect={false}
             keyboardType={keyboardType}
             autoCapitalize="none"
             placeholder={placeholder}
-            style={[styles.input, error && styles.errorInput]}
-            theme={{ colors: { primary: defaultColor } }}
+            style={[style, error && styles.errorInput]}
+            theme={{
+              colors: {
+                primary: defaultColor,
+                outline: '#c9c9c9',
+                background: '#fff',
+              },
+              roundness: 10,
+            }}
             error={!!error}
           />
           {error && (
@@ -70,12 +74,9 @@ const FormInput: React.FC<FormInputProps> = ({
 };
 
 const styles = StyleSheet.create({
-  input: {
-    marginBottom: 12,
-  },
   errorInput: {
     borderColor: 'red',
   },
 });
 
-export default FormInput;
+export default RegisterForm;

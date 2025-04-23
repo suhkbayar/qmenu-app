@@ -1,17 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  Pressable,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  useWindowDimensions,
-} from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Badge, FAB, Icon } from 'react-native-paper';
+import { FAB, Icon } from 'react-native-paper';
 import { defaultColor } from '@/constants/Colors';
 import { ICustomerOrder, IMenuOption, IMenuVariant, IOrderItem } from '@/types';
 import { isEmpty } from 'lodash';
@@ -23,6 +14,7 @@ import { LogBox } from 'react-native';
 import { CURRENCY } from '@/constants';
 import { calculateOrderItem, generateUUID } from '@/utils';
 import OptionValuesModal from '@/components/Modal/OptionValuesModal';
+import CustomBadge from '@/components/Badge';
 interface ValidationResult {
   isValid: boolean;
   missingMandatoryOptions: IMenuOption[];
@@ -246,19 +238,27 @@ const ProductDetailsScreen = () => {
           <Icon source="arrow-left" size={24} color="#333" />
           <Text style={styles.backText}>{t('mainPage.GoBack')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setDrawerVisible(true)} style={{}}>
-          <FAB
-            animated
-            icon="cart-outline"
-            size="small"
-            style={styles.fab}
-            onPress={() => {
-              setDrawerVisible(true);
-            }}
-            color="white"
-          />
-          {orderState?.items.length > 0 && <Badge style={styles.badge}>{orderState?.items.length}</Badge>}
-        </TouchableOpacity>
+        <View
+          style={{
+            position: 'absolute',
+            top: 20,
+            right: 0,
+          }}
+        >
+          <TouchableOpacity onPress={() => setDrawerVisible(true)} style={{}}>
+            <FAB
+              animated
+              icon="cart-outline"
+              size="small"
+              style={styles.fab}
+              onPress={() => {
+                setDrawerVisible(true);
+              }}
+              color="white"
+            />
+            {orderState?.totalQuantity > 0 && <CustomBadge value={orderState?.totalQuantity} />}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.content}>
@@ -287,7 +287,9 @@ const ProductDetailsScreen = () => {
                 onPress={() => onSelect(variant)}
                 style={[styles.sizeButton, selectedItem?.id === variant.id && styles.sizeButtonSelected]}
               >
-                <Text style={styles.sizeText}>{variant.name}</Text>
+                <Text style={[selectedItem?.id === variant.id ? styles.selectedSizeText : styles.sizeText]}>
+                  {variant.name}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -319,21 +321,12 @@ const ProductDetailsScreen = () => {
                               styles.sizeButtonSelected,
                         ]}
                       >
-                        {option.mandatory && (
-                          <Text
-                            style={[
-                              validateOptions.some((opt) => opt.id === option.id)
-                                ? { marginRight: 4, color: 'white' }
-                                : { marginRight: 4, color: 'red' },
-                            ]}
-                          >
-                            *
-                          </Text>
-                        )}
                         <Text
                           style={[
                             validateOptions.some((opt) => opt.id === option.id)
                               ? styles.validateText
+                              : selectedItem?.options.some((selectedOption) => selectedOption.id === option.id)
+                              ? styles.selectedToppingText
                               : styles.toppingText,
                           ]}
                         >
@@ -345,6 +338,17 @@ const ProductDetailsScreen = () => {
                               selectedItem?.options.find((selectedOption) => selectedOption.id === option.id)?.value
                             }`}
                         </Text>
+                        {option.mandatory && (
+                          <Text
+                            style={[
+                              validateOptions.some((opt) => opt.id === option.id)
+                                ? { marginLeft: 4, color: 'white' }
+                                : { marginLeft: 4, color: 'red' },
+                            ]}
+                          >
+                            *
+                          </Text>
+                        )}
                       </TouchableOpacity>
                     );
                   })}
@@ -353,24 +357,34 @@ const ProductDetailsScreen = () => {
           )}
 
           <View style={styles.priceSection}>
-            <View style={styles.quantityControls}>
-              <Pressable onPress={() => onRemove()} style={styles.qtyButton}>
-                <Text style={styles.qtyButtonText}>−</Text>
-              </Pressable>
-              <Text style={styles.qtyNumber}>{selectedItem?.quantity}</Text>
-              <Pressable
-                onPress={() =>
-                  onSelect(product.variants.find((variant: IMenuVariant) => variant?.id === selectedItem?.id))
-                }
-                style={styles.qtyButton}
-              >
-                <Text style={styles.qtyButtonText}>+</Text>
-              </Pressable>
-            </View>
             <Text style={styles.priceText}>
               {selectedItem && calculateOrderItem(selectedItem)}
               {CURRENCY}
             </Text>
+
+            <View style={styles.quantityControls}>
+              <FAB
+                animated
+                icon="minus"
+                size="small"
+                style={styles.secondfab}
+                onPress={() => onRemove()}
+                color={defaultColor}
+              />
+
+              <Text style={styles.qtyNumber}>{selectedItem?.quantity}</Text>
+
+              <FAB
+                animated
+                icon="plus"
+                size="small"
+                style={styles.plusFab}
+                onPress={() =>
+                  onSelect(product.variants.find((variant: IMenuVariant) => variant?.id === selectedItem?.id))
+                }
+                color="white"
+              />
+            </View>
           </View>
           <TouchableOpacity
             style={styles.orderButton}
@@ -390,7 +404,6 @@ const ProductDetailsScreen = () => {
           onClose={() => setDrawerVisible(false)}
         />
       )}
-
       {visibleValues && (
         <OptionValuesModal
           visible={visibleValues}
@@ -469,9 +482,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  plusFab: {
+    backgroundColor: defaultColor,
+    width: 56,
+    height: 56,
+    borderRadius: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   statusBadgeText: {
     color: '#fff',
     fontSize: 12,
+  },
+  secondfab: {
+    backgroundColor: 'white',
+    width: 56,
+    borderColor: '#f0f0f0',
+    borderWidth: 1,
+    height: 56,
+    borderRadius: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   pizzaImage: {
     height: 560,
@@ -518,11 +549,16 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   sizeButtonSelected: {
-    backgroundColor: '#fde68a',
+    backgroundColor: defaultColor,
   },
 
   validateButtonSelected: {
     backgroundColor: 'red',
+  },
+  selectedSizeText: {
+    fontWeight: '600',
+    fontSize: 14,
+    color: 'white',
   },
   sizeText: {
     fontWeight: '600',
@@ -541,6 +577,13 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
+
+  selectedToppingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'white',
+  },
+
   toppingText: {
     fontSize: 14,
     fontWeight: '500',
@@ -607,9 +650,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   fab: {
-    backgroundColor: defaultColor,
-    width: 40,
-    height: 40,
+    backgroundColor: '#EB1833',
+    width: 56,
+    height: 56,
     borderRadius: 999,
     justifyContent: 'center',
     alignItems: 'center',
@@ -618,8 +661,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: 'red',
-    color: 'white',
+    backgroundColor: 'white',
+    color: '#EB1833',
+    fontWeight: 700,
   },
   ul: {
     paddingLeft: 20,

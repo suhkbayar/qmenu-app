@@ -13,9 +13,9 @@ export const CalculateProductPrice: React.FC<Props> = ({ variants, config }) => 
     return null;
   }
 
-  const prices: number[] = variants.map((val) => val.salePrice);
-  const max: number = Math.max(...prices);
-  const min: number = Math.min(...prices);
+  const prices: number = variants[0]?.salePrice ?? 0;
+  const max: number = Math.max(prices);
+  const min: number = Math.min(prices);
 
   const priceText =
     min === max
@@ -27,7 +27,7 @@ export const CalculateProductPrice: React.FC<Props> = ({ variants, config }) => 
 
 const styles = StyleSheet.create({
   priceText: {
-    fontWeight: '600',
-    fontSize: 14,
+    fontWeight: '700',
+    fontSize: 20,
   },
 });

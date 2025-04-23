@@ -43,7 +43,7 @@ const CategorySection = memo(
               product={item}
             />
           )}
-          numColumns={4}
+          numColumns={3}
           columnWrapperStyle={{ justifyContent: 'center', alignSelf: 'flex-start' }}
           scrollEnabled={false}
           removeClippedSubviews={true}

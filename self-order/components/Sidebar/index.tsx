@@ -16,10 +16,13 @@ const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
 
   return (
     <View style={styles.sidebar}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <View style={{ padding: 10 }}>
         <View style={styles.logoContainer}>
-          <Image source={{ uri: participant?.branch?.logo }} style={styles.logo} resizeMode="contain" />
+          <Image source={{ uri: participant?.branch?.logo }} style={styles.logo} resizeMode="cover" />
         </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scroll}>
         {categories.map((item, idx) => {
           const isActive = activeIndex === idx;
           return (
@@ -42,16 +45,14 @@ const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
 
 const styles = StyleSheet.create({
   sidebar: {
-    width: 140,
+    width: 260,
     backgroundColor: '#f3f4f6',
   },
   scroll: {
-    paddingVertical: 10,
     alignItems: 'center',
   },
   logoContainer: {
-    width: 70,
-    height: 70,
+    width: '100%',
     borderRadius: 12,
     backgroundColor: 'white',
     justifyContent: 'center',
@@ -60,14 +61,14 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   logo: {
-    width: 60,
-    height: 60,
+    width: '100%',
+    height: 220,
     borderRadius: 10,
   },
   itemContainer: {
-    width: 110,
+    width: '100%',
     marginBottom: 20,
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
@@ -76,7 +77,6 @@ const styles = StyleSheet.create({
   },
   activeItem: {
     backgroundColor: defaultColor,
-    borderRadius: 8,
   },
   itemContent: {
     alignItems: 'center',
@@ -90,14 +90,14 @@ const styles = StyleSheet.create({
   label: {
     color: '#333',
     fontWeight: 'bold',
-    fontSize: 14,
-    textAlign: 'center',
+    fontSize: 18,
+    textAlign: 'right',
   },
   activeLabel: {
-    color: '#fff',
+    color: 'white',
     fontWeight: 'bold',
-    fontSize: 14,
-    textAlign: 'center',
+    fontSize: 18,
+    textAlign: 'right',
   },
   arrow: {
     position: 'absolute',

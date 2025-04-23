@@ -64,8 +64,8 @@ const Header = ({ categories, activeIndex }: Props) => {
 
   return (
     <View style={styles.header}>
-      <Text variant="titleMedium" style={{ marginLeft: 10 }}>
-        {activeCategoryName}
+      <Text variant="titleMedium" style={{ marginLeft: 10, fontSize: 18, fontWeight: 700 }}>
+        {activeCategoryName.toLocaleUpperCase()}
       </Text>
 
       <View
@@ -98,8 +98,8 @@ const Header = ({ categories, activeIndex }: Props) => {
                 <Image
                   source={selectedCountry.path}
                   style={{
-                    height: 18,
-                    width: 28,
+                    height: 22,
+                    width: 32,
                     borderRadius: 2,
                   }}
                 />
@@ -120,8 +120,8 @@ const Header = ({ categories, activeIndex }: Props) => {
                     <Image
                       source={country.path}
                       style={{
-                        height: 18,
-                        width: 28,
+                        height: 22,
+                        width: 32,
                         borderRadius: 2,
                       }}
                     />

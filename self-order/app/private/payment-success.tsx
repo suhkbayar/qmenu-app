@@ -9,9 +9,11 @@ import Loader from '@/components/Loader';
 import { useOrder } from '@/providers/OrderProvider';
 import { useDraw } from '@/providers/drawerProvider';
 import { emptyOrder } from '@/constants';
+import { useTranslation } from 'react-i18next';
 
 const PaymentSuccess = () => {
   const { orderId } = useLocalSearchParams();
+  const { t } = useTranslation('language');
   const { setOrderState } = useOrder();
   const { setDrawerVisible } = useDraw();
   const [order, setOrder] = useState<IOrder>();
@@ -39,16 +41,13 @@ const PaymentSuccess = () => {
       <View style={styles.iconWrap}>
         <Icon source="check-circle" size={180} color="#4ade80" />
       </View>
-
-      <Text style={styles.title}>Төлбөр амжилттай</Text>
-
+      <Text style={styles.title}>{t('mainPage.YourOrderSuccess')}</Text>
       <Text style={styles.label}>
-        Захиалгын дугаар: <Text style={styles.value}>{order?.number?.slice(-4)}</Text>
+        {t('mainPage.YourOrderNumber')}: <Text style={styles.value}>{order?.number?.slice(-4)}</Text>
       </Text>
       <Text style={styles.label}>
-        Төлсөн дүн: <Text style={styles.value}>{Number(order.paidAmount).toFixed(2)} MNT</Text>
+        {t('mainPage.AmountPaid2')}: <Text style={styles.value}>{Number(order.paidAmount).toFixed(2)} MNT</Text>
       </Text>
-
       <Button
         mode="contained"
         style={styles.newOrderBtn}

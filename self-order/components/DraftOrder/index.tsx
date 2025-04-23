@@ -35,14 +35,17 @@ const DraftOrder = ({ order, visible, onClose, setOrder }: Props) => {
       }
     },
     onCompleted: async (data) => {
-      // if (participant?.vat) {
-      //   router.push('/private/vat');
-      // } else {
-      router.push({
-        pathname: '/private/payment',
-        params: { orderId: data.createOrder.id },
-      });
-      // }
+      if (participant?.vat) {
+        router.push({
+          pathname: '/private/vat',
+          params: { orderId: data.createOrder.id },
+        });
+      } else {
+        router.push({
+          pathname: '/private/payment',
+          params: { orderId: data.createOrder.id },
+        });
+      }
     },
   });
 

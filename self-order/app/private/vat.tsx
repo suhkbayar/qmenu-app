@@ -1,8 +1,17 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, SafeAreaView, Image, TouchableOpacity } from 'react-native';
-import { Text, Surface, TouchableRipple, Button, Icon } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  SafeAreaView,
+  Image,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Platform,
+  Keyboard,
+  ScrollView,
+} from 'react-native';
+import { Text, Surface, TouchableRipple, Icon, SegmentedButtons, TextInput } from 'react-native-paper';
 import { FieldValues, useForm } from 'react-hook-form';
 import { useOrder } from '@/providers/OrderProvider';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -12,34 +21,32 @@ import { defaultColor } from '@/constants/Colors';
 import { useToast } from 'react-native-toast-notifications';
 import { useTranslation } from 'react-i18next';
 import { validPrefixes } from '@/constants';
+import PaperDropdown from '@/components/Dropdown';
+import RegisterForm from '@/components/Forms/RegisterForm';
+import { isEmpty } from 'lodash';
 
 const EbarimtScreen = () => {
   const toast = useToast();
   const { t } = useTranslation('language');
   const { orderId } = useLocalSearchParams();
   const { orderState, setOrderState } = useOrder();
-  const [personRegister, setPersonRegister] = useState<string>();
-  const [buyerRegister, setBuyerRegister] = useState<string>();
-  const [isCompany, setIsCompany] = useState<boolean>(true);
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    reset,
-    watch,
-    formState: { errors },
-  } = useForm<FieldValues>({
+  const [isError, setIsError] = useState<boolean>(false);
+  const [companyType, setCompanyType] = useState<string>('company');
+
+  const { control, setValue, reset, watch } = useForm<FieldValues>({
     mode: 'all',
     defaultValues: {
       vatType: '1',
     },
   });
-  const { vatType, buyer } = watch();
+
+  const { vatType, buyer, fistLetter, secondLetter, personRegister, companyRegister } = watch();
 
   const [getVatPayer, { loading }] = useLazyQuery(GET_VAT_PAYER, {
     onCompleted(data) {
       setValue('buyer', data.getVatPayer.name);
+      setIsError(false);
       if (!data.getVatPayer.found) {
         reset({
           buyer: null,
@@ -47,7 +54,8 @@ const EbarimtScreen = () => {
       }
     },
     onError(err) {
-      toast.show(t('mainPage.Error'), {
+      setIsError(true);
+      toast.show(err.message, {
         type: 'warning',
         icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
         placement: 'top',
@@ -58,20 +66,22 @@ const EbarimtScreen = () => {
     },
   });
 
-  const onSubmit = (data: any) => {
-    let targetVat = {};
-    if (data.vatType === '1') {
-      targetVat = {
-        vatType: '1',
-      };
-    } else {
-      targetVat = {
-        vatType: '3',
-        buyer: data.buyer,
-        register: data.register,
-      };
-    }
-    setOrderState({ ...orderState, ...targetVat });
+  const onSubmit = () => {
+    const isCompanyValid = companyType === 'company' && companyRegister?.length === 7;
+    const isPersonValid = companyType === 'person' && personRegister?.length === 8 && fistLetter && secondLetter;
+
+    const targetVat =
+      vatType === '1'
+        ? { vatType: '1' }
+        : !isEmpty(buyer) && (isCompanyValid || isPersonValid)
+        ? {
+            vatType: '3',
+            buyer,
+            register: isCompanyValid ? companyRegister : `${fistLetter}${secondLetter}${personRegister}`,
+          }
+        : {};
+
+    setOrderState((prev) => ({ ...prev, ...targetVat }));
 
     router.push({
       pathname: '/private/payment',
@@ -79,112 +89,246 @@ const EbarimtScreen = () => {
     });
   };
 
+  const onChangeSegmen = (value: any) => {
+    setCompanyType(value);
+    setValue('companyRegister', null);
+    setValue('personRegister', null);
+    setValue('fistLetter', null);
+    setValue('secondLetter', null);
+    setValue('buyer', null);
+  };
+
+  useEffect(() => {
+    if (vatType === '3') {
+      if (companyType === 'company') {
+        if (companyRegister?.length === 7) {
+          setIsError(false);
+          getVatPayer({
+            variables: {
+              register: `${companyRegister}`,
+            },
+          });
+        } else if (!isEmpty(companyRegister)) {
+          setIsError(true);
+        }
+
+        if (companyRegister?.length < 7) {
+          setValue('buyer', null);
+        } else if (companyRegister?.length > 7) {
+          setValue('buyer', null);
+        }
+      }
+    }
+  }, [vatType, companyType, companyRegister]);
+
+  useEffect(() => {
+    if (vatType === '3') {
+      if (companyType === 'person') {
+        if (personRegister?.length === 8 && !isEmpty(fistLetter) && !isEmpty(secondLetter)) {
+          setIsError(false);
+          getVatPayer({
+            variables: {
+              register: `${fistLetter}${secondLetter}${personRegister}`,
+            },
+          });
+        } else if (!isEmpty(personRegister)) {
+          setIsError(true);
+        }
+
+        if (personRegister?.length < 8) {
+          setValue('buyer', null);
+        } else if (personRegister?.length > 8) {
+          setValue('buyer', null);
+        }
+      }
+    }
+  }, [vatType, companyType, personRegister, fistLetter, secondLetter]);
+
   const onSelect = (vatValue: any) => {
     setValue('vatType', vatValue);
   };
 
-  const onPersonRegister = (value: any) => {
-    const isLetterPrefix = /^[\p{L}]{2}/u.test(value);
-    const prefixOne = value.substring(0, 1).toUpperCase();
-    const prefixTwo = value.substring(1, 2).toUpperCase();
-    let isLetterOne = validPrefixes.includes(prefixOne);
-    let isLetterTwo = validPrefixes.includes(prefixTwo);
-    if (isLetterOne && !isLetterTwo) {
-      setPersonRegister(value.toUpperCase());
-    }
-    if (isLetterOne && isLetterTwo && value.length <= 10) {
-      setPersonRegister(value.toUpperCase());
-      if (isLetterPrefix && value.length === 10) {
-        setValue('register', value);
-        getVatPayer({ variables: { register: value } });
-      } else {
-        reset({
-          buyer: null,
-        });
-      }
-    }
-  };
-
-  const onRegister = (value: any) => {
-    if (value.length <= 7) {
-      setBuyerRegister(value);
-      if (value.length === 7) {
-        setValue('register', value);
-        getVatPayer({ variables: { register: value } });
-      } else {
-        reset({
-          buyer: null,
-        });
-      }
-    }
-  };
-
-  const onInstitutionVatType = (boolean: boolean) => {
-    setIsCompany(boolean);
-    setPersonRegister('');
-    setBuyerRegister('');
-    reset({
-      buyer: null,
-    });
-  };
+  const options = validPrefixes.map((prefix) => ({
+    label: prefix,
+    value: prefix,
+  }));
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="auto" />
-
-      <View style={styles.logoContainer}>
-        <Image source={require('../../assets/icon/eBarimt_logo.png')} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.subtitle}>НӨАТ-ын баримтын төрөл</Text>
-      </View>
-
-      <View style={styles.cardContainer}>
-        <Surface style={[styles.card, vatType === '1' && styles.activeCard]}>
-          <TouchableRipple onPress={() => onSelect('1')} style={styles.cardTouchable} borderless>
-            <View style={styles.cardContent}>
-              <View style={styles.iconContainer}>
-                <Icon source="account-outline" size={60} color={vatType === '1' ? 'white' : '#a9a9a9'} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+            <View style={{ flex: 1 }}>
+              <View style={styles.logoContainer}>
+                <Image
+                  source={require('../../assets/icon/eBarimt_logo.png')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+                <Text style={styles.subtitle}>НӨАТ-ын баримтын төрөл</Text>
               </View>
-              <Text style={[vatType === '1' ? styles.activeCardText : styles.cardText]}>Хувь хүн</Text>
-            </View>
-          </TouchableRipple>
-        </Surface>
 
-        <Surface style={[styles.card, vatType === '3' && styles.activeCard]}>
-          <TouchableRipple onPress={() => onSelect('3')} style={styles.cardTouchable} borderless>
-            <View style={styles.cardContent}>
-              <View style={styles.iconContainer}>
-                <Icon source="bank" size={60} color={vatType === '3' ? 'white' : '#a9a9a9'} />
+              <View style={styles.cardContainer}>
+                <Surface style={[styles.card, vatType === '1' && styles.activeCard]}>
+                  <TouchableRipple onPress={() => onSelect('1')} style={styles.cardTouchable} borderless>
+                    <View style={styles.cardContent}>
+                      <View style={styles.iconContainer}>
+                        <Icon source="account-outline" size={60} color={vatType === '1' ? 'white' : '#a9a9a9'} />
+                      </View>
+                      <Text style={[vatType === '1' ? styles.activeCardText : styles.cardText]}>Хувь хүн</Text>
+                    </View>
+                  </TouchableRipple>
+                </Surface>
+
+                <Surface style={[styles.card, vatType === '3' && styles.activeCard]}>
+                  <TouchableRipple onPress={() => onSelect('3')} style={styles.cardTouchable} borderless>
+                    <View style={styles.cardContent}>
+                      <View style={styles.iconContainer}>
+                        <Icon source="bank" size={60} color={vatType === '3' ? 'white' : '#a9a9a9'} />
+                      </View>
+                      <Text style={[vatType === '3' ? styles.activeCardText : styles.cardText]}>Татвар төлөгч</Text>
+                    </View>
+                  </TouchableRipple>
+                </Surface>
               </View>
-              <Text style={[vatType === '3' ? styles.activeCardText : styles.cardText]}>Байгууллага</Text>
+              {vatType === '3' && (
+                <View>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      marginVertical: 8,
+                    }}
+                  >
+                    <Text style={styles.subtitle}>Татвар төлөгчийн төрөл</Text>
+                  </View>
+                  <View style={styles.cardContainer}>
+                    <SegmentedButtons
+                      value={companyType}
+                      onValueChange={onChangeSegmen}
+                      density="regular"
+                      theme={{ colors: { primary: 'green', borderRadius: 10 } }}
+                      style={{ marginTop: 6, width: '42%', borderRadius: 10 }}
+                      buttons={[
+                        {
+                          value: 'company',
+                          checkedColor: 'white',
+                          uncheckedColor: '#525252',
+                          labelStyle: {
+                            fontSize: 16,
+                            fontWeight: 'bold',
+                          },
+                          style: {
+                            borderRadius: 12,
+                            paddingVertical: 10,
+                            backgroundColor: companyType === 'company' ? defaultColor : '#efefef',
+                            borderColor: 'transparent',
+                          },
+                          label: 'Байгууллага',
+                        },
+                        {
+                          value: 'person',
+                          checkedColor: 'white',
+                          uncheckedColor: '#525252',
+                          labelStyle: {
+                            fontSize: 16,
+                            fontWeight: 'bold',
+                          },
+                          style: {
+                            borderRadius: 12,
+                            paddingVertical: 10,
+                            backgroundColor: companyType === 'person' ? defaultColor : '#efefef',
+                            borderColor: 'transparent',
+                          },
+                          label: 'Иргэн',
+                        },
+                      ]}
+                    />
+                  </View>
+
+                  {companyType === 'company' ? (
+                    <View style={styles.inputContainer}>
+                      <RegisterForm
+                        control={control}
+                        style={{ width: '42%' }}
+                        name="companyRegister"
+                        label="Байгууллагын регистрийн дугаар "
+                        mode="outlined"
+                        keyboardType="numeric"
+                        right={
+                          isError ? (
+                            <TextInput.Icon icon="alert-circle-outline" color="#9b1c1c" />
+                          ) : !isEmpty(buyer) ? (
+                            <TextInput.Icon icon="check-circle-outline" color="#1ecb84" />
+                          ) : (
+                            loading && <TextInput.Icon icon="loading" color={defaultColor} />
+                          )
+                        }
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.inputContainer}>
+                      <PaperDropdown
+                        option={fistLetter}
+                        options={options}
+                        onSelect={(value) => setValue('fistLetter', value)}
+                      />
+
+                      <PaperDropdown
+                        option={secondLetter}
+                        options={options}
+                        onSelect={(value) => setValue('secondLetter', value)}
+                      />
+                      <RegisterForm
+                        control={control}
+                        style={{ width: '28%' }}
+                        name="personRegister"
+                        label="Регистрийн дугаар "
+                        mode="outlined"
+                        keyboardType="numeric"
+                        right={
+                          isError ? (
+                            <TextInput.Icon icon="alert-circle-outline" color="#9b1c1c" />
+                          ) : !isEmpty(buyer) ? (
+                            <TextInput.Icon icon="check-circle-outline" color="#1ecb84" />
+                          ) : (
+                            loading && <TextInput.Icon icon="loading" color={defaultColor} />
+                          )
+                        }
+                      />
+                    </View>
+                  )}
+                  {!isEmpty(buyer) && (
+                    <View style={styles.inputContainer}>
+                      <RegisterForm
+                        control={control}
+                        style={{ width: '42%' }}
+                        name="buyer"
+                        label={` ${companyType === 'company' ? 'Байгууллагын нэр' : 'Татвар төлөгчийн нэр'}   `}
+                        mode="outlined"
+                        keyboardType="numeric"
+                        isRead
+                      />
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
-          </TouchableRipple>
-        </Surface>
-      </View>
-      {vatType === '3' && (
-        <View style={styles.cardContainer}>
-          <Text>asd</Text>
-        </View>
-      )}
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
       <View style={styles.bottomContainer}>
-        <Button
-          mode="outlined"
-          style={styles.backButton}
-          labelStyle={styles.backButtonText}
-          contentStyle={styles.buttonContent}
-          onPress={() => console.log('Back pressed')}
-        >
-          Буцах
-        </Button>
+        <TouchableOpacity style={styles.footerButton} onPress={() => router.back()}>
+          <Text style={styles.footerButtonText}>{t('mainPage.GoBack')}</Text>
+        </TouchableOpacity>
 
-        <Button
-          mode="contained"
-          style={styles.continueButton}
-          labelStyle={styles.continueButtonText}
-          contentStyle={styles.buttonContent}
-          onPress={() => console.log('Continue pressed')}
+        <TouchableOpacity
+          style={vatType === '3' && isEmpty(buyer) ? styles.disableButton : styles.continueButton}
+          disabled={vatType === '3' && isEmpty(buyer)}
+          onPress={onSubmit}
         >
-          Үргэлжлүүлэх (1) 10 MNT
-        </Button>
+          <Text style={styles.continueButtonText}>{t('mainPage.Confirmation')}</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -221,8 +365,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
-  buttonContent: {
-    height: 52,
+  inputContainer: {
+    marginTop: 10,
+    gap: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   card: {
     width: '20%',
@@ -302,6 +450,12 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     backgroundColor: defaultColor,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  disableButton: {
+    backgroundColor: '#f0f0f0',
     paddingVertical: 18,
     paddingHorizontal: 24,
     borderRadius: 12,

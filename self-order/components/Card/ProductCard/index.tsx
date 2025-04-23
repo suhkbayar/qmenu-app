@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Icon, Text } from 'react-native-paper';
+import { View, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { FAB, Icon, Text } from 'react-native-paper';
 import { IMenuProduct, IOrderItem } from '@/types';
 import { CalculateProductPrice } from '@/tools/calculate';
 import { defaultColor } from '@/constants/Colors';
@@ -118,51 +118,42 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQua
           <Text style={styles.description} numberOfLines={2}>
             {product.description}
           </Text>
-          {product.variants && <CalculateProductPrice variants={product.variants} />}
         </View>
 
         {participant?.orderable && (
           <>
             {isConfigurable(product) ? (
               <View style={styles.addButtonContainer}>
-                <TouchableOpacity style={styles.smallButton} onPress={() => goProductInfo()}>
-                  <Icon source="cart-outline" color={defaultColor} size={16} />
-                  <Text style={styles.smallButtonText}>{t('mainPage.Enter')}</Text>
-                </TouchableOpacity>
+                {product.variants && <CalculateProductPrice variants={product.variants} />}
+
+                <FAB animated icon="plus" size="small" style={styles.fab} onPress={increase} color="white" />
               </View>
             ) : (
-              <>
+              <View style={styles.addButtonContainer}>
+                {product.variants && <CalculateProductPrice variants={product.variants} />}
                 {quantity > 0 ? (
-                  <View style={styles.buttonContainer}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        decrease();
-                      }}
-                      style={[styles.button, styles.buttonWhite]}
-                    >
-                      <Icon source="minus" color={defaultColor} size={16} />
-                    </TouchableOpacity>
-
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 18,
+                    }}
+                  >
+                    <FAB
+                      animated
+                      icon="minus"
+                      size="small"
+                      style={styles.secondfab}
+                      onPress={decrease}
+                      color={defaultColor}
+                    />
                     <Text style={styles.quantityText}>{quantity}</Text>
-
-                    <TouchableOpacity
-                      onPress={() => {
-                        increase();
-                      }}
-                      style={styles.fullAddButton}
-                    >
-                      <Icon source="plus" color="#fff" size={16} />
-                    </TouchableOpacity>
+                    <FAB animated icon="plus" size="small" style={styles.fab} onPress={increase} color="white" />
                   </View>
                 ) : (
-                  <View style={styles.addButtonContainer}>
-                    <TouchableOpacity style={styles.smallButton} onPress={increase}>
-                      <Icon source="cart-outline" color={defaultColor} size={16} />
-                      <Text style={styles.smallButtonText}>{t('mainPage.Order')}</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <FAB animated icon="plus" size="small" style={styles.fab} onPress={increase} color="white" />
                 )}
-              </>
+              </View>
             )}
           </>
         )}
@@ -173,7 +164,7 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQua
 
 const styles = StyleSheet.create({
   card: {
-    width: '23%',
+    width: '32%',
     backgroundColor: '#fff',
     marginVertical: 7,
     marginHorizontal: 7,
@@ -182,42 +173,31 @@ const styles = StyleSheet.create({
     elevation: 4,
     position: 'relative',
   },
-
   smallButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 2,
-    borderColor: defaultColor,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 60,
+    display: 'flex',
   },
   smallButtonText: {
-    color: defaultColor,
-    fontSize: 12,
-    fontWeight: '500',
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
   },
   image: {
-    height: 120,
+    height: 220,
     width: '100%',
   },
   info: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     paddingBottom: 0,
-    gap: 2,
+    gap: 4,
   },
   name: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '700',
     color: '#333',
   },
   description: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     color: '#77798c',
   },
@@ -250,9 +230,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  fab: {
+    backgroundColor: defaultColor,
+    width: 56,
+    height: 56,
+    borderRadius: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  secondfab: {
+    backgroundColor: 'white',
+    width: 56,
+    borderColor: '#f0f0f0',
+    borderWidth: 1,
+    height: 56,
+    borderRadius: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   button: {
     borderRadius: 12,
-    paddingVertical: 6,
+    paddingVertical: 10,
     paddingHorizontal: 20,
   },
   buttonWhite: {
@@ -269,21 +267,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   quantityText: {
-    fontSize: 16,
+    fontSize: 20,
     color: '#555',
+    fontWeight: '700',
   },
   addButtonContainer: {
-    padding: 10,
-  },
-  buttonContainer: {
     padding: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  buttonContainer: {
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
   fullAddButton: {
     backgroundColor: defaultColor,
-    paddingVertical: 6,
+    paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 10,
     flexDirection: 'row',

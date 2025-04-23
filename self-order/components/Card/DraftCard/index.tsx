@@ -2,8 +2,8 @@ import { CURRENCY } from '@/constants';
 import { defaultColor } from '@/constants/Colors';
 import { IOrderItem } from '@/types';
 import React from 'react';
-import { FlatList, View, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Text, Icon } from 'react-native-paper';
+import { FlatList, View, Image, StyleSheet } from 'react-native';
+import { Text, FAB } from 'react-native-paper';
 
 type Props = {
   items: IOrderItem[];
@@ -17,9 +17,7 @@ export default function DraftList({ items, increase, decrease }: Props) {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        marginVertical: 12,
       }}
     >
       <Image
@@ -32,25 +30,30 @@ export default function DraftList({ items, increase, decrease }: Props) {
           {item.price.toLocaleString()} {CURRENCY}
         </Text>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <TouchableOpacity
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        <FAB
+          animated
+          icon="minus"
+          size="small"
+          style={styles.secondfab}
           onPress={() => {
             decrease(item.uuid);
           }}
-          style={[styles.button, styles.buttonWhite]}
-        >
-          <Icon source="minus" color={defaultColor} size={16} />
-        </TouchableOpacity>
+          color={defaultColor}
+        />
 
-        <Text style={{ fontSize: 16, color: '#555', fontWeight: '600' }}>{item.quantity}</Text>
-        <TouchableOpacity
+        <Text style={{ fontSize: 16, color: '#555', fontWeight: '700' }}>{item.quantity}</Text>
+
+        <FAB
+          animated
+          icon="plus"
+          size="small"
+          style={styles.fab}
           onPress={() => {
             increase(item.uuid);
           }}
-          style={styles.fullAddButton}
-        >
-          <Icon source="plus" color="#fff" size={16} />
-        </TouchableOpacity>
+          color="white"
+        />
       </View>
     </View>
   );
@@ -60,27 +63,27 @@ export default function DraftList({ items, increase, decrease }: Props) {
       data={items}
       keyExtractor={(item) => item.uuid}
       renderItem={renderItem}
-      contentContainerStyle={{ paddingVertical: 8 }}
+      contentContainerStyle={{ paddingVertical: 8, marginHorizontal: 14 }}
     />
   );
 }
 const styles = StyleSheet.create({
-  fullAddButton: {
-    backgroundColor: defaultColor,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    flexDirection: 'row',
+  secondfab: {
+    backgroundColor: 'white',
+    width: 46,
+    borderColor: '#f0f0f0',
+    borderWidth: 1,
+    height: 46,
+    borderRadius: 999,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  button: {
-    borderRadius: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-  },
-  buttonWhite: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: defaultColor,
+  fab: {
+    backgroundColor: defaultColor,
+    width: 46,
+    height: 46,
+    borderRadius: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

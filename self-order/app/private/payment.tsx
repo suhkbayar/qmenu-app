@@ -1,8 +1,11 @@
 import { useCallStore } from '@/cache/cart.store';
 import Loader from '@/components/Loader';
+import PayCashierModal from '@/components/Modal/PayCashierModal';
 import PaymentModal from '@/components/Modal/PendingTransaction';
+import OrderInfo from '@/components/OrderInfo';
+import CashForm from '@/components/PaymentForms/cash';
 import QpayForm from '@/components/PaymentForms/qpay';
-import { emptyOrder, PAYMENT_TYPE } from '@/constants';
+import { CURRENCY, emptyOrder, PAYMENT_TYPE } from '@/constants';
 import { defaultColor } from '@/constants/Colors';
 import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/graphql/mutation/order';
 import { GET_ORDER, GET_ORDERS } from '@/graphql/query';
@@ -14,20 +17,23 @@ import { IOrder, ITransaction } from '@/types';
 import { useMutation, useQuery, useSubscription } from '@apollo/client';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Icon } from 'react-native-paper';
 import { useToast } from 'react-native-toast-notifications';
 
 const Payment = () => {
+  const { t } = useTranslation('language');
   const { orderId } = useLocalSearchParams();
   const [order, setOrder] = useState<IOrder>();
   const toast = useToast();
-  const { setOrderState } = useOrder();
+  const { orderState, setOrderState } = useOrder();
   const { setDrawerVisible } = useDraw();
   const [transaction, setTransaction] = useState<ITransaction>();
   const [visiblePending, setVisiblePending] = useState(false);
   const { participant } = useCallStore();
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [visibleCash, setVisibleCash] = useState(false);
 
   useEffect(() => {
     const fetchPayload = async () => {
@@ -37,10 +43,6 @@ const Payment = () => {
 
     fetchPayload();
   }, []);
-
-  useEffect(() => {
-    console.log('customerId', customerId);
-  }, [customerId]);
 
   useSubscription(ON_UPDATED_ORDER, {
     variables: { customer: customerId },
@@ -139,12 +141,35 @@ const Payment = () => {
     },
   });
 
+  const [payOrderByCash, { loading: cashing }] = useMutation(GET_PAY_ORDER, {
+    onCompleted: (data) => {
+      if (data && data?.payOrder) {
+        setVisibleCash(false);
+        router.push({
+          pathname: '/private/payment-success',
+          params: { orderId: orderId },
+        });
+      }
+
+      setVisiblePending(true);
+    },
+    onError(err) {
+      toast.show(err.message, {
+        type: 'warning',
+        icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
+        placement: 'top',
+        warningColor: defaultColor,
+        duration: 4000,
+        animationType: 'slide-in',
+      });
+    },
+  });
+
   const [payOrderByPayment, { loading: paying }] = useMutation(GET_PAY_ORDER, {
     onCompleted: (data) => {
       if (data && data?.payOrder) {
         setTransaction(data.payOrder.transaction);
       }
-
       setVisiblePending(true);
     },
     onError(err) {
@@ -195,7 +220,8 @@ const Payment = () => {
       confirm: false,
       order: order.id,
       payment: paymentId,
-      vatType: 0,
+      register: orderState.register,
+      vatType: participant?.vat ? orderState.vatType : 0,
     };
 
     payOrderByPayment({
@@ -205,7 +231,30 @@ const Payment = () => {
     });
   };
 
+  const onCash = async () => {
+    if (!order) return;
+
+    let input = {
+      confirm: true,
+      order: order.id,
+      payment: '',
+      register: orderState.register,
+      vatType: participant?.vat ? orderState.vatType : 0,
+    };
+
+    payOrderByCash({
+      variables: {
+        input: { ...input },
+      },
+    });
+  };
+
   const onSelectBank = (type?: any, id?: string) => {
+    if (type === 'Cash') {
+      setVisibleCash(true);
+      return;
+    }
+
     if (id) {
       onSubmit(id);
     }
@@ -232,8 +281,9 @@ const Payment = () => {
     <View style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>Таны төлбөр</Text>
-        <Text style={styles.amount}>{order.totalAmount.toFixed(2)} MNT</Text>
-
+        <Text style={styles.amount}>
+          {order.totalAmount.toLocaleString()} {CURRENCY}
+        </Text>
         <Text style={styles.subtitle}>Та төлбөрийн сувагaa сонгоно уу.</Text>
         <View
           style={{
@@ -250,12 +300,14 @@ const Payment = () => {
             onSelect={onSelectBank}
             loading={paying}
           />
+          {!participant?.advancePayment && <CashForm onSelect={onSelectBank} />}
         </View>
+        {order && <OrderInfo order={order} />}
       </View>
 
       <View style={styles.footer}>
         <TouchableOpacity style={styles.footerButton} onPress={() => router.back()}>
-          <Text style={styles.footerButtonText}>Буцах</Text>
+          <Text style={styles.footerButtonText}>{t('mainPage.GoBack')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -266,7 +318,7 @@ const Payment = () => {
             setDrawerVisible(false);
           }}
         >
-          <Text style={styles.footerButtonText}>Шинэ захиалга</Text>
+          <Text style={styles.footerButtonText}>{t('mainPage.NewOrder')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -283,6 +335,15 @@ const Payment = () => {
           }}
         />
       )}
+
+      <PayCashierModal
+        visible={visibleCash}
+        loading={cashing}
+        onClose={() => {
+          setVisibleCash(false);
+        }}
+        onConfirm={() => onCash()}
+      />
     </View>
   );
 };
@@ -304,11 +365,20 @@ const styles = StyleSheet.create({
     color: '#4B5563',
     marginBottom: 8,
   },
+
+  summary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '20%',
+    gap: 16,
+  },
+
   amount: {
     fontSize: 24,
     fontWeight: '700',
     color: '#facc15',
-    marginBottom: 24,
+    marginBottom: 10,
   },
   subtitle: {
     fontSize: 16,

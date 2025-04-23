@@ -55,9 +55,14 @@ const HelpFloatingButton = () => {
 
 const styles = StyleSheet.create({
   fab: {
-    backgroundColor: defaultColor,
+    backgroundColor: '#EB1833',
     borderRadius: 999, // <- ensures full circle
     elevation: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    fontSize: 10,
+    width: 66,
+    height: 66,
     bottom: 76,
   },
 });
