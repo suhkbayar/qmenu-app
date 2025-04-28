@@ -16,11 +16,18 @@
     "AboutQmenu": "O qmenu",
     "login": "Авторизоваться",
     "register": "регистр",
+    "NotPaidDescription": "Ваш счёт не был оплачен.",
+    "citizen": "Гражданин",
+    "scan_qr_code": "Отсканируйте QR-код, чтобы оплатить",
+    "SelectYourPaymentChannel": "Выберите способ оплаты",
+    "your_payment": "Ваш платеж",
+    "taxpayer_type": "Тип налогоплательщика",
     "RestaurantRegistration": "Регистрация ресторана",
     "bannerTitle1": "Экономьте свое время, ищите рестораны...",
     "searchPlaceholder": "Название ресторана, название еды...",
     "RestaurantType": "Тип ресторана",
     "Restaurant": "Ресторан",
+    "enter_registration_number": "Введите регистрационный номер",
     "Bar": "Бар",
     "CoffeeShop": "Кофейный магазин",
     "Karaoke": "Караоке",
@@ -287,6 +294,9 @@
     "chooseOption": "Выберите желаемый вариант",
     "extra": "Дополнительно",
     "chooseIngredients": "Можно выбрать дополнительные ингредиенты ниже",
-    "writeRequest": "Вы можете написать дополнительный запрос"
+    "writeRequest": "Вы можете написать дополнительный запрос",
+    "tax_payer": "Налогоплательщик",
+    "call_waiter": "Позвать официанта",
+    "request_bill": "Попросить счёт"
   }
 }

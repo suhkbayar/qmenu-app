@@ -57,7 +57,7 @@ const PaymentSuccess = () => {
           setDrawerVisible(false);
         }}
       >
-        Шинэ захиалга
+        {t('mainPage.NewOrder')}
       </Button>
     </View>
   );

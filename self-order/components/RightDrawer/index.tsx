@@ -1,59 +1,73 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Dimensions, StyleSheet, View, Pressable } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, TouchableWithoutFeedback } from 'react-native';
+import { Modal, Portal } from 'react-native-paper';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const DRAWER_WIDTH = SCREEN_WIDTH * 0.4;
-
-interface Props {
+interface RightDrawerProps {
   visible: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  width?: number;
 }
 
-const RightDrawer: React.FC<Props> = ({ visible, onClose, children }) => {
-  const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
-
-  useEffect(() => {
-    Animated.timing(translateX, {
-      toValue: visible ? 0 : DRAWER_WIDTH,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
-  }, [visible]);
+const RightDrawer: React.FC<RightDrawerProps> = ({
+  visible,
+  onClose,
+  children,
+  width = 450, // Default width
+}) => {
+  // Animation value for drawer sliding
 
   return (
-    <>
-      {visible && <Pressable style={styles.overlay} onPress={onClose} />}
-      <Animated.View
-        style={[
-          styles.drawer,
-          {
-            transform: [{ translateX }],
-          },
-        ]}
-      >
-        {children}
-      </Animated.View>
-    </>
+    <Portal>
+      <Modal visible={visible} onDismiss={onClose} contentContainerStyle={styles.modalContainer}>
+        <View style={styles.container}>
+          <TouchableWithoutFeedback onPress={onClose}>
+            <View style={styles.backdrop} />
+          </TouchableWithoutFeedback>
+          <View
+            style={[
+              styles.drawer,
+              {
+                width: width,
+              },
+            ]}
+          >
+            {children}
+          </View>
+        </View>
+      </Modal>
+    </Portal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    zIndex: 1,
+  modalContainer: {
+    margin: 0,
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   drawer: {
+    height: '100%',
     position: 'absolute',
-    right: 0,
     top: 0,
+    right: 0,
     bottom: 0,
-    width: DRAWER_WIDTH,
-    backgroundColor: '#fff',
-    elevation: 8,
-    zIndex: 2,
-    padding: 16,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: -2,
+      height: 0,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
 

@@ -1,5 +1,6 @@
 import { CURRENCY } from '@/constants';
 import { IOrder } from '@/types';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, Text } from 'react-native';
 
 type OrderInfoProps = {
@@ -7,6 +8,7 @@ type OrderInfoProps = {
 };
 
 const OrderInfo = ({ order }: OrderInfoProps) => {
+  const { t } = useTranslation('language');
   const orderTaxSum = order && Math.abs(order?.taxAmount + order?.vatAmount + order?.cityTax).toLocaleString();
 
   return (
@@ -17,19 +19,19 @@ const OrderInfo = ({ order }: OrderInfoProps) => {
       }}
     >
       <View style={styles.summary}>
-        <Text style={styles.amountTitle}>Татвар,хураамж:</Text>
+        <Text style={styles.amountTitle}>{t('mainPage.Tax')}:</Text>
         <Text style={styles.total}>
           {orderTaxSum} {CURRENCY}
         </Text>
       </View>
       <View style={styles.summary}>
-        <Text style={styles.amountTitle}>Хөнгөлөлт:</Text>
+        <Text style={styles.amountTitle}>{t('mainPage.Discount')}:</Text>
         <Text style={styles.total}>
           {order.discountAmount.toLocaleString()} {CURRENCY}
         </Text>
       </View>
       <View style={styles.summary}>
-        <Text style={styles.amountTitle}>Нийт дүн:</Text>
+        <Text style={styles.amountTitle}>{t('mainPage.Total')}:</Text>
         <Text style={styles.summaryTotal}>
           {order.totalAmount.toLocaleString()} {CURRENCY}
         </Text>

@@ -13,15 +13,22 @@
     "aboutResort": "Dam olish maskani haqida   ",
     "aboutOther": "Haqida",
     "today": "Bugun",
+    "NotPaidDescription": "Sizning hisobingiz to'lanmagan",
     "AboutQmenu": "Qmenu haqida",
     "login": "Tizimga kirish",
+    "citizen": "Fuqarolik",
+    "your_payment": "To'lovingiz",
+    "scan_qr_code": "To'lov qilish uchun QR kodni skaner qiling",
+    "SelectYourPaymentChannel": "To'lov kanalingizni tanlang",
     "register": "Ro'yxatdan o'tish",
+    "taxpayer_type": "Soliq to‘lovchi turi",
     "RestaurantRegistration": "Restoranni ro'yxatdan o'tkazish",
     "bannerTitle1": "Vaqtingizni tejang, restoranlarni qidiring...",
     "searchPlaceholder": "Restoran nomi, ovqat nomi ...",
     "RestaurantType": "Restoran turi",
     "Restaurant": "Restoran",
     "Bar": "Bar",
+    "enter_registration_number": "Ro‘yxatga olish raqamini kiriting",
     "CoffeeShop": "Qahvaxona",
     "PREPARING": "tayyorlanmoqda",
     "PREPARED": "Tayyorlangan",
@@ -309,6 +316,9 @@
     "chooseOption": "Istalgan variantni tanlang",
     "extra": "Qo‘shimcha",
     "chooseIngredients": "Quyidagi ingredientlardan qo‘shimcha tanlashingiz mumkin",
-    "writeRequest": "Qo‘shimcha so‘rov yozishingiz mumkin"
+    "writeRequest": "Qo‘shimcha so‘rov yozishingiz mumkin",
+    "tax_payer": "Soliq to‘lovchi",
+    "call_waiter": "Ofitsiantni chaqirish",
+    "request_bill": "Hisobni so‘rash"
   }
 }

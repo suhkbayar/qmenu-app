@@ -129,7 +129,7 @@ export interface IOrderItem {
   productId?: string;
   // variant: IVariant;
   variantName?: string;
-  options: IOrderItemOptions[];
+  options: any[];
   createdAt?: Date;
   updatedAt?: Date;
   completedAt?: Date;

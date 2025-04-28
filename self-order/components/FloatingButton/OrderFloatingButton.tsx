@@ -1,56 +1,55 @@
-import { FAB } from 'react-native-paper';
+import React, { useCallback, memo, useState, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { FAB } from 'react-native-paper';
 import { ICustomerOrder } from '@/types';
 import CustomBadge from '../Badge';
+import DraftOrder from '../DraftOrder';
 
 type Props = {
   order: ICustomerOrder;
-  setDrawerVisible: (visible: boolean) => void;
+  drawStore: (value: boolean) => void;
 };
 
-const OrderFloatingButton = ({ order, setDrawerVisible }: Props) => {
+// Make sure to export a function component, not an object
+const OrderFloatingButton = memo(({ order }: Props) => {
+  const [drawerVisible, setDrawerVisible] = useState(false);
+
+  const handlePress = useCallback(() => {
+    setDrawerVisible(true);
+  }, [setDrawerVisible]);
+
+  const onCloseModal = useCallback(() => {
+    setDrawerVisible(false);
+  }, [setDrawerVisible]);
+
+  const showBadge = (order?.totalQuantity || 0) > 0;
+
   return (
-    <>
-      <View style={styles.container}>
-        <FAB
-          icon="cart-outline"
-          style={styles.fab}
-          onPress={() => {
-            setDrawerVisible(true);
-          }}
-          color="white"
-        />
-        {order?.totalQuantity > 0 && <CustomBadge value={order?.totalQuantity} />}
-      </View>
-    </>
+    <View style={styles.container}>
+      <FAB animated={false} icon="cart-outline" style={styles.fab} onPress={handlePress} color="white" />
+      {showBadge && <CustomBadge value={order?.totalQuantity || 0} />}
+      <DraftOrder visible={drawerVisible} onCloseModal={onCloseModal} />
+    </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     right: 16,
-
     bottom: 16,
   },
   fab: {
     backgroundColor: '#EB1833',
-    width: 66,
-    height: 66,
+    width: 70,
+    height: 70,
     borderRadius: 999,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    fontSize: 14,
-    borderColor: 'white',
-    borderWidth: 2,
-    backgroundColor: '#EB1833',
-    color: 'white',
-    fontWeight: '700',
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

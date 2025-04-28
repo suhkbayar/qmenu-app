@@ -1,65 +1,88 @@
-import React, { useEffect, useState } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useCallback, memo } from 'react';
+import { View, Image, StyleSheet, TouchableOpacity, ImageSourcePropType } from 'react-native';
 import { FAB, Icon, Text } from 'react-native-paper';
-import { IMenuProduct, IOrderItem } from '@/types';
+import { IMenuProduct, IOrderItem, IMenuVariant } from '@/types';
 import { CalculateProductPrice } from '@/tools/calculate';
 import { defaultColor } from '@/constants/Colors';
-import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import { useCallStore } from '@/cache/cart.store';
 import { isConfigurable } from '@/utils';
+
 interface Props {
   product: IMenuProduct;
   orderItem?: IOrderItem;
   drawerVisible: boolean;
   onQuantityChange: (product: IMenuProduct, quantity: number) => void;
+  languageKey?: string; // Add a language key prop to force re-renders on language change
 }
 
-const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQuantityChange }) => {
-  const [quantity, setQuantity] = useState(0);
-  const { participant } = useCallStore();
-  const [loading, setLoading] = useState(false);
-  const { t } = useTranslation('language');
+// Fix the variants typing
+interface PriceComponentProps {
+  variants: IMenuVariant[];
+}
 
-  const increase = () => {
+interface ProductImageProps {
+  source: ImageSourcePropType;
+  style: object;
+  onPress: () => void;
+}
+
+// Memoize the CalculateProductPrice component to prevent re-renders
+const MemoizedPriceComponent = memo(({ variants }: PriceComponentProps) => (
+  <CalculateProductPrice variants={variants} />
+));
+
+// Memoize the product image to prevent re-renders
+const ProductImage = memo(({ source, style, onPress }: ProductImageProps) => (
+  // <TouchableOpacity onPress={onPress}>
+  <Image source={source} style={style} resizeMode="cover" />
+  // </TouchableOpacity>
+));
+
+const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQuantityChange, languageKey }) => {
+  const [quantity, setQuantity] = useState<number>(0);
+  const { participant } = useCallStore();
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const increase = useCallback(() => {
     if (loading) return;
 
     const { variants } = product;
     if (!variants || variants.length === 0) return;
+
     if (variants.length > 1) {
       goProductInfo();
     } else {
-      variants.forEach((item) => {
-        if (item?.options?.length > 0) {
-          goProductInfo();
-          return;
-        } else {
-          const newQty = quantity + 1;
-          setQuantity(newQty);
-          onQuantityChange(product, newQty);
-        }
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (drawerVisible) {
-      if (orderItem) {
-        setQuantity(orderItem.quantity);
+      if (variants[0]?.options?.length > 0) {
+        goProductInfo();
       } else {
-        setQuantity(0);
+        const newQty = quantity + 1;
+        setQuantity(newQty);
+        onQuantityChange(product, newQty);
       }
     }
-  }, [orderItem, drawerVisible]);
+  }, [loading, product, quantity, onQuantityChange]);
 
-  const decrease = () => {
+  useEffect(() => {
+    if (product?.productId && orderItem?.productId) {
+      const newQuantity = orderItem ? orderItem.quantity : 0;
+      if (newQuantity !== quantity) {
+        setQuantity(newQuantity);
+      }
+    } else {
+      setQuantity(0);
+    }
+  }, [orderItem]);
+
+  const decrease = useCallback(() => {
+    console.log('decrease');
     if (quantity === 0) return;
     const newQty = quantity - 1;
     setQuantity(newQty);
     onQuantityChange(product, newQty);
-  };
+  }, [quantity, product, onQuantityChange]);
 
-  const goProductInfo = async () => {
+  const goProductInfo = useCallback(async () => {
     if (loading) return;
 
     try {
@@ -77,88 +100,70 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQua
         setLoading(false);
       }, 300);
     }
+  }, [loading, product]);
+
+  // Prepare image source only once
+  const imageSource = product.image ? { uri: product.image } : require('../../../assets/images/noImage.jpg');
+
+  // Only render controls if the participant is orderable
+  const renderControls = () => {
+    if (!participant?.orderable) return null;
+
+    if (isConfigurable(product)) {
+      return (
+        <View style={styles.addButtonContainer}>
+          {product.variants && <MemoizedPriceComponent variants={product.variants} />}
+          <TouchableOpacity onPress={increase}>
+            <FAB animated={false} icon="plus" size="small" style={styles.fab} color="white" />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.addButtonContainer}>
+        {product.variants && <MemoizedPriceComponent variants={product.variants} />}
+        {quantity > 0 ? (
+          <View style={styles.quantityControls}>
+            <TouchableOpacity activeOpacity={10} onPress={decrease}>
+              <FAB animated={false} icon="minus" size="small" style={styles.secondfab} color={defaultColor} />
+            </TouchableOpacity>
+            <Text style={styles.quantityText}>{quantity}</Text>
+            <TouchableOpacity activeOpacity={10} onPress={increase}>
+              <FAB animated={false} icon="plus" size="small" style={styles.fab} color="white" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity activeOpacity={10} onPress={increase}>
+            <FAB animated={false} icon="plus" size="small" style={styles.fab} color="white" />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
   };
 
   return (
-    <>
-      <View style={styles.card}>
-        <TouchableOpacity onPress={increase}>
-          <Image
-            source={product.image ? { uri: product.image } : require('../../../assets/images/noImage.jpg')}
-            style={styles.image}
-            resizeMode="cover"
-          />
-          <TouchableOpacity
-            style={{
-              position: 'absolute',
-              top: 6,
-              right: 6,
-            }}
-            onPress={() => {
-              goProductInfo();
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.4)', // semi-transparent white background
-                borderRadius: 4,
-                padding: 6,
-              }}
-            >
-              <Icon source="eye" size={20} color="#bababa" />
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+    <View style={styles.card}>
+      <ProductImage source={imageSource} style={styles.image} onPress={increase} />
 
-        <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={1}>
-            {product.name}
-          </Text>
-
-          <Text style={styles.description} numberOfLines={2}>
-            {product.description}
-          </Text>
+      <TouchableOpacity style={styles.infoButton} onPress={goProductInfo}>
+        <View style={styles.infoButtonBg}>
+          <Icon source="eye" size={30} color="#bababa" />
         </View>
+      </TouchableOpacity>
 
-        {participant?.orderable && (
-          <>
-            {isConfigurable(product) ? (
-              <View style={styles.addButtonContainer}>
-                {product.variants && <CalculateProductPrice variants={product.variants} />}
+      <View style={styles.info}>
+        <Text style={styles.name} numberOfLines={1}>
+          {product.name}
+        </Text>
 
-                <FAB animated icon="plus" size="small" style={styles.fab} onPress={increase} color="white" />
-              </View>
-            ) : (
-              <View style={styles.addButtonContainer}>
-                {product.variants && <CalculateProductPrice variants={product.variants} />}
-                {quantity > 0 ? (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 18,
-                    }}
-                  >
-                    <FAB
-                      animated
-                      icon="minus"
-                      size="small"
-                      style={styles.secondfab}
-                      onPress={decrease}
-                      color={defaultColor}
-                    />
-                    <Text style={styles.quantityText}>{quantity}</Text>
-                    <FAB animated icon="plus" size="small" style={styles.fab} onPress={increase} color="white" />
-                  </View>
-                ) : (
-                  <FAB animated icon="plus" size="small" style={styles.fab} onPress={increase} color="white" />
-                )}
-              </View>
-            )}
-          </>
-        )}
+        <Text style={styles.description} numberOfLines={2}>
+          {product.description}
+        </Text>
       </View>
-    </>
+
+      {renderControls()}
+    </View>
   );
 };
 
@@ -173,17 +178,19 @@ const styles = StyleSheet.create({
     elevation: 4,
     position: 'relative',
   },
-  smallButton: {
-    display: 'flex',
-  },
-  smallButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-  },
   image: {
     height: 220,
     width: '100%',
+  },
+  infoButton: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+  },
+  infoButtonBg: {
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    borderRadius: 4,
+    padding: 6,
   },
   info: {
     paddingHorizontal: 10,
@@ -201,34 +208,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#77798c',
   },
-  price: {
-    fontSize: 13,
-    color: '#888',
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  addButton: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-  },
-  badge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: '#f44336',
-    color: '#fff',
-  },
-  quantityContainer: {
-    marginTop: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  controlRow: {
+  quantityControls: {
     flexDirection: 'row',
-    width: '88%',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 18,
   },
   fab: {
     backgroundColor: defaultColor,
@@ -248,24 +231,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  button: {
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  buttonWhite: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: defaultColor,
-  },
-  buttonColored: {
-    backgroundColor: defaultColor,
-  },
-  icon: {
-    fontSize: 20,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
   quantityText: {
     fontSize: 20,
     color: '#555',
@@ -277,20 +242,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  buttonContainer: {
-    padding: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  fullAddButton: {
-    backgroundColor: defaultColor,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
 });
 
-export default ProductCard;
+// Export a memoized component with custom comparison function
+export default memo(ProductCard, (prevProps, nextProps) => {
+  // Force re-render if language changes
+  if (prevProps.languageKey !== nextProps.languageKey) {
+    return false;
+  }
+
+  // Force re-render if product name or description changes
+  if (
+    prevProps.product.name !== nextProps.product.name ||
+    prevProps.product.description !== nextProps.product.description
+  ) {
+    return false;
+  }
+
+  // Check other props that would cause a re-render
+  return (
+    prevProps.drawerVisible === nextProps.drawerVisible &&
+    prevProps.product.id === nextProps.product.id &&
+    prevProps.orderItem?.quantity === nextProps.orderItem?.quantity
+  );
+});

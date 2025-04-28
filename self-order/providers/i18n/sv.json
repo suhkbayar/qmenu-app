@@ -16,11 +16,18 @@
     "AboutQmenu": "Om Qmenu",
     "login": "Logga in",
     "register": "Registrera",
+    "scan_qr_code": "Skanna QR-koden för att göra din betalning",
+    "NotPaidDescription": "Din räkning har inte blivit betald.",
+    "citizen": "Medborgare",
+    "your_payment": "Din betalning",
+    "SelectYourPaymentChannel": "Välj din betalningskanal",
+    "taxpayer_type": "Skattebetalartyp",
     "RestaurantRegistration": "Restaurangregistrering",
     "bannerTitle1": "Spara din tid, sök restauranger...",
     "searchPlaceholder": "Restaurangnamn, matnamn...",
     "RestaurantType": "Typ av restaurang",
     "Restaurant": "Restaurang",
+    "enter_registration_number": "Ange registreringsnummer",
     "Bar": "Bar",
     "CoffeeShop": "Kafé",
     "Karaoke": "Karaoke",
@@ -310,6 +317,9 @@
     "chooseOption": "Välj det alternativ du vill ha",
     "extra": "Extra",
     "chooseIngredients": "Du kan välja fler ingredienser nedan",
-    "writeRequest": "Du kan skriva en extra begäran"
+    "writeRequest": "Du kan skriva en extra begäran",
+    "tax_payer": "Skattebetalare",
+    "call_waiter": "Kalla på servitör",
+    "request_bill": "Be om notan"
   }
 }

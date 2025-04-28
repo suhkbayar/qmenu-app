@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, Icon } from 'react-native-paper';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { ITransaction } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   visible: boolean;
@@ -15,6 +16,7 @@ const base64Types = ['QPay', 'QPay2'];
 
 const PaymentModal = ({ visible, onClose, refetch, transaction, loading }: Props) => {
   const isBase64 = base64Types.includes(transaction?.type || '');
+  const { t } = useTranslation('language');
 
   const renderQR = () => {
     if (isBase64) {
@@ -31,11 +33,11 @@ const PaymentModal = ({ visible, onClose, refetch, transaction, loading }: Props
           <Icon source="close" color="#4B5563" size={20} />
         </TouchableOpacity>
         <View style={styles.qrContainer}>{renderQR()}</View>
-        <Text style={styles.instruction}>QR кодыг уншуулан төлбөрөө төлнө үү</Text>
+        <Text style={styles.instruction}>{t('mainPage.scan_qr_code')}</Text>
 
         <TouchableOpacity style={styles.paidButton} onPress={() => refetch(transaction.id)}>
           {loading && <ActivityIndicator animating={true} size="small" color="#fff" />}
-          <Text style={styles.paidText}>Төлсөн</Text>
+          <Text style={styles.paidText}>{t('mainPage.Paid')}</Text>
         </TouchableOpacity>
       </View>
     </Modal>

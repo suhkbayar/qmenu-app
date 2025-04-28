@@ -29,7 +29,7 @@ const EbarimtScreen = () => {
   const toast = useToast();
   const { t } = useTranslation('language');
   const { orderId } = useLocalSearchParams();
-  const { orderState, setOrderState } = useOrder();
+  const { setOrderState } = useOrder();
 
   const [isError, setIsError] = useState<boolean>(false);
   const [companyType, setCompanyType] = useState<string>('company');
@@ -165,7 +165,7 @@ const EbarimtScreen = () => {
                   style={styles.logo}
                   resizeMode="contain"
                 />
-                <Text style={styles.subtitle}>НӨАТ-ын баримтын төрөл</Text>
+                <Text style={styles.subtitle}>{t('mainPage.VATreceipt')}</Text>
               </View>
 
               <View style={styles.cardContainer}>
@@ -175,7 +175,9 @@ const EbarimtScreen = () => {
                       <View style={styles.iconContainer}>
                         <Icon source="account-outline" size={60} color={vatType === '1' ? 'white' : '#a9a9a9'} />
                       </View>
-                      <Text style={[vatType === '1' ? styles.activeCardText : styles.cardText]}>Хувь хүн</Text>
+                      <Text style={[vatType === '1' ? styles.activeCardText : styles.cardText]}>
+                        {t('mainPage.Individual')}
+                      </Text>
                     </View>
                   </TouchableRipple>
                 </Surface>
@@ -186,7 +188,9 @@ const EbarimtScreen = () => {
                       <View style={styles.iconContainer}>
                         <Icon source="bank" size={60} color={vatType === '3' ? 'white' : '#a9a9a9'} />
                       </View>
-                      <Text style={[vatType === '3' ? styles.activeCardText : styles.cardText]}>Татвар төлөгч</Text>
+                      <Text style={[vatType === '3' ? styles.activeCardText : styles.cardText]}>
+                        {t('mainPage.tax_payer')}
+                      </Text>
                     </View>
                   </TouchableRipple>
                 </Surface>
@@ -200,7 +204,7 @@ const EbarimtScreen = () => {
                       marginVertical: 8,
                     }}
                   >
-                    <Text style={styles.subtitle}>Татвар төлөгчийн төрөл</Text>
+                    <Text style={styles.subtitle}>{t('mainPage.taxpayer_type')}</Text>
                   </View>
                   <View style={styles.cardContainer}>
                     <SegmentedButtons
@@ -224,7 +228,7 @@ const EbarimtScreen = () => {
                             backgroundColor: companyType === 'company' ? defaultColor : '#efefef',
                             borderColor: 'transparent',
                           },
-                          label: 'Байгууллага',
+                          label: t('mainPage.Institution'),
                         },
                         {
                           value: 'person',
@@ -240,7 +244,7 @@ const EbarimtScreen = () => {
                             backgroundColor: companyType === 'person' ? defaultColor : '#efefef',
                             borderColor: 'transparent',
                           },
-                          label: 'Иргэн',
+                          label: t('mainPage.citizen'),
                         },
                       ]}
                     />
@@ -252,7 +256,7 @@ const EbarimtScreen = () => {
                         control={control}
                         style={{ width: '42%' }}
                         name="companyRegister"
-                        label="Байгууллагын регистрийн дугаар "
+                        label={t('mainPage.OrganizationalRegisters')}
                         mode="outlined"
                         keyboardType="numeric"
                         right={
@@ -283,7 +287,7 @@ const EbarimtScreen = () => {
                         control={control}
                         style={{ width: '28%' }}
                         name="personRegister"
-                        label="Регистрийн дугаар "
+                        label={t('mainPage.enter_registration_number')}
                         mode="outlined"
                         keyboardType="numeric"
                         right={

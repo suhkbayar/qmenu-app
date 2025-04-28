@@ -15,11 +15,18 @@
     "today": "今日",
     "AboutQmenu": "Qメニューについて",
     "login": "ログイン",
+    "scan_qr_code": "QRコードをスキャンしてお支払いください",
     "register": "登録",
+    "NotPaidDescription": "請求書が支払われていません",
     "RestaurantRegistration": "レストラン登録",
     "bannerTitle1": "時間を節約し、レストランを検索...",
     "searchPlaceholder": "店名、料理名…",
     "RestaurantType": "レストランの種類",
+    "citizen": "市民",
+    "your_payment": "お支払い",
+    "SelectYourPaymentChannel": "支払いチャネルを選択してください",
+    "taxpayer_type": "納税者の種類",
+    "enter_registration_number": "登録番号を入力してください",
     "Restaurant": "レストラン",
     "Bar": "バー",
     "CoffeeShop": "喫茶店",
@@ -310,6 +317,9 @@
     "chooseOption": "ご希望のオプションをお選びください",
     "extra": "追加",
     "chooseIngredients": "以下の材料を追加で選べます",
-    "writeRequest": "追加のリクエストを書くことができます"
+    "writeRequest": "追加のリクエストを書くことができます",
+    "tax_payer": "納税者",
+    "call_waiter": "ウェイターを呼ぶ",
+    "request_bill": "お会計をお願いします"
   }
 }

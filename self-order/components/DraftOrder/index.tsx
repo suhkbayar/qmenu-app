@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import RightDrawer from '../RightDrawer';
 import { Icon, Text } from 'react-native-paper';
 import DraftList from '../Card/DraftCard';
@@ -13,17 +14,18 @@ import { router } from 'expo-router';
 import { isEmpty } from 'lodash';
 import { useCallStore } from '@/cache/cart.store';
 import { useTranslation } from 'react-i18next';
+import { useOrder } from '@/providers/OrderProvider';
 
 type Props = {
   visible: boolean;
-  onClose: () => void;
-  order: ICustomerOrder;
-  setOrder: (order: ICustomerOrder) => void;
+  onCloseModal: () => void;
 };
 
-const DraftOrder = ({ order, visible, onClose, setOrder }: Props) => {
+const DraftOrder = memo(({ visible, onCloseModal }: Props) => {
+  const { orderState, setOrderState } = useOrder();
   const { t } = useTranslation('language');
   const { participant } = useCallStore();
+
   const [createOrder, { loading }] = useMutation(CREATE_ORDER, {
     update(cache, { data: { createOrder } }) {
       const caches = cache.readQuery<{ getOrders: IOrder[] }>({ query: GET_ORDERS });
@@ -35,56 +37,66 @@ const DraftOrder = ({ order, visible, onClose, setOrder }: Props) => {
       }
     },
     onCompleted: async (data) => {
-      if (participant?.vat) {
-        router.push({
-          pathname: '/private/vat',
-          params: { orderId: data.createOrder.id },
-        });
-      } else {
-        router.push({
-          pathname: '/private/payment',
-          params: { orderId: data.createOrder.id },
-        });
-      }
+      const path = participant?.vat ? '/private/vat' : '/private/payment';
+
+      router.push({
+        pathname: path,
+        params: { orderId: data.createOrder.id },
+      });
+
+      await onCloseModal();
     },
   });
 
-  const calculateTotals = (items: IOrderItem[]) => {
+  // Memoize this function to prevent recreating it on each render
+  const calculateTotals = useCallback((items: IOrderItem[]) => {
     const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
     const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
     const grandTotal = totalAmount; // You can add tax/fees here if needed
 
     return { totalAmount, grandTotal, totalQuantity };
-  };
+  }, []);
 
-  const increase = (uuid: string) => {
-    const updatedItems = order.items.map((item) =>
-      item.uuid === uuid ? { ...item, quantity: item.quantity + 1 } : item,
-    );
+  // Memoize these handlers to prevent recreating them on each render
+  const increase = useCallback(
+    (uuid: string) => {
+      setOrderState((prevOrder: ICustomerOrder) => {
+        const updatedItems = prevOrder.items.map((item) =>
+          item.uuid === uuid ? { ...item, quantity: item.quantity + 1 } : item,
+        );
 
-    const totals = calculateTotals(updatedItems);
-    setOrder({ ...order, items: updatedItems, ...totals });
-  };
+        const totals = calculateTotals(updatedItems);
+        return { ...prevOrder, items: updatedItems, ...totals };
+      });
+    },
+    [calculateTotals, setOrderState],
+  );
 
-  const decrease = (uuid: string) => {
-    const updatedItems = order.items
-      .map((item) => {
-        if (item.uuid === uuid) {
-          if (item.quantity === 1) return null;
-          return { ...item, quantity: item.quantity - 1 };
-        }
-        return item;
-      })
-      .filter(Boolean) as IOrderItem[];
+  const decrease = useCallback(
+    (uuid: string) => {
+      setOrderState((prevOrder: ICustomerOrder) => {
+        const updatedItems = prevOrder.items
+          .map((item) => {
+            if (item.uuid === uuid) {
+              if (item.quantity === 1) return null;
+              return { ...item, quantity: item.quantity - 1 };
+            }
+            return item;
+          })
+          .filter(Boolean) as IOrderItem[];
 
-    const totals = calculateTotals(updatedItems);
-    setOrder({ ...order, items: updatedItems, ...totals });
-  };
+        const totals = calculateTotals(updatedItems);
+        return { ...prevOrder, items: updatedItems, ...totals };
+      });
+    },
+    [calculateTotals, setOrderState],
+  );
 
-  const onSubmit = () => {
-    if (isEmpty(order.items) && isEmpty(participant)) return;
+  // Memoize this to avoid recreating the order items on each render
+  const preparedItems = useMemo(() => {
+    if (isEmpty(orderState.items)) return [];
 
-    let items = order.items.map((item) => ({
+    return orderState.items.map((item) => ({
       id: item.id,
       quantity: item.quantity,
       comment: item.comment,
@@ -93,6 +105,10 @@ const DraftOrder = ({ order, visible, onClose, setOrder }: Props) => {
         value: option.value,
       })),
     }));
+  }, [orderState.items]);
+
+  const onSubmit = useCallback(() => {
+    if (isEmpty(orderState.items) || isEmpty(participant)) return;
 
     createOrder({
       variables: {
@@ -105,43 +121,66 @@ const DraftOrder = ({ order, visible, onClose, setOrder }: Props) => {
           name: '',
           comment: '',
           guests: 1,
-          items: items,
+          items: preparedItems,
         },
       },
     });
-  };
+  }, [orderState.items, participant, preparedItems, createOrder]);
+
+  // Memoize formatted price to avoid recalculation
+  const formattedPrice = useMemo(() => {
+    return `${orderState.totalAmount.toLocaleString()} ${CURRENCY}`;
+  }, [orderState.totalAmount]);
+
+  const onClose = useCallback(() => {
+    onCloseModal();
+  }, [onCloseModal]);
+
   return (
     <RightDrawer visible={visible} onClose={onClose}>
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingVertical: 14,
-          paddingHorizontal: 14,
-        }}
-      >
-        <Text style={{ fontWeight: 'bold', fontSize: 18 }}>{t('mainPage.YourOrder')}</Text>
-        <TouchableOpacity onPress={onClose}>
-          <Icon source="close" color={defaultColor} size={22} />
+      {/* Always render header for immediate response */}
+      <View style={styles.header}>
+        <Text style={styles.headerText}>{t('mainPage.YourOrder')}</Text>
+        <TouchableOpacity onPress={onClose} style={{ padding: 10 }}>
+          <Icon source="close" color={defaultColor} size={28} />
         </TouchableOpacity>
       </View>
-      <DraftList items={order.items} decrease={decrease} increase={increase} />
+      <DraftList items={orderState.items} decrease={decrease} increase={increase} />
       <View style={styles.addButtonContainer}>
-        <TouchableOpacity style={styles.smallButton} onPress={() => onSubmit()}>
+        <TouchableOpacity
+          style={styles.smallButton}
+          onPress={onSubmit}
+          disabled={isEmpty(orderState.items) || isEmpty(participant) || loading}
+        >
           <Text style={styles.smallButtonText}>{t('mainPage.Order')}</Text>
-          <Text style={styles.price}>
-            {order.totalAmount.toLocaleString()} {CURRENCY}
-          </Text>
+          <Text style={styles.price}>{formattedPrice}</Text>
         </TouchableOpacity>
       </View>
     </RightDrawer>
   );
-};
+});
 
 const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  headerText: {
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+  loadingPlaceholder: {
+    height: 300,
+  },
   addButtonContainer: {
     padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
   },
   price: {
     color: 'white',

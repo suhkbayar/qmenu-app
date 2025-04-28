@@ -15,12 +15,19 @@
     "today": "오늘",
     "AboutQmenu": "큐메뉴 소개",
     "login": "로그인",
+    "scan_qr_code": "QR 코드를 스캔하여 결제하세요",
+    "NotPaidDescription": "귀하의 청구서는 미납 상태입니다",
     "register": "등록하다",
+    "your_payment": "결제",
+    "citizen": "시민",
+    "SelectYourPaymentChannel": "결제 채널 선택",
+    "taxpayer_type": "납세자 유형",
     "RestaurantRegistration": "음식점 등록",
     "bannerTitle1": "시간을 절약하고 레스토랑을 검색하십시오 ...",
     "searchPlaceholder": "식당 이름, 음식 이름...",
     "RestaurantType": "레스토랑의 종류",
     "Restaurant": "레스토랑",
+    "enter_registration_number": "등록 번호를 입력하세요",
     "Bar": "술집",
     "CoffeeShop": "커피 샵",
     "Karaoke": "노래방",
@@ -310,6 +317,9 @@
     "chooseOption": "원하는 옵션을 선택하세요",
     "extra": "추가 항목",
     "chooseIngredients": "아래 재료를 추가로 선택할 수 있습니다",
-    "writeRequest": "추가 요청을 입력할 수 있습니다"
+    "writeRequest": "추가 요청을 입력할 수 있습니다",
+    "tax_payer": "납세자",
+    "call_waiter": "웨이터 호출",
+    "request_bill": "계산 요청"
   }
 }

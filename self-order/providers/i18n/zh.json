@@ -14,8 +14,15 @@
     "aboutOther": "关于",
     "today": "今天",
     "AboutQmenu": "关于 Qmenu",
+    "citizen": "公民",
+    "taxpayer_type": "纳税人类型",
     "login": "登录",
     "register": "登记",
+    "scan_qr_code": "请扫描二维码完成付款",
+    "SelectYourPaymentChannel": "选择您的付款渠道",
+    "your_payment": "您的付款",
+    "NotPaidDescription": "您的账单尚未付清",
+    "enter_registration_number": "请输入注册号",
     "RestaurantRegistration": "餐厅登记",
     "bannerTitle1": "节省您的时间，搜索餐厅...",
     "searchPlaceholder": "餐厅名称，食物名称...",
@@ -310,6 +317,9 @@
     "chooseOption": "请选择您想要的选项",
     "extra": "附加项",
     "chooseIngredients": "您可以从下方选择更多配料",
-    "writeRequest": "您可以写下额外的请求"
+    "writeRequest": "您可以写下额外的请求",
+    "tax_payer": "纳税人",
+    "call_waiter": "叫服务员",
+    "request_bill": "结账"
   }
 }

@@ -1,13 +1,15 @@
 import { FAB, Icon } from 'react-native-paper';
 import { StyleSheet } from 'react-native';
 import { defaultColor } from '@/constants/Colors';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation } from '@apollo/client';
 import { WAITER_CALL } from '@/graphql/mutation/waiter';
 import { useToast } from 'react-native-toast-notifications';
+import { useTranslation } from 'react-i18next';
 
 const HelpFloatingButton = () => {
   const toast = useToast();
+  const { t } = useTranslation('language');
   const [open, setOpen] = useState(false);
 
   const [call] = useMutation(WAITER_CALL, {
@@ -22,6 +24,9 @@ const HelpFloatingButton = () => {
       });
     },
   });
+  const handlePress = useCallback((state: { open: boolean }) => {
+    setOpen(state.open);
+  }, []);
 
   return (
     <FAB.Group
@@ -30,23 +35,25 @@ const HelpFloatingButton = () => {
       color="white"
       fabStyle={styles.fab}
       visible
-      onStateChange={({ open }) => setOpen(open)}
+      onStateChange={handlePress}
       actions={[
         {
           icon: 'message-text-outline',
-          style: { backgroundColor: defaultColor, bottom: 60 },
+          style: { backgroundColor: defaultColor, bottom: 70, right: 6 },
           color: 'white',
-          label: 'Зөөгч дуудах',
-          labelStyle: { color: defaultColor, bottom: 60 },
-          onPress: () => call({ variables: { message: 'Зөөгч дуудах' } }),
+          size: 'medium',
+          label: t('mainPage.call_waiter'),
+          labelStyle: { color: defaultColor, bottom: 70, fontSize: 18 },
+          onPress: () => call({ variables: { message: t('mainPage.call_waiter') } }),
         },
         {
           icon: 'file-document-outline',
-          label: 'Тооцоо авах',
+          label: t('mainPage.request_bill'),
           color: 'white',
-          labelStyle: { color: defaultColor, bottom: 70 },
-          style: { backgroundColor: defaultColor, bottom: 70 },
-          onPress: () => call({ variables: { message: 'Тооцоо авах' } }),
+          size: 'medium',
+          labelStyle: { color: defaultColor, bottom: 70, fontSize: 18 },
+          style: { backgroundColor: defaultColor, bottom: 70, right: 6 },
+          onPress: () => call({ variables: { message: t('mainPage.request_bill') } }),
         },
       ]}
     />
@@ -61,8 +68,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     fontSize: 10,
-    width: 66,
-    height: 66,
+    width: 70,
+    height: 70,
     bottom: 76,
   },
 });

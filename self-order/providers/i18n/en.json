@@ -14,11 +14,18 @@
     "aboutOther": "About",
     "today": "Today",
     "AboutQmenu": "About Qmenu",
+    "scan_qr_code": "Please scan the QR code to make your payment",
     "login": "Login",
+    "SelectYourPaymentChannel": "Select your payment channel",
+    "your_payment": "Your Payment",
+    "NotPaidDescription": "Your bill has not been paid",
     "PREPARED": "Prepared",
     "PREPARING": "Preparing",
     "DELIVERING": "Delivering",
     "register": "Register",
+    "enter_registration_number": "Enter Registration Number",
+    "citizen": "Citizen",
+    "taxpayer_type": "Taxpayer Type",
     "RestaurantRegistration": "Restaurant registration",
     "bannerTitle1": "Save your time, search restaurants...",
     "searchPlaceholder": "Restaurant name, food name ...",
@@ -311,6 +318,9 @@
     "chooseOption": "Choose your preferred option",
     "extra": "Extra",
     "chooseIngredients": "You can choose additional ingredients below",
-    "writeRequest": "You can write an additional request"
+    "writeRequest": "You can write an additional request",
+    "tax_payer": "Taxpayer",
+    "call_waiter": "Call waiter",
+    "request_bill": "Request bill"
   }
 }

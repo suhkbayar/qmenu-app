@@ -193,7 +193,7 @@ const Payment = () => {
           params: { orderId: orderId },
         });
       } else if (data.validateTransaction.paymentState !== 'PAID') {
-        toast.show('   Таны төлбөр төлөгдөөгүй байна.', {
+        toast.show(t('mainPage.NotPaidDescription'), {
           type: 'warning',
           icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
           placement: 'top',
@@ -264,7 +264,7 @@ const Payment = () => {
     try {
       await validateTransaction({ variables: { id: transactionId } });
     } catch (error) {
-      toast.show('   Таны төлбөр төлөгдөөгүй байна.', {
+      toast.show(t('mainPage.NotPaidDescription'), {
         type: 'warning',
         icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
         placement: 'top',
@@ -280,11 +280,11 @@ const Payment = () => {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Таны төлбөр</Text>
+        <Text style={styles.title}>{t('mainPage.your_payment')}</Text>
         <Text style={styles.amount}>
           {order.totalAmount.toLocaleString()} {CURRENCY}
         </Text>
-        <Text style={styles.subtitle}>Та төлбөрийн сувагaa сонгоно уу.</Text>
+        <Text style={styles.subtitle}>{t('mainPage.SelectYourPaymentChannel')}</Text>
         <View
           style={{
             flexDirection: 'row',

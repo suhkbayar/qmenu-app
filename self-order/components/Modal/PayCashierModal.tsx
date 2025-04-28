@@ -34,12 +34,12 @@ const PayCashierModal = ({ visible, onClose, loading, onConfirm }: Props) => {
           }}
         >
           <TouchableOpacity style={styles.secondPaidButton} onPress={onClose}>
-            <Text style={styles.secondPaidText}>Үгүй</Text>
+            <Text style={styles.secondPaidText}>{t('mainPage.No')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.paidButton} onPress={onConfirm}>
             {loading && <ActivityIndicator animating={true} size="small" color="#fff" />}
-            <Text style={styles.paidText}>Тийм</Text>
+            <Text style={styles.paidText}>{t('mainPage.Yes')}</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -15,10 +15,17 @@
     "today": "Aujourd'hui",
     "AboutQmenu": "À propos de Qmenu",
     "login": "Connexion",
+    "scan_qr_code": "Veuillez scanner le code QR pour effectuer votre paiement",
     "register": "S'inscrire",
     "PREPARED": "Préparé",
     "PREPARING": "en train de préparer",
+    "your_payment": "Votre paiement",
+    "SelectYourPaymentChannel": "Sélectionnez votre canal de paiement",
+    "NotPaidDescription": "Votre facture n'a pas été payée.",
     "DELIVERING": "Livraison",
+    "enter_registration_number": "Entrez le numéro d'enregistrement",
+    "taxpayer_type": "Type de contribuable",
+    "citizen": "Citoyen",
     "RestaurantRegistration": "Inscription au restaurant",
     "bannerTitle1": "Gagnez du temps, recherchez des restaurants...",
     "searchPlaceholder": "Nom du restaurant, nom de l'aliment...",
@@ -310,6 +317,9 @@
     "chooseOption": "Choisissez votre option préférée",
     "extra": "Supplément",
     "chooseIngredients": "Vous pouvez ajouter des ingrédients ci-dessous",
-    "writeRequest": "Vous pouvez écrire une demande supplémentaire"
+    "writeRequest": "Vous pouvez écrire une demande supplémentaire",
+    "tax_payer": "Contribuable",
+    "call_waiter": "Appeler le serveur",
+    "request_bill": "Demander l'addition"
   }
 }
