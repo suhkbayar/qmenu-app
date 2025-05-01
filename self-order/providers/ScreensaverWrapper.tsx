@@ -2,20 +2,21 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
-  TouchableWithoutFeedback,
   ImageSourcePropType,
   Animated,
   Easing,
   Dimensions,
   PanResponder,
   GestureResponderEvent,
+  AppState,
+  Keyboard,
 } from 'react-native';
 
 interface ScreensaverWrapperProps {
   children: React.ReactNode;
-  images: ImageSourcePropType[]; // accepts { uri: string } or require()
-  delay?: number; // optional inactivity time before screensaver
-  interval?: number; // optional image switch time
+  images: ImageSourcePropType[];
+  delay?: number;
+  interval?: number;
 }
 
 export default function ScreensaverWrapper({
@@ -28,65 +29,74 @@ export default function ScreensaverWrapper({
   const [imageIndex, setImageIndex] = useState(0);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
 
-  // Animation references
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const translateXAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
 
-  // Timers
-  const inactivityTimeout = useRef<number | null>(null);
-  const slideshowInterval = useRef<number | null>(null);
+  const slideshowInterval = useRef<NodeJS.Timeout | null>(null);
+  const idleTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Activity tracking
-  const isUserActive = useRef<boolean>(true);
-  const lastActivityTimestamp = useRef<number>(Date.now());
-
-  // Function to handle user activity
-  const handleUserActivity = () => {
-    // Record activity time
-    lastActivityTimestamp.current = Date.now();
-    isUserActive.current = true;
-
-    // If screensaver is active, disable it
+  const resetTimer = () => {
+    if (idleTimeout.current) {
+      clearTimeout(idleTimeout.current);
+    }
     if (isInactive) {
       setIsInactive(false);
       stopSlideshow();
     }
 
-    // Clear any existing timeout
-    if (inactivityTimeout.current) {
-      clearTimeout(inactivityTimeout.current);
-      inactivityTimeout.current = null;
-    }
-
-    // Set new timeout to start tracking inactivity
-    inactivityTimeout.current = setTimeout(() => {
-      // Only mark as inactive if there was truly no activity
-      if (Date.now() - lastActivityTimestamp.current >= delay) {
-        isUserActive.current = false;
-        setIsInactive(true);
-        startSlideshow();
-      }
+    idleTimeout.current = setTimeout(() => {
+      setIsInactive(true);
+      startSlideshow();
     }, delay);
   };
 
-  // Create pan responder to detect any gesture
+  useEffect(() => {
+    resetTimer();
+
+    const appStateListener = AppState.addEventListener('change', resetTimer);
+    const keyboardListener = Keyboard.addListener('keyboardDidShow', resetTimer);
+
+    return () => {
+      if (idleTimeout.current) clearTimeout(idleTimeout.current);
+      if (slideshowInterval.current) clearInterval(slideshowInterval.current);
+      appStateListener.remove();
+      keyboardListener.remove();
+    };
+  }, []);
+
+  // Detect pan (swipe / scroll) without blocking touch events
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: handleUserActivity,
-      onPanResponderMove: handleUserActivity,
-      onPanResponderRelease: handleUserActivity,
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: () => false,
+      onPanResponderGrant: () => resetTimer(),
+      onPanResponderMove: () => resetTimer(),
+      onPanResponderRelease: () => resetTimer(),
+      onShouldBlockNativeResponder: () => false, // <- important
     }),
   ).current;
 
-  // Animate image with fadeInRight effect
+  const startSlideshow = () => {
+    if (images.length === 0) return;
+    setIsImageLoaded(false);
+
+    slideshowInterval.current = setInterval(() => {
+      setIsImageLoaded(false);
+      setImageIndex((prev) => (prev + 1) % images.length);
+    }, interval);
+  };
+
+  const stopSlideshow = () => {
+    if (slideshowInterval.current) {
+      clearInterval(slideshowInterval.current);
+      slideshowInterval.current = null;
+    }
+  };
+
   const animateImage = () => {
-    // Reset animation values
     opacityAnim.setValue(0);
     translateXAnim.setValue(Dimensions.get('window').width);
 
-    // Run parallel animations
     Animated.parallel([
       Animated.timing(opacityAnim, {
         toValue: 1,
@@ -103,89 +113,34 @@ export default function ScreensaverWrapper({
     ]).start();
   };
 
-  // Start slideshow
-  const startSlideshow = () => {
-    if (images.length === 0) return;
-
-    // Set initial image
-    setIsImageLoaded(false);
-
-    // Set up interval for image rotation
-    slideshowInterval.current = setInterval(() => {
-      // Only change image if user is still inactive
-      if (!isUserActive.current) {
-        setIsImageLoaded(false);
-        setImageIndex((prev) => (prev + 1) % images.length);
-      } else {
-        // If user became active, stop slideshow
-        stopSlideshow();
-      }
-    }, interval);
-  };
-
-  // Stop slideshow
-  const stopSlideshow = () => {
-    if (slideshowInterval.current) {
-      clearInterval(slideshowInterval.current);
-      slideshowInterval.current = null;
-    }
-  };
-
-  // Listen for touch events anywhere in the app
-  const onTouchEvent = (event: GestureResponderEvent) => {
-    handleUserActivity();
-    return false; // Allow the event to continue to children
-  };
-
-  // Set up and clean up
-  useEffect(() => {
-    // Start tracking inactivity
-    handleUserActivity();
-
-    // Listen for dimension changes
-    const dimensionHandler = Dimensions.addEventListener('change', () => {
-      if (!isImageLoaded || !isInactive) {
-        translateXAnim.setValue(Dimensions.get('window').width);
-      }
-    });
-
-    // Clean up
-    return () => {
-      if (inactivityTimeout.current) clearTimeout(inactivityTimeout.current);
-      if (slideshowInterval.current) clearInterval(slideshowInterval.current);
-      dimensionHandler.remove();
-    };
-  }, []);
-
-  // Watch for image changes to trigger animation
   useEffect(() => {
     if (isInactive && isImageLoaded) {
       animateImage();
     }
   }, [imageIndex, isImageLoaded, isInactive]);
 
-  // Return early if no images
+  const handleTouch = (event: GestureResponderEvent) => {
+    resetTimer();
+  };
+
   if (images.length === 0) return <View style={{ flex: 1 }}>{children}</View>;
 
   return (
-    <TouchableWithoutFeedback onPress={handleUserActivity}>
-      <View
-        style={styles.container}
-        {...panResponder.panHandlers}
-        onTouchStart={onTouchEvent}
-        onTouchMove={onTouchEvent}
-        onTouchEnd={onTouchEvent}
-      >
-        {/* Main app content */}
-        <View style={[styles.contentContainer, isInactive && styles.hidden]}>{children}</View>
+    <View style={styles.container} {...panResponder.panHandlers} onTouchStart={handleTouch}>
+      {/* Main App Content */}
+      <View style={[styles.contentContainer, isInactive && styles.hidden]}>{children}</View>
 
-        {/* Screensaver overlay */}
-        {isInactive && (
+      {/* Screensaver */}
+      {isInactive && (
+        <View
+          style={StyleSheet.absoluteFill}
+          onTouchStart={handleTouch}
+          onTouchMove={handleTouch}
+          onTouchEnd={handleTouch}
+        >
           <Animated.Image
             source={images[imageIndex]}
-            onLoad={() => {
-              setIsImageLoaded(true);
-            }}
+            onLoad={() => setIsImageLoaded(true)}
             style={[
               StyleSheet.absoluteFillObject,
               styles.screensaverImage,
@@ -196,16 +151,16 @@ export default function ScreensaverWrapper({
             ]}
             resizeMode="cover"
           />
-        )}
-      </View>
-    </TouchableWithoutFeedback>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black', // ensures black background always
+    backgroundColor: 'black',
   },
   contentContainer: {
     flex: 1,

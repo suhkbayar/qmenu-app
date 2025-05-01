@@ -327,6 +327,7 @@
     "citizen": "Иргэн",
     "tax_payer": "Татвар төлөгч",
     "call_waiter": "Зөөгч дуудах",
-    "request_bill": "Тооцоо авах"
+    "request_bill": "Тооцоо авах",
+    "table_clean": "Ширээ цэвэрлүүлэх"
   }
 }

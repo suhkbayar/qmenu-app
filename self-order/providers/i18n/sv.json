@@ -320,6 +320,7 @@
     "writeRequest": "Du kan skriva en extra begäran",
     "tax_payer": "Skattebetalare",
     "call_waiter": "Kalla på servitör",
-    "request_bill": "Be om notan"
+    "request_bill": "Be om notan",
+    "table_clean": "Be om bordsrengöring"
   }
 }

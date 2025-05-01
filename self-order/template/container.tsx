@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback, memo, useMemo } from 'react';
-import { ScrollView, View, StyleSheet, FlatList, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import {
+  ScrollView,
+  View,
+  StyleSheet,
+  FlatList,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  InteractionManager,
+} from 'react-native';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import { IMenuCategory, IMenuProduct, IOrderItem, IParticipant, ICustomerOrder } from '@/types';
@@ -16,7 +24,6 @@ import { GET_ORDERS } from '@/graphql/query';
 import i18n from '@/utils/i18n';
 import OpacityLoader from '@/components/Loader/OpacityLoader';
 
-// Define interfaces for component props
 interface ProductCardProps {
   product: IMenuProduct;
   onQuantityChange: (product: IMenuProduct, quantity: number) => void;
@@ -124,14 +131,19 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
   const [categories, setCategories] = useState<IMenuCategory[]>([]);
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const isTranslating = useRef<boolean>(false);
+  const [collapsedMenu, setCollapsedMenu] = useState(false);
+
+  // Ref to track the source of the activeIndex change
+  const activeIndexSource = useRef<'scroll' | 'click' | null>(null);
+  // Timestamp to track when the last manual selection happened
+  const lastClickTime = useRef<number>(0);
+  // Lock period after a manual selection (ms)
+  const CLICK_LOCK_PERIOD = 800;
 
   const [showDraw, setShowDraw] = useState(false);
-
   const [loading, setLoading] = useState<boolean>(false);
-
   const pendingUpdates = useRef<Record<string, number>>({});
-  const updateTimeout = useRef<number | null>(null);
-  const lastScrollTime = useRef<number>(0);
+  const updateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Filter categories efficiently
   const filterCategories = useCallback((menu: any): IMenuCategory[] => {
@@ -203,20 +215,38 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
     processMenu();
   }, [participant, i18n.language, filterCategories]);
 
-  // Scroll to category implementation
+  // Clean up any pending timeouts when component unmounts
+  useEffect(() => {
+    return () => {
+      if (updateTimeout.current) {
+        clearTimeout(updateTimeout.current);
+      }
+    };
+  }, []);
+
+  // NEW APPROACH: Scroll to category implementation
   const scrollToCategory = useCallback(
     (index: number) => {
+      // Mark that this activeIndex change comes from a click
+      activeIndexSource.current = 'click';
+      // Update timestamp to block scroll events
+      lastClickTime.current = Date.now();
+
+      // Update the active index immediately
+      setActiveIndex(index);
+
+      // Scroll to the category
       const catId = categories[index]?.id;
       const y = sectionLayouts.current[catId];
+
       if (typeof y === 'number') {
+        // Disable onScroll temporarily while we perform programmatic scrolling
         scrollRef.current?.scrollTo({ y, animated: true });
-        setActiveIndex(index);
       }
     },
     [categories],
   );
 
-  // Optimize quantity changes with efficient batching
   const onQuantityChange = useCallback(
     (product: IMenuProduct, quantity: number) => {
       // Track pending update
@@ -305,33 +335,46 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
     }
   }, [orderState, setOrderState]);
 
-  // Efficient scroll handling with throttling
-  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const now = Date.now();
-    if (now - lastScrollTime.current < 50) return;
-
-    lastScrollTime.current = now;
-    const scrollY = event.nativeEvent.contentOffset.y;
-
-    // Find visible category with binary search
-    const layoutEntries = Object.entries(sectionLayouts.current).sort((a, b) => Number(a[1]) - Number(b[1]));
-
-    let low = 0;
-    let high = layoutEntries.length - 1;
-    let result = 0;
-
-    while (low <= high) {
-      const mid = Math.floor((low + high) / 2);
-      if (layoutEntries[mid][1] <= scrollY + 100) {
-        result = mid;
-        low = mid + 1;
-      } else {
-        high = mid - 1;
+  // NEW APPROACH: Scroll handler with time-based lockout
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      // Check if we're within the lock period after a manual selection
+      const now = Date.now();
+      if (now - lastClickTime.current < CLICK_LOCK_PERIOD) {
+        // We're in the lock period after a click, don't process scroll events
+        return;
       }
-    }
 
-    setActiveIndex(result);
-  }, []);
+      const scrollY = event.nativeEvent.contentOffset.y;
+
+      // Find visible category with binary search
+      const layoutEntries = Object.entries(sectionLayouts.current).sort((a, b) => Number(a[1]) - Number(b[1]));
+
+      if (layoutEntries.length === 0) return;
+
+      let low = 0;
+      let high = layoutEntries.length - 1;
+      let result = 0;
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        if (layoutEntries[mid][1] <= scrollY + 100) {
+          result = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      // Only update if different from current index
+      if (result !== activeIndex) {
+        // Mark that this change comes from scroll
+        activeIndexSource.current = 'scroll';
+        setActiveIndex(result);
+      }
+    },
+    [activeIndex],
+  );
 
   // Create category layout handler
   const createLayoutHandler = useCallback((categoryId: string) => {
@@ -350,15 +393,21 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
   return (
     <View style={styles.container}>
       <OpacityLoader visible={loading} opacity={0.7} />
-      <Sidebar categories={memoizedCategories} activeIndex={activeIndex} onSelect={scrollToCategory} />
-
+      {!collapsedMenu && (
+        <Sidebar categories={memoizedCategories} activeIndex={activeIndex} onSelect={scrollToCategory} />
+      )}
       <View style={styles.content}>
-        <Header categories={memoizedCategories} activeIndex={activeIndex} refreshLanguage={refreshLanguage} />
-
+        <Header
+          collapsedMenu={collapsedMenu}
+          setCollapsedMenu={setCollapsedMenu}
+          categories={memoizedCategories}
+          activeIndex={activeIndex}
+          refreshLanguage={refreshLanguage}
+        />
         <ScrollView
           ref={scrollRef}
           onScroll={onScroll}
-          scrollEventThrottle={50}
+          scrollEventThrottle={100} // Reduced throttle frequency
           contentContainerStyle={{ paddingBottom: 100, marginTop: 4, marginLeft: 6 }}
         >
           {memoizedCategories.map((category) => (

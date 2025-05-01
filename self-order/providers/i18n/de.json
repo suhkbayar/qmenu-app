@@ -320,6 +320,7 @@
     "writeRequest": "Sie können eine zusätzliche Anfrage schreiben",
     "tax_payer": "Steuerzahler",
     "call_waiter": "Kellner rufen",
-    "request_bill": "Rechnung anfordern"
+    "request_bill": "Rechnung anfordern",
+    "table_clean": "Tisch reinigen lassen"
   }
 }

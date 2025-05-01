@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
 import { Menu, Text } from 'react-native-paper';
 import { useCallStore } from '@/cache/cart.store';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,8 @@ import { getStorage, setStorage } from '@/cache';
 import { Image } from '../image';
 import { IMenuCategory } from '@/types';
 import { defaultColor } from '@/constants/Colors';
+import CustomMessageIcon from '@/assets/collapsedMenu';
+import CustomReplyIcon from '@/assets/unCollapsedMenu';
 
 interface Country {
   label: string;
@@ -18,6 +20,8 @@ interface Country {
 interface HeaderProps {
   categories: IMenuCategory[];
   activeIndex: number;
+  collapsedMenu: boolean;
+  setCollapsedMenu: React.Dispatch<React.SetStateAction<boolean>>;
   refreshLanguage: () => void;
 }
 
@@ -41,7 +45,13 @@ const countryByLanguage: Record<string, Country> = countryList.reduce((map: Reco
   return map;
 }, {});
 
-const Header: React.FC<HeaderProps> = ({ categories, activeIndex, refreshLanguage }) => {
+const Header: React.FC<HeaderProps> = ({
+  categories,
+  activeIndex,
+  refreshLanguage,
+  collapsedMenu,
+  setCollapsedMenu,
+}) => {
   const { participant } = useCallStore();
   const [visible, setVisible] = useState<boolean>(false);
   const { i18n } = useTranslation('language');
@@ -107,9 +117,41 @@ const Header: React.FC<HeaderProps> = ({ categories, activeIndex, refreshLanguag
     return participant?.table?.name?.toLocaleUpperCase() || '';
   }, [participant?.table?.name]);
 
+  const hideMenu = useCallback(() => {
+    setCollapsedMenu(true);
+  }, [setCollapsedMenu]);
+
+  const showMenu = useCallback(() => {
+    setCollapsedMenu(false);
+  }, [setCollapsedMenu]);
+
   return (
     <View style={styles.header}>
       <View style={styles.leftContainer}>
+        <View>
+          {/* {collapsedMenu ? (
+            <Pressable onPress={showMenu}>
+              <View
+                style={{
+                  padding: 2,
+                }}
+              >
+                <CustomReplyIcon color={'#696969'} size={26} />
+              </View>
+            </Pressable>
+          ) : (
+            <Pressable onPress={hideMenu}>
+              <View
+                style={{
+                  padding: 2,
+                }}
+              >
+                <CustomMessageIcon color={'#696969'} size={26} />
+              </View>
+            </Pressable>
+          )} */}
+        </View>
+
         <Text variant="titleMedium" style={styles.titleText}>
           {activeCategoryName}
         </Text>

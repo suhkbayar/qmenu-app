@@ -320,6 +320,7 @@
     "writeRequest": "추가 요청을 입력할 수 있습니다",
     "tax_payer": "납세자",
     "call_waiter": "웨이터 호출",
-    "request_bill": "계산 요청"
+    "request_bill": "계산 요청",
+    "table_clean": "테이블 청소 요청"
   }
 }

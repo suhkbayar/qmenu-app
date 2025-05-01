@@ -320,6 +320,7 @@
     "writeRequest": "Vous pouvez écrire une demande supplémentaire",
     "tax_payer": "Contribuable",
     "call_waiter": "Appeler le serveur",
-    "request_bill": "Demander l'addition"
+    "request_bill": "Demander l'addition",
+    "table_clean": "Demander le nettoyage de la table"
   }
 }

@@ -320,6 +320,7 @@
     "writeRequest": "追加のリクエストを書くことができます",
     "tax_payer": "納税者",
     "call_waiter": "ウェイターを呼ぶ",
-    "request_bill": "お会計をお願いします"
+    "request_bill": "お会計をお願いします",
+    "table_clean": "テーブルの清掃を依頼する"
   }
 }

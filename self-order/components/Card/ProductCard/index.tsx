@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, memo } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity, ImageSourcePropType } from 'react-native';
+import { View, Image, StyleSheet, TouchableOpacity, ImageSourcePropType, Pressable } from 'react-native';
 import { FAB, Icon, Text } from 'react-native-paper';
 import { IMenuProduct, IOrderItem, IMenuVariant } from '@/types';
 import { CalculateProductPrice } from '@/tools/calculate';
@@ -34,9 +34,9 @@ const MemoizedPriceComponent = memo(({ variants }: PriceComponentProps) => (
 
 // Memoize the product image to prevent re-renders
 const ProductImage = memo(({ source, style, onPress }: ProductImageProps) => (
-  // <TouchableOpacity onPress={onPress}>
-  <Image source={source} style={style} resizeMode="cover" />
-  // </TouchableOpacity>
+  <Pressable onPress={onPress}>
+    <Image source={source} style={style} resizeMode="cover" />
+  </Pressable>
 ));
 
 const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQuantityChange, languageKey }) => {
@@ -75,7 +75,6 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQua
   }, [orderItem]);
 
   const decrease = useCallback(() => {
-    console.log('decrease');
     if (quantity === 0) return;
     const newQty = quantity - 1;
     setQuantity(newQty);

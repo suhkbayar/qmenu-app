@@ -321,6 +321,7 @@
     "writeRequest": "You can write an additional request",
     "tax_payer": "Taxpayer",
     "call_waiter": "Call waiter",
-    "request_bill": "Request bill"
+    "request_bill": "Request bill",
+    "table_clean": "Request table cleaning"
   }
 }

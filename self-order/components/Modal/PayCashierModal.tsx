@@ -4,6 +4,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, ActivityIn
 import { ITransaction } from '../../types';
 import { useTranslation } from 'react-i18next';
 import { defaultColor } from '@/constants/Colors';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 type Props = {
   visible: boolean;
@@ -22,14 +23,15 @@ const PayCashierModal = ({ visible, onClose, loading, onConfirm }: Props) => {
           <Icon source="close" color="#4B5563" size={20} />
         </TouchableOpacity>
         <View style={styles.qrContainer}>
-          <Image source={require('../../assets/icon/point2.png')} style={styles.qrImage} />
+          <MaterialCommunityIcons name="cash-register" size={160} color={defaultColor} />
+
+          {/* <Image source={require('../../assets/icon/point2.png')} /> */}
         </View>
         <Text style={styles.instruction}>{t('mainPage.PayAtTheBoxOffice')}</Text>
         <View
           style={{
             flexDirection: 'row',
             justifyContent: 'space-between',
-            marginTop: 20,
             width: '100%',
           }}
         >
@@ -74,7 +76,6 @@ const styles = StyleSheet.create({
   },
   qrContainer: {
     marginTop: 0,
-    marginBottom: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -95,7 +96,6 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   instruction: {
-    marginTop: 20,
     textAlign: 'center',
     color: '#6b7280',
     fontWeight: '700',

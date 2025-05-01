@@ -1,9 +1,10 @@
+import React, { useRef, useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions, Animated } from 'react-native';
+import { Text } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons'; // or 'react-native-vector-icons/Ionicons'
 import { useCallStore } from '@/cache/cart.store';
 import { defaultColor } from '@/constants/Colors';
 import { IMenuCategory } from '@/types';
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { Text } from 'react-native-paper';
 
 type Props = {
   categories: IMenuCategory[];
@@ -13,6 +14,27 @@ type Props = {
 
 const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
   const { participant } = useCallStore();
+  // console.log('Sidebar activeIndex:', activeIndex);
+  const scrollRef = useRef<ScrollView>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(true);
+
+  const handleScroll = (event: any) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const contentHeight = event.nativeEvent.contentSize.height;
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height;
+
+    setShowScrollTop(y > 10); // Show scroll-to-top if not at the top
+    setShowScrollBottom(y + layoutHeight < contentHeight - 10); // Show scroll-to-bottom if not at the bottom
+  };
+
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const scrollToBottom = () => {
+    scrollRef.current?.scrollToEnd({ animated: true });
+  };
 
   return (
     <View style={styles.sidebar}>
@@ -22,7 +44,12 @@ const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scroll}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         {categories.map((item, idx) => {
           const isActive = activeIndex === idx;
           return (
@@ -39,6 +66,20 @@ const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
           );
         })}
       </ScrollView>
+
+      {/* Scroll to Top Button */}
+      {showScrollTop && (
+        <TouchableOpacity style={[styles.scrollButton, { top: 238 }]} onPress={scrollToTop}>
+          <Ionicons name="arrow-up-circle" size={30} color="#888" />
+        </TouchableOpacity>
+      )}
+
+      {/* Scroll to Bottom Button */}
+      {showScrollBottom && (
+        <TouchableOpacity style={[styles.scrollButton, { bottom: 10 }]} onPress={scrollToBottom}>
+          <Ionicons name="arrow-down-circle" size={30} color="#888" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -47,10 +88,21 @@ const styles = StyleSheet.create({
   sidebar: {
     width: 260,
     backgroundColor: '#f3f4f6',
+    borderTopRightRadius: 19,
+    borderBottomRightRadius: 19,
+    position: 'relative',
   },
   scroll: {
     alignItems: 'center',
+    paddingBottom: 60, // So button doesn't block last item
   },
+  scrollButton: {
+    position: 'absolute',
+    left: '50%',
+    transform: [{ translateX: -15 }], // Half of icon size (30/2) to center it perfectly
+    zIndex: 10,
+  },
+
   logoContainer: {
     width: '100%',
     borderRadius: 12,
@@ -77,15 +129,11 @@ const styles = StyleSheet.create({
   },
   activeItem: {
     backgroundColor: defaultColor,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
   },
   itemContent: {
     alignItems: 'center',
-  },
-  iconBox: {
-    backgroundColor: '#1f2a38',
-    padding: 8,
-    borderRadius: 4,
-    marginBottom: 4,
   },
   label: {
     color: '#333',
@@ -98,21 +146,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 18,
     textAlign: 'right',
-  },
-  arrow: {
-    position: 'absolute',
-    right: -6,
-    top: '120%',
-    marginTop: -8,
-    width: 0,
-    height: 0,
-    borderTopWidth: 8,
-    borderBottomWidth: 8,
-    borderLeftWidth: 8,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: '#f5f5f5',
-    transform: [{ rotate: '180deg' }],
   },
 });
 

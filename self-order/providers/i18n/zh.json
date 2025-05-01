@@ -320,6 +320,7 @@
     "writeRequest": "您可以写下额外的请求",
     "tax_payer": "纳税人",
     "call_waiter": "叫服务员",
-    "request_bill": "结账"
+    "request_bill": "结账",
+    "table_clean": "请求清理桌子"
   }
 }

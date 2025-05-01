@@ -319,6 +319,7 @@
     "writeRequest": "Qo‘shimcha so‘rov yozishingiz mumkin",
     "tax_payer": "Soliq to‘lovchi",
     "call_waiter": "Ofitsiantni chaqirish",
-    "request_bill": "Hisobni so‘rash"
+    "request_bill": "Hisobni so‘rash",
+    "table_clean": "Stolni tozalashni so'rash"
   }
 }

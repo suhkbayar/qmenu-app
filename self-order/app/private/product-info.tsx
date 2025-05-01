@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { FAB, Icon } from 'react-native-paper';
 import { defaultColor } from '@/constants/Colors';
-import { ICustomerOrder, IMenuOption, IMenuVariant, IOrderItem } from '@/types';
+import { IMenuOption, IMenuVariant, IOrderItem } from '@/types';
 import { isEmpty } from 'lodash';
 import { useOrder } from '@/providers/OrderProvider';
 import DraftOrder from '@/components/DraftOrder';

@@ -1,9 +1,10 @@
 import React from 'react';
-import { Modal, Icon } from 'react-native-paper';
+import { Modal } from 'react-native-paper';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useCallStore } from '@/cache/cart.store';
 import QRCode from 'react-native-qrcode-svg';
+import { Ionicons } from '@expo/vector-icons'; // or 'react-native-vector-icons/Ionicons'
 
 type Props = {
   visible: boolean;
@@ -19,15 +20,20 @@ const TableQrModal = ({ visible, onClose }: Props) => {
   return (
     <Modal visible={visible} onDismiss={onClose} contentContainerStyle={styles.modal}>
       <View style={styles.container}>
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Icon source="close" color="#4B5563" size={28} />
-        </TouchableOpacity>
-
-        <View style={styles.qrContainer}>
-          <QRCode value={targetLink} size={200} />
+        {/* Info Box */}
+        <View style={styles.infoBox}>
+          <Ionicons name="information-circle-outline" size={20} color={'#e0ad07'} />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.infoMessage}>
+              {t('qr_info_text', 'QR кодыг уншуулснаар та захиалга хийх боломжтой')}
+            </Text>
+          </View>
         </View>
 
-        <Text style={styles.instruction}>QR кодыг уншуулан захиалга хийх боломжтой</Text>
+        {/* QR Code */}
+        <View style={styles.qrContainer}>
+          <QRCode value={targetLink} size={260} />
+        </View>
 
         <TouchableOpacity style={styles.paidButton} onPress={onClose}>
           <Text style={styles.paidText}>{t('mainPage.Close')}</Text>
@@ -51,34 +57,42 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     width: Dimensions.get('window').width * 0.9,
-    maxWidth: 420,
+    maxWidth: 380,
     zIndex: 1001,
   },
   closeButton: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 4,
+    right: 4,
     backgroundColor: '#f3f4f6',
-    borderRadius: 20,
+    borderRadius: 999,
     padding: 6,
     zIndex: 1010,
   },
   qrContainer: {
-    marginTop: 20,
-    marginBottom: 16,
+    marginTop: 30,
     justifyContent: 'center',
     alignItems: 'center',
     height: 200,
     width: 200,
   },
-  instruction: {
-    marginTop: 20,
-    textAlign: 'center',
-    color: '#6b7280',
-    fontSize: 16,
+  infoBox: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF8E1', // light yellow background
+    borderColor: '#FFC300',
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+    width: '100%',
+  },
+  infoMessage: {
+    color: '#e0ad07',
   },
   paidButton: {
-    marginTop: 20,
+    marginTop: 50,
+    width: '90%',
     backgroundColor: '#facc15',
     borderRadius: 10,
     paddingVertical: 14,
@@ -87,6 +101,8 @@ const styles = StyleSheet.create({
   paidText: {
     color: '#fff',
     fontWeight: '600',
+    alignItems: 'center',
+    textAlign: 'center',
     fontSize: 16,
   },
 });
