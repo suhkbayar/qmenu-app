@@ -15,7 +15,6 @@ import { isEmpty } from 'lodash';
 import ProductCard from '@/components/Card/ProductCard';
 import { emptyOrder } from '@/constants';
 import OrderFloatingButton from '@/components/FloatingButton/OrderFloatingButton';
-import { fetchBatchTranslations } from '@/tools';
 import { useTranslation } from 'react-i18next';
 import { useOrder } from '@/providers/OrderProvider';
 import { generateUUID } from '@/utils';
@@ -130,8 +129,8 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
   const sectionLayouts = useRef<Record<string, number>>({});
   const [categories, setCategories] = useState<IMenuCategory[]>([]);
   const [activeIndex, setActiveIndex] = useState<number>(0);
-  const isTranslating = useRef<boolean>(false);
   const [collapsedMenu, setCollapsedMenu] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Ref to track the source of the activeIndex change
   const activeIndexSource = useRef<'scroll' | 'click' | null>(null);
@@ -159,61 +158,18 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
     });
   }, []);
 
+  // Simplified menu processing - no client-side translation
   useEffect(() => {
-    if (!participant || isEmpty(participant.menu) || isTranslating.current) return;
+    if (!participant || isEmpty(participant.menu)) return;
 
-    const processMenu = async () => {
-      try {
-        isTranslating.current = true;
-        const filtered = filterCategories(participant.menu);
-
-        // Skip translation if source language or no categories
-        if (i18n.language === 'mn' || filtered.length === 0) {
-          setCategories(filtered);
-          return;
-        }
-
-        // Collect all unique texts to translate (using Set for deduplication)
-        const textsSet = new Set<string>();
-        filtered.forEach((category: IMenuCategory) => {
-          if (category.name) textsSet.add(category.name);
-          category.products?.forEach((product: IMenuProduct) => {
-            if (product.name) textsSet.add(product.name);
-            if (product.description) textsSet.add(product.description);
-          });
-        });
-
-        // Convert Set to Array
-        const textsToTranslate = Array.from(textsSet);
-
-        // Only translate what's needed
-        const translations = await fetchBatchTranslations(textsToTranslate);
-
-        // Apply translations efficiently
-        const translatedCategories = filtered.map((category: IMenuCategory) => ({
-          ...category,
-          name: translations[category.name] || category.name,
-          products: category.products?.map((product: IMenuProduct) => ({
-            ...product,
-            name: translations[product.name] || product.name,
-            description: translations[product.description] || product.description,
-          })),
-        }));
-
-        setCategories(translatedCategories);
-      } catch (error) {
-        console.error('Error processing menu:', error);
-        // Fallback to untranslated if error
-        const filtered = filterCategories(participant.menu);
-        setCategories(filtered);
-      } finally {
-        setLoading(false);
-        isTranslating.current = false;
-      }
-    };
-
-    processMenu();
-  }, [participant, i18n.language, filterCategories]);
+    try {
+      const filtered = filterCategories(participant.menu);
+      setCategories(filtered);
+    } catch (error) {
+      console.error('Error processing menu:', error);
+      setCategories([]);
+    }
+  }, [participant, i18n.language, filterCategories, refreshTrigger]);
 
   // Clean up any pending timeouts when component unmounts
   useEffect(() => {
@@ -222,6 +178,16 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
         clearTimeout(updateTimeout.current);
       }
     };
+  }, []);
+
+  // Refresh language callback - triggers menu re-processing
+  const refreshLanguage = useCallback(() => {
+    setLoading(true);
+    // Small delay to ensure participant data is updated
+    setTimeout(() => {
+      setRefreshTrigger((prev) => prev + 1);
+      setLoading(false);
+    }, 500);
   }, []);
 
   // NEW APPROACH: Scroll to category implementation
@@ -382,10 +348,6 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
       sectionLayouts.current[categoryId] = event.nativeEvent.layout.y;
     };
   }, []);
-
-  const refreshLanguage = useCallback(() => {
-    setLoading(true);
-  }, [setLoading]);
 
   // Memoize categories to prevent unnecessary re-renders
   const memoizedCategories = useMemo(() => categories, [categories]);

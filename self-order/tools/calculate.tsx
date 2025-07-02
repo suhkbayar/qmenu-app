@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, StyleSheet } from 'react-native';
 import { CURRENCY } from '@/constants';
-import { IConfig, IMenuVariant } from '@/types';
+import { IConfig, IMenuProduct, IMenuVariant } from '@/types';
 
 interface Props {
   variants: IMenuVariant[];
@@ -23,6 +23,35 @@ export const CalculateProductPrice: React.FC<Props> = ({ variants, config }) => 
       : `${min.toLocaleString()} ${CURRENCY} - ${max.toLocaleString()} ${CURRENCY}`;
 
   return <Text style={[styles.priceText, { color: config?.textColor || '#000' }]}>{priceText}</Text>;
+};
+
+export const CalculateProductMinPrice = (variants: IMenuVariant[], config?: IConfig) => {
+  if (!variants || variants.length === 0) {
+    return null;
+  }
+  const prices: number[] = variants.map((val) => val.salePrice);
+  const min: number = Math.min(...prices);
+  return (
+    <Text style={[styles.priceText, { color: config?.textColor || '#000' }]}>
+      {min.toLocaleString()} {CURRENCY}
+    </Text>
+  );
+};
+
+export const isConfigurable = (product: IMenuProduct): boolean => {
+  if (!product.variants || product.variants.length === 0) {
+    return false;
+  }
+  if (product.variants.length > 1) {
+    return true;
+  }
+  for (const item of product.variants) {
+    if (item.options?.length > 0) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 const styles = StyleSheet.create({

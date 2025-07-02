@@ -15,6 +15,7 @@ export const ME = gql`
       name
       updatedAt
       verified
+
       contacts {
         createdAt
         name

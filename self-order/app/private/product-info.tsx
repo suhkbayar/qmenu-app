@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Modal } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { FAB, Icon } from 'react-native-paper';
@@ -7,13 +7,16 @@ import { defaultColor } from '@/constants/Colors';
 import { IMenuOption, IMenuVariant, IOrderItem } from '@/types';
 import { isEmpty } from 'lodash';
 import { useOrder } from '@/providers/OrderProvider';
-import DraftOrder from '@/components/DraftOrder';
 import RenderHtml from 'react-native-render-html';
 import { LogBox } from 'react-native';
 import { CURRENCY } from '@/constants';
 import { calculateOrderItem, generateUUID } from '@/utils';
 import OptionValuesModal from '@/components/Modal/OptionValuesModal';
 import CustomBadge from '@/components/Badge';
+import { useLazyQuery } from '@apollo/client';
+import { GET_CROSS_SELLS } from '@/graphql/query/product';
+import { useCallStore } from '@/cache/cart.store';
+import RecommendedCard from '@/components/Card/RecommendedCard';
 
 interface ValidationResult {
   isValid: boolean;
@@ -21,29 +24,40 @@ interface ValidationResult {
   productId: string | null;
 }
 
-const ProductDetailsScreen = () => {
+interface ProductDetailsScreenProps {
+  visible?: boolean;
+  onClose?: () => void;
+  product?: any;
+}
+
+const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
+  visible = true,
+  onClose,
+  product: propProduct,
+}) => {
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const { t } = useTranslation('language');
   const { orderState, setOrderState } = useOrder();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
   const [visibleValues, setVisibleValues] = useState(false);
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [validationError, setValidationError] = useState<string>('');
   const [selectedItem, setSelectedItem] = useState<IOrderItem | null>();
   const [validateOptions, setValidateOptions] = useState<IMenuOption[]>([]);
+  const [getCrossSells, { data: cross }] = useLazyQuery(GET_CROSS_SELLS);
+  const { participant, order } = useCallStore();
 
-  // Memoize product parsing to avoid doing it on every render
+  // Use prop product if provided, otherwise parse from params
   const product = useMemo(() => {
-    if (!params.product) return null;
+    if (propProduct) return propProduct;
     try {
       return JSON.parse(params.product as string);
     } catch (e) {
       console.error('Error parsing product:', e);
       return null;
     }
-  }, [params.product]);
+  }, [propProduct, params.product]);
 
   // Memoize current variant
   const currentVariant = useMemo(() => {
@@ -52,6 +66,78 @@ const ProductDetailsScreen = () => {
   }, [product, selectedItem?.id]);
 
   LogBox.ignoreLogs(['Support for defaultProps will be removed from function components']);
+
+  // Calculate totals helper function
+  const calculateTotals = useCallback((items: IOrderItem[]) => {
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalAmount = items.reduce((sum, item) => {
+      const optionTotal = item.options?.reduce((optSum, opt) => optSum + (opt.price || 0), 0) ?? 0;
+      return sum + (item.price + optionTotal) * item.quantity;
+    }, 0);
+    return { totalAmount, grandTotal: totalAmount, totalQuantity };
+  }, []);
+
+  const addToCart = useCallback(
+    (variant: any, productId: string) => {
+      const newItem: IOrderItem = {
+        id: variant.id,
+        uuid: generateUUID(),
+        productId: productId,
+        name: variant.name || cross?.getCrossSells?.find((p: any) => p.productId === productId).name || '',
+        price: variant.price || variant.salePrice || 0,
+        quantity: 1,
+        comment: '',
+        reason: '',
+        state: 'DRAFT',
+        options: [],
+        discount: 0,
+        image: cross?.getCrossSells?.find((p: any) => p.productId === productId)?.image,
+      };
+
+      setOrderState((prev) => {
+        const existingItemIndex = prev.items.findIndex((item) => item.id === variant.id);
+        let updatedItems;
+
+        if (existingItemIndex >= 0) {
+          updatedItems = prev.items.map((item, index) =>
+            index === existingItemIndex ? { ...item, quantity: item.quantity + 1 } : item,
+          );
+        } else {
+          updatedItems = [...prev.items, newItem];
+        }
+
+        const totals = calculateTotals(updatedItems);
+        return { ...prev, items: updatedItems, ...totals };
+      });
+    },
+    [setOrderState, calculateTotals, cross?.getCrossSells],
+  );
+
+  const removeFromCart = useCallback(
+    (productId: string) => {
+      setOrderState((prev) => {
+        const existingItemIndex = prev.items.findIndex((item) => item.productId === productId);
+        let updatedItems;
+
+        if (existingItemIndex >= 0) {
+          const existingItem = prev.items[existingItemIndex];
+          if (existingItem.quantity > 1) {
+            updatedItems = prev.items.map((item, index) =>
+              index === existingItemIndex ? { ...item, quantity: item.quantity - 1 } : item,
+            );
+          } else {
+            updatedItems = prev.items.filter((_, index) => index !== existingItemIndex);
+          }
+        } else {
+          updatedItems = prev.items;
+        }
+
+        const totals = calculateTotals(updatedItems);
+        return { ...prev, items: updatedItems, ...totals };
+      });
+    },
+    [setOrderState, calculateTotals],
+  );
 
   const toggleOption = useCallback((option: IMenuOption, value?: string) => {
     setValidateOptions([]);
@@ -79,13 +165,44 @@ const ProductDetailsScreen = () => {
         comment: '',
         image: product.image ?? '',
       };
+
+      getCrossSells({
+        variables: {
+          menuId: participant?.menu.id,
+          ids: [product.productId],
+        },
+      });
       setSelectedItem(item);
       setValidationError('');
     } else {
       setSelectedItem(null);
       setValidationError('');
     }
-  }, [params.product, product]);
+  }, [product]);
+
+  const renderRecommendations = (result: any[]) => {
+    const limitedResults = result?.slice(0, 3) || [];
+
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.recommendationsScroll}
+      >
+        {limitedResults.map((product) => (
+          <View key={product.id} style={styles.recommendationCard}>
+            <RecommendedCard
+              isFullWidth
+              product={product}
+              orderItem={orderState.items?.find((item: any) => item.productId === product.productId)}
+              onAdd={addToCart}
+              onRemove={removeFromCart}
+            />
+          </View>
+        ))}
+      </ScrollView>
+    );
+  };
 
   const onSelect = useCallback(
     (variant: IMenuVariant) => {
@@ -166,7 +283,6 @@ const ProductDetailsScreen = () => {
     [product],
   );
 
-  // Memoize validation result
   const validationResult = useMemo(() => {
     if (!selectedItem) {
       return {
@@ -228,42 +344,40 @@ const ProductDetailsScreen = () => {
 
     setOrderState((prevState) => {
       const items = [...prevState.items, selectedItem];
-
-      // Calculate totals in one pass
-      let totalAmount = 0;
-      let totalQuantity = 0;
-
-      for (const item of items) {
-        const optionTotal = item.options?.reduce((sum, opt) => sum + (opt.price || 0), 0) ?? 0;
-        totalAmount += (item.price + optionTotal) * item.quantity;
-        totalQuantity += item.quantity;
-      }
+      const totals = calculateTotals(items);
 
       return {
         items,
-        totalAmount,
-        grandTotal: totalAmount,
-        totalQuantity,
+        ...totals,
         state: 'DRAFT',
       };
     });
 
-    router.back();
+    if (onClose) {
+      onClose();
+    } else {
+      router.back();
+    }
+
     setSelectedOption(null);
     setValidationError('');
     setSelectedItem(null);
     setValidateOptions([]);
-  }, [selectedItem, validationResult, t, setOrderState]);
+  }, [selectedItem, validationResult, t, setOrderState, onClose, calculateTotals]);
 
   const goBack = useCallback(() => {
-    router.back();
+    if (onClose) {
+      onClose();
+    } else {
+      router.back();
+    }
+
     setSelectedOption(null);
     setValidationError('');
     setSelectedItem(null);
     setValidateOptions([]);
-  }, []);
+  }, [onClose]);
 
-  // Memoize render of variants section
   const renderVariants = useMemo(() => {
     if (!product || !product.variants) return null;
 
@@ -288,7 +402,6 @@ const ProductDetailsScreen = () => {
     );
   }, [product?.variants, selectedItem?.id, t, onSelect]);
 
-  // Memoize render of options section
   const renderOptions = useMemo(() => {
     if (!currentVariant || isEmpty(currentVariant.options)) return null;
 
@@ -340,19 +453,17 @@ const ProductDetailsScreen = () => {
     );
   }, [currentVariant, selectedItem?.options, validateOptions, validationError, t, toggleOption]);
 
-  // Memoize price calculation
   const priceDisplay = useMemo(() => {
     if (!selectedItem) return '0' + CURRENCY;
     return calculateOrderItem(selectedItem) + CURRENCY;
   }, [selectedItem]);
 
-  // Memoize HTML content
   const htmlContent = useMemo(() => {
     if (!product?.specification) return null;
     return { html: product.specification };
   }, [product?.specification]);
 
-  return (
+  const renderContent = () => (
     <View style={styles.page}>
       <View style={styles.header}>
         <TouchableOpacity
@@ -374,14 +485,14 @@ const ProductDetailsScreen = () => {
             right: 0,
           }}
         >
-          <TouchableOpacity onPress={() => setDrawerVisible(true)}>
+          <TouchableOpacity onPress={() => router.push('/private/draft-order')}>
             <FAB
               animated={false}
               icon="cart-outline"
               size="small"
               style={styles.fab}
               onPress={() => {
-                setDrawerVisible(true);
+                router.push('/private/draft-order');
               }}
               color="white"
             />
@@ -396,9 +507,15 @@ const ProductDetailsScreen = () => {
             source={{ uri: product?.image }}
             style={styles.pizzaImage}
             resizeMode="cover"
-            // Add default onError handler
             onError={(e) => console.log('Image load error:', e.nativeEvent.error)}
           />
+
+          {!isEmpty(cross?.getCrossSells) && (
+            <View style={styles.crossSellSection}>
+              <Text style={styles.crossSellTitle}>{t('mainPage.recommendedForYou')}</Text>
+              {renderRecommendations(cross?.getCrossSells)}
+            </View>
+          )}
         </View>
 
         <ScrollView style={styles.rightColumn} contentContainerStyle={styles.rightContent}>
@@ -415,10 +532,8 @@ const ProductDetailsScreen = () => {
             </View>
           )}
 
-          {/* Render variants section */}
           {renderVariants}
 
-          {/* Render options section */}
           {renderOptions}
 
           <View style={styles.priceSection}>
@@ -442,8 +557,6 @@ const ProductDetailsScreen = () => {
         </ScrollView>
       </View>
 
-      <DraftOrder visible={drawerVisible} onCloseModal={() => setDrawerVisible(false)} />
-
       {visibleValues && (
         <OptionValuesModal
           visible={visibleValues}
@@ -456,12 +569,36 @@ const ProductDetailsScreen = () => {
       )}
     </View>
   );
+
+  if (visible === false) {
+    return null;
+  }
+
+  if (onClose) {
+    return (
+      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+        {renderContent()}
+      </Modal>
+    );
+  }
+
+  return renderContent();
 };
 
 const styles = StyleSheet.create({
   page: {
     backgroundColor: '#fff',
     paddingHorizontal: 24,
+    flex: 1,
+  },
+  scrollContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+  },
+  cardContainer: {
+    marginRight: 12,
+    marginBottom: 8,
   },
   clamped: {
     maxHeight: 100,
@@ -545,9 +682,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pizzaImage: {
-    height: 560,
+    height: 400,
     width: '100%',
     borderRadius: 16,
+    marginBottom: 16,
   },
   title: {
     fontSize: 28,
@@ -564,13 +702,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 16,
   },
-
   validateDesc: {
     color: 'red',
     fontSize: 13,
     marginBottom: 16,
   },
-
   sectionTitle: {
     fontWeight: '600',
     fontSize: 16,
@@ -591,7 +727,6 @@ const styles = StyleSheet.create({
   sizeButtonSelected: {
     backgroundColor: defaultColor,
   },
-
   validateButtonSelected: {
     backgroundColor: 'red',
   },
@@ -617,13 +752,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-
   selectedToppingText: {
     fontSize: 14,
     fontWeight: '500',
     color: 'white',
   },
-
   toppingText: {
     fontSize: 14,
     fontWeight: '500',
@@ -717,6 +850,27 @@ const styles = StyleSheet.create({
   htmlClamp: {
     maxHeight: 80, // 4 lines × 20 lineHeight = 80
     overflow: 'hidden',
+  },
+  // Updated styles for cross-sell section - now positioned below product image
+  crossSellSection: {
+    marginTop: 16,
+    flex: 1,
+  },
+  crossSellTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 12,
+  },
+  // Horizontal scroll layout for recommendations
+  recommendationsScroll: {
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  recommendationCard: {
+    borderRadius: 12,
+    padding: 4,
+    marginRight: 12,
   },
 });
 
