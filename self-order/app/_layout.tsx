@@ -26,7 +26,7 @@ import { ValidProvider } from '@/context/ValidContext';
 import { getStorage } from '@/cache';
 import { useTranslation } from 'react-i18next';
 import { OrderProvider } from '@/providers/OrderProvider';
-import { LogBox } from 'react-native';
+import { LogBox, Platform } from 'react-native';
 import { DrawerProvider } from '@/providers/drawerProvider';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -64,6 +64,21 @@ export default function RootLayout() {
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
     NavigationBar.setVisibilityAsync('hidden'); // hides the soft nav bar
+  }, []);
+
+  useEffect(() => {
+    const hideNavigationBar = async () => {
+      if (Platform.OS === 'android') {
+        try {
+          await NavigationBar.setBackgroundColorAsync('transparent');
+          await NavigationBar.setButtonStyleAsync('light');
+          await NavigationBar.setVisibilityAsync('hidden');
+        } catch (e) {
+          console.warn('Navigation bar hide failed:', e);
+        }
+      }
+    };
+    hideNavigationBar();
   }, []);
 
   useEffect(() => {

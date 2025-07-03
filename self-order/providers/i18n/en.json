@@ -41,6 +41,7 @@
       "mandatoryOptions": "Please select required options: {{options}}"
     },
     "recommendedForYou": "Recommended products",
+    "loading": "Loading",
     "totalItems": "Total Items",
     "Cafeteria": "Cafeteria",
     "FastFood": "Fast food",
