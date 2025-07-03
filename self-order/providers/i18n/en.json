@@ -40,6 +40,8 @@
     "validation": {
       "mandatoryOptions": "Please select required options: {{options}}"
     },
+    "recommendedForYou": "Recommended products",
+    "totalItems": "Total Items",
     "Cafeteria": "Cafeteria",
     "FastFood": "Fast food",
     "MOVED": "Moved",

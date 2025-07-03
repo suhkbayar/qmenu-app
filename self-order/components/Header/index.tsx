@@ -9,6 +9,11 @@ import { IMenuCategory } from '@/types';
 import { defaultColor } from '@/constants/Colors';
 import CustomMessageIcon from '@/assets/collapsedMenu';
 import CustomReplyIcon from '@/assets/unCollapsedMenu';
+import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
+import { UPDATE_PROFILE } from '@/graphql/mutation/register';
+import { GET_BRANCH, ME } from '@/graphql/query';
+
+import { isEmpty } from 'lodash';
 
 interface Country {
   label: string;
@@ -26,7 +31,7 @@ interface HeaderProps {
 }
 
 // Pre-defined country list outside component to avoid recreation
-const countryList: Country[] = [
+export const countryList: Country[] = [
   { label: 'English', value: 'US', i18n: 'en', path: require('../../assets/lang/US.png') },
   { label: 'Монгол', value: 'MN', i18n: 'mn', path: require('../../assets/lang/MN.png') },
   { label: 'Svenska', value: 'SV', i18n: 'sv', path: require('../../assets/lang/SV.png') },
@@ -52,12 +57,79 @@ const Header: React.FC<HeaderProps> = ({
   collapsedMenu,
   setCollapsedMenu,
 }) => {
-  const { participant } = useCallStore();
+  const { participant, setParticipant } = useCallStore();
   const [visible, setVisible] = useState<boolean>(false);
   const { i18n } = useTranslation('language');
   const [loading, setLoading] = useState<boolean>(false);
 
   const [selectedCountry, setSelectedCountry] = useState<Country>(countryByLanguage['en'] || countryList[0]);
+
+  // Query current user data
+  const { data: userData } = useQuery(ME, {
+    onCompleted(data) {
+      if (data?.me?.language) {
+        const langCode = data.me.language.toLowerCase();
+        i18n.changeLanguage(langCode);
+        if (countryByLanguage[langCode]) {
+          setSelectedCountry(countryByLanguage[langCode]);
+        }
+      }
+    },
+  });
+
+  // Lazy query to refetch branch data after language change
+  const [getBranch] = useLazyQuery(GET_BRANCH, {
+    fetchPolicy: 'network-only',
+    onCompleted(data) {
+      if (data?.getParticipant) {
+        setParticipant(data.getParticipant);
+        refreshLanguage();
+      }
+      setLoading(false);
+    },
+    onError(error) {
+      console.error('Error fetching branch data:', error);
+      setLoading(false);
+    },
+  });
+
+  // Mutation to update user profile with new language
+  const [updateProfile] = useMutation(UPDATE_PROFILE, {
+    update(cache, { data: { updateProfile } }) {
+      const caches = cache.readQuery<{ me: any }>({ query: ME });
+      if (caches && caches.me) {
+        cache.writeQuery({
+          query: ME,
+          data: {
+            me: caches.me.id === updateProfile.id ? updateProfile : caches.me,
+          },
+        });
+      }
+    },
+    onCompleted: (data) => {
+      // Refetch branch data to get updated translations
+      if (participant?.id) {
+        getBranch({ variables: { id: participant.id } });
+      } else {
+        setLoading(false);
+      }
+    },
+    onError(error) {
+      console.error('Error updating profile:', error);
+      setLoading(false);
+    },
+  });
+
+  // Filter available languages based on branch settings
+  const availableLanguages = useMemo(() => {
+    const branchLanguages = participant?.branch?.languages?.map((lang: string) => lang.toLowerCase()) || [];
+
+    if (branchLanguages.length === 0) {
+      return countryList; // Return all if no branch languages defined
+    }
+
+    return countryList.filter((country) => branchLanguages.includes(country.i18n.toLowerCase()));
+  }, [participant?.branch?.languages]);
 
   const loadLanguageSetting = useCallback(async () => {
     try {
@@ -82,24 +154,33 @@ const Header: React.FC<HeaderProps> = ({
   const handleLanguageChange = useCallback(
     async (country: Country) => {
       try {
+        setLoading(true);
         setSelectedCountry(country);
+        setVisible(false);
 
-        // Change language in i18n first for immediate UI update
+        // Change language in i18n immediately for UI feedback
         i18n.changeLanguage(country.i18n.toLowerCase());
 
-        // Then save to storage (don't await this operation to avoid delay)
-        setStorage('language', country.i18n.toLowerCase()).catch((err) =>
-          console.error('Error saving language setting:', err),
-        );
+        // Save to local storage
+        await setStorage('language', country.i18n.toLowerCase());
 
-        // Close the menu
-        setVisible(false);
-        setLoading(false);
+        // Update user profile with new language preference
+        const input = {
+          firstName: userData?.me?.firstName,
+          lastName: userData?.me?.lastName,
+          gender: userData?.me?.gender,
+          birthday: null,
+          email: isEmpty(userData?.me?.email) ? null : userData?.me?.email,
+          language: country.i18n.toUpperCase(),
+        };
+
+        updateProfile({ variables: { input } });
       } catch (error) {
         console.error('Error changing language:', error);
+        setLoading(false);
       }
     },
-    [i18n],
+    [i18n, userData, updateProfile],
   );
 
   const toggleMenu = useCallback(() => {
@@ -175,13 +256,10 @@ const Header: React.FC<HeaderProps> = ({
               </TouchableOpacity>
             }
           >
-            {countryList.map((country) => (
+            {availableLanguages.map((country) => (
               <Menu.Item
                 key={country.i18n}
                 onPress={() => {
-                  setLoading(true);
-                  console.log('Selected setLoading:', true);
-                  refreshLanguage();
                   handleLanguageChange(country);
                 }}
                 title={

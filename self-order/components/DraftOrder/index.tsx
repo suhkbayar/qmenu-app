@@ -48,16 +48,14 @@ const DraftOrder = memo(({ visible, onCloseModal }: Props) => {
     },
   });
 
-  // Memoize this function to prevent recreating it on each render
   const calculateTotals = useCallback((items: IOrderItem[]) => {
     const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
     const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
-    const grandTotal = totalAmount; // You can add tax/fees here if needed
+    const grandTotal = totalAmount;
 
     return { totalAmount, grandTotal, totalQuantity };
   }, []);
 
-  // Memoize these handlers to prevent recreating them on each render
   const increase = useCallback(
     (uuid: string) => {
       setOrderState((prevOrder: ICustomerOrder) => {
@@ -92,7 +90,6 @@ const DraftOrder = memo(({ visible, onCloseModal }: Props) => {
     [calculateTotals, setOrderState],
   );
 
-  // Memoize this to avoid recreating the order items on each render
   const preparedItems = useMemo(() => {
     if (isEmpty(orderState.items)) return [];
 
@@ -127,7 +124,6 @@ const DraftOrder = memo(({ visible, onCloseModal }: Props) => {
     });
   }, [orderState.items, participant, preparedItems, createOrder]);
 
-  // Memoize formatted price to avoid recalculation
   const formattedPrice = useMemo(() => {
     return `${orderState.totalAmount.toLocaleString()} ${CURRENCY}`;
   }, [orderState.totalAmount]);
@@ -138,7 +134,6 @@ const DraftOrder = memo(({ visible, onCloseModal }: Props) => {
 
   return (
     <RightDrawer visible={visible} onClose={onClose}>
-      {/* Always render header for immediate response */}
       <View style={styles.header}>
         <Text style={styles.headerText}>{t('mainPage.YourOrder')}</Text>
         <TouchableOpacity onPress={onClose} style={{ padding: 10 }}>
