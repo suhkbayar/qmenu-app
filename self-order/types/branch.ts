@@ -19,4 +19,5 @@ export interface IBranch {
   type: string;
   instagram: string;
   services: string[];
+  languages: string[];
 }
