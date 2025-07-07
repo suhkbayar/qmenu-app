@@ -16,6 +16,7 @@
       }
     },
     "android": {
+      "theme": "Theme.AppCompat.Light.NoActionBar",
       "bundleIdentifier": "com.mn.qmenu.selforder",
       "versionCode": 1,
       "adaptiveIcon": {

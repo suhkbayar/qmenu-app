@@ -70,7 +70,7 @@ export default function RootLayout() {
     const hideNavigationBar = async () => {
       if (Platform.OS === 'android') {
         try {
-          await NavigationBar.setBackgroundColorAsync('transparent');
+          await NavigationBar.setBackgroundColorAsync('#FF000000');
           await NavigationBar.setButtonStyleAsync('light');
           await NavigationBar.setVisibilityAsync('hidden');
         } catch (e) {
