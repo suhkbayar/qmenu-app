@@ -15,7 +15,7 @@ export default function BatteryInfoScreen() {
 
     fetchBatteryInfo();
 
-    const intervalId = setInterval(fetchBatteryInfo, 300); // every 5 min
+    const intervalId = setInterval(fetchBatteryInfo, 300000);
 
     const batteryLevelSubscription = Battery.addBatteryLevelListener(({ batteryLevel }) => {
       setBatteryLevel(batteryLevel);
