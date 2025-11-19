@@ -53,11 +53,11 @@ const Public = () => {
   };
 
   const onSubmit = async (data: FieldValues) => {
-    getCurrentToken({ variables: { code: data.code, type: 'Q' } });
+    getCurrentToken({ variables: { code: data.code, type: 'TB' } });
   };
 
   const goTable = async (table: any) => {
-    getCurrentToken({ variables: { code: table.code, type: 'Q' } });
+    getCurrentToken({ variables: { code: table.code, type: 'TB' } });
   };
 
   useEffect(() => {

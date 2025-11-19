@@ -50,7 +50,7 @@ const CameraScreen = () => {
     if (code) {
       setScanned(true); // mark as scanned
 
-      getCurrentToken({ variables: { code: code, type: 'Q' } });
+      getCurrentToken({ variables: { code: code, type: 'TB' } });
     }
   };
 

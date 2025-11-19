@@ -6,7 +6,9 @@ import { getToken } from './auth';
 import { RetryLink } from '@apollo/client/link/retry';
 import { DEFAULT_TOKEN } from '@/constants/token';
 
-const url = 'https://graph.qmenu.mn/graphql';
+// const url = 'https://graph.qmenu.mn/graphql';
+
+const url = 'https://t3s2m53kbndyfj7o6roqlwssvq.appsync-api.ap-east-1.amazonaws.com/graphql';
 
 const region = 'ap-east-1';
 

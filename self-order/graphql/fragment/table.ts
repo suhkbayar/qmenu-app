@@ -9,6 +9,8 @@ export const TABLE_FIELDS = gql`
     min
     max
     active
+    battery
+    charging
     shape {
       type
       x

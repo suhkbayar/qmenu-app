@@ -1,9 +1,9 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { Platform, SafeAreaView, StyleSheet, View, Text, AppState } from 'react-native';
 import { getStorage } from '@/cache';
 import { useCallStore } from '@/cache/cart.store';
 import { GET_BANNERS, GET_BRANCH } from '@/graphql/query';
-import { useLazyQuery } from '@apollo/client';
+import { useLazyQuery, useMutation } from '@apollo/client';
 import { isEmpty } from 'lodash';
 import HelpFloatingButton from '@/components/FloatingButton/HelpFloatingButton';
 import Loader from '@/components/Loader';
@@ -12,9 +12,11 @@ import { AuthContext } from '@/providers/auth';
 import { router } from 'expo-router';
 import { emptyOrder } from '@/constants';
 import { ICustomerTable } from '@/types';
+import * as Battery from 'expo-battery';
 
 import ScreensaverWrapper from '@/providers/ScreensaverWrapper';
 import TableQrFloatingButton from '@/components/FloatingButton/TableQrFloatingButtin';
+import { UPDATE_BATTERY } from '@/graphql/mutation/table';
 
 const MemoizedContainer = React.memo(({ participant }: any) => <Container participant={participant} />);
 
@@ -100,6 +102,26 @@ const Private = () => {
       }
     };
   }, []);
+
+  const [sendBattery] = useMutation(UPDATE_BATTERY);
+  const tableId = data?.getParticipant?.table?.id;
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || !tableId || !sendBattery) return;
+
+    const push = async () => {
+      const state = await Battery.getPowerStateAsync();
+      const percent = Math.round((state?.batteryLevel ?? 0) * 100);
+      const charging =
+        state?.batteryState === Battery.BatteryState.CHARGING || state?.batteryState === Battery.BatteryState.FULL;
+      await sendBattery({ variables: { id: tableId, battery: percent, charging } });
+    };
+
+    push();
+    const id = setInterval(push, 5 * 60 * 1000);
+
+    return () => clearInterval(id);
+  }, [tableId, sendBattery]);
 
   if (loading || loadBranch || loadBanners) return <Loader />;
 

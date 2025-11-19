@@ -38,6 +38,7 @@ export const PAYMENT_TYPE = {
   MCD: 'MCD',
   XCP: 'XCP',
   MBP: 'MBP',
+  MCS: 'MCS', //Card Scanner
 };
 
 export const TYPE = {
@@ -81,6 +82,7 @@ export enum PaymentType {
   UNP = 'UNP', //UnionPay
   UBE = 'UBE', //UBEats
   HRC = 'HRC', //Horeca
+  MCS = 'MCS', //Card Scanner
 }
 
 export enum WidgetType {
@@ -125,6 +127,7 @@ export enum ChannelType {
   MB = 'MB', //MBank
   MR = 'MR', //Marketplace
   QM = 'QM', //Qmenu
+  TB = 'TB' //Tablet
 }
 
 export enum LoyaltyState {
@@ -339,6 +342,7 @@ export const ChannelTypesArr = [
   { nvalue: ChannelType.MR, name: 'Market' },
   { nvalue: ChannelType.MB, name: 'M Bank' },
   { nvalue: ChannelType.QM, name: 'Qmenu' },
+  { nvalue: ChannelType.TB, name: 'Tablet' },
 ];
 
 export const qmenuConfigs = [

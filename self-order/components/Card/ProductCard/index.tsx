@@ -161,14 +161,14 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQua
 
 const styles = StyleSheet.create({
   card: {
-    width: '32%',
-    backgroundColor: '#fff',
+    width: '100%',
     marginVertical: 7,
     marginHorizontal: 7,
     borderRadius: 12,
     overflow: 'hidden',
     elevation: 4,
     position: 'relative',
+    backgroundColor: '#fff',
   },
   image: {
     height: 220,

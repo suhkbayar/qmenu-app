@@ -24,7 +24,13 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.mn.qmenu.selforder",
-      "runtimeVersion": "1.0.0"
+      "runtimeVersion": "1.0.0",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -59,15 +65,14 @@
         "origin": false
       },
       "eas": {
-        "projectId": "1a851a81-ff4a-437b-9509-daa6c6ed91e0",
-        "buildId": "c457594d-54da-45fa-84f4-abfa3ced70b1"
+        "projectId": "e305709f-4a6a-4b04-94fa-be9ab9358121"
       }
     },
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/1a851a81-ff4a-437b-9509-daa6c6ed91e0"
+      "url": "https://u.expo.dev/e305709f-4a6a-4b04-94fa-be9ab9358121"
     }
   }
 }
