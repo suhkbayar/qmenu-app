@@ -308,7 +308,7 @@
     "CardScanner": "Карт уншуулах",
     "WaitingForCardScan": "Карт уншиж байна",
     "PleaseInsertOrTapCard": "Картаа төхөөрөмж дээр уншуулна уу",
-    "ProcessingPayment": "Төлбөр боловсруулж байна...",
+    "ProcessingPayment": "Төлбөр шалгаж байна...",
     "CheckPaymentStatus": "Төлбөрийн төлөв шалгах",
     "PaymentSuccessful": "Төлбөр амжилттай!",
     "PaymentFailed": "Төлбөр амжилтгүй. Дахин оролдоно уу.",

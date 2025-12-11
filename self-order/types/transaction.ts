@@ -16,6 +16,7 @@ export interface ITransaction {
   payment: IPayment;
   image: string;
   code: string;
+  data: string;
 }
 
 export interface ITransactionLink {

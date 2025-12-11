@@ -9,11 +9,10 @@ type Props = {
   visible: boolean;
   loading: boolean;
   onClose: () => void;
-  refetch: (transactionId: any) => void;
   transaction: ITransaction;
 };
 
-const McsPaymentModal = ({ visible, onClose, refetch, transaction, loading }: Props) => {
+const McsPaymentModal = ({ visible, onClose, loading }: Props) => {
   const { t } = useTranslation('language');
 
   return (
@@ -34,11 +33,6 @@ const McsPaymentModal = ({ visible, onClose, refetch, transaction, loading }: Pr
           <ActivityIndicator animating={true} size="large" color="#facc15" />
           <Text style={styles.statusText}>{t('mainPage.ProcessingPayment')}</Text>
         </View>
-
-        <TouchableOpacity style={styles.checkButton} onPress={() => refetch(transaction.id)} disabled={loading}>
-          {loading && <ActivityIndicator animating={true} size="small" color="#fff" />}
-          <Text style={styles.checkText}>{t('mainPage.CheckPaymentStatus')}</Text>
-        </TouchableOpacity>
       </View>
     </Modal>
   );

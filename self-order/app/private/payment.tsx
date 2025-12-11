@@ -20,7 +20,7 @@ import { useMutation, useQuery, useSubscription } from '@apollo/client';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Icon } from 'react-native-paper';
 import { useToast } from 'react-native-toast-notifications';
 import { launchCardScanner } from '@/utils/cardScanner';
@@ -53,36 +53,57 @@ const Payment = () => {
     const handleMcsPayment = async () => {
       if (visibleMcs && transaction && order) {
         try {
-          console.log('🔵 [MCS] Launching card scanner with amount:', order.totalAmount);
-          console.log('🔵 [MCS] Transaction ID:', transaction.id);
-          console.log('🔵 [MCS] Order ID:', order.id);
-
-          // Launch the card scanner with the payment amount
           const result = await launchCardScanner(order.totalAmount.toString());
 
-          console.log('🟢 [MCS] Card scanner returned successfully');
-          console.log('🟢 [MCS] Payment status from native module:', result.payment_status);
-          console.log('🟢 [MCS] Full result:', JSON.stringify(result, null, 2));
-
-          // Now we can properly check payment_status from native module
-          if (result.payment_status) {
-            console.log('✅ [MCS] Payment successful from card scanner');
-            console.log('🔄 [MCS] Validating transaction on backend:', transaction.id);
-            await validateTransaction({ variables: { id: transaction.id } });
-            console.log('✅ [MCS] Validation mutation called');
-          } else {
-            // Payment was not successful or user cancelled
-            console.log('⚠️ [MCS] Payment not successful or cancelled');
-            console.log('🔄 [MCS] Validating transaction anyway to check backend state');
-            await validateTransaction({ variables: { id: transaction.id } });
-          }
-        } catch (error: any) {
-          console.error('🔴 [MCS] Card scanner error:', error);
-          console.error('🔴 [MCS] Error details:', {
-            message: error.message,
-            stack: error.stack,
-            name: error.name,
+          const mcsData = JSON.stringify({
+            timestamp: new Date().toISOString(),
+            response: {
+              payment_status: result.payment_status,
+              response_body: result.response_body || {},
+            },
           });
+
+          await validateTransaction({
+            variables: {
+              id: transaction.id,
+              data: mcsData,
+            },
+          });
+        } catch (error: any) {
+          if (error.message === 'CANCELLED') {
+            setVisibleMcs(false);
+            toast.show(t('mainPage.PaymentCancelled') || 'Payment was cancelled', {
+              type: 'warning',
+              icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
+              placement: 'top',
+              warningColor: defaultColor,
+              duration: 4000,
+              animationType: 'slide-in',
+            });
+            return;
+          }
+
+          const errorData = JSON.stringify({
+            timestamp: new Date().toISOString(),
+            response: {
+              payment_status: false,
+              response_body: {
+                message: error.message || 'Error',
+              },
+            },
+          });
+
+          try {
+            await validateTransaction({
+              variables: {
+                id: transaction.id,
+                data: errorData,
+              },
+            });
+          } catch (validationError) {
+            console.error('Failed to update transaction:', validationError);
+          }
+
           setVisibleMcs(false);
           toast.show(error.message || t('mainPage.CardScannerError'), {
             type: 'danger',
@@ -101,19 +122,10 @@ const Payment = () => {
     variables: { customer: customerId },
     skip: !customerId,
     onData: ({ client, data }) => {
-      console.log('📡 [SUBSCRIPTION] Data received:', data);
-      console.log('📡 [SUBSCRIPTION] Customer ID:', customerId);
-
       const updatedData = data?.data?.onUpdatedOrder;
-      if (!updatedData) {
-        console.log('⚠️ [SUBSCRIPTION] No updated data in subscription response');
-        return;
-      }
+      if (!updatedData) return;
 
       const { event, order: subscriptionOrder } = updatedData;
-      console.log('📡 [SUBSCRIPTION] Event:', event);
-      console.log('📡 [SUBSCRIPTION] Order ID:', subscriptionOrder?.id);
-      console.log('📡 [SUBSCRIPTION] Order payment state:', subscriptionOrder?.paymentState);
 
       try {
         // 1️⃣ Update GET_ORDERS (list)
@@ -168,34 +180,16 @@ const Payment = () => {
           });
         }
         if (subscriptionOrder.id === orderId) {
-          console.log('✅ [SUBSCRIPTION] Order matches current orderId, navigating to success');
-          console.log('✅ [SUBSCRIPTION] Closing modals and navigating...');
           setVisiblePending(false);
           setVisibleMcs(false);
           router.push({
             pathname: '/private/payment-success',
             params: { orderId: orderId },
           });
-        } else {
-          console.log('ℹ️ [SUBSCRIPTION] Order does not match current orderId');
-          console.log('ℹ️ [SUBSCRIPTION] Current:', orderId, 'Received:', subscriptionOrder.id);
         }
-
-        console.log('✅ [SUBSCRIPTION] Cache updated for both getOrders and getOrder');
       } catch (err) {
-        console.error('❌ [SUBSCRIPTION] Cache update failed:', err);
-        console.error('❌ [SUBSCRIPTION] Error details:', err);
+        console.error('[SUBSCRIPTION] Cache update failed:', err);
       }
-    },
-    onError: (err) => {
-      console.error('🔴 [SUBSCRIPTION] Subscription error occurred');
-      console.error('🔴 [SUBSCRIPTION] Error message:', err.message);
-      console.error('🔴 [SUBSCRIPTION] Error details:', {
-        message: err.message,
-        graphQLErrors: err.graphQLErrors,
-        networkError: err.networkError,
-        extraInfo: err.extraInfo,
-      });
     },
   });
 
@@ -242,32 +236,19 @@ const Payment = () => {
 
   const [payOrderByPayment, { loading: paying }] = useMutation(GET_PAY_ORDER, {
     onCompleted: (data) => {
-      console.log('💳 [PAYMENT] Payment mutation completed');
-      console.log('💳 [PAYMENT] Response data:', JSON.stringify(data, null, 2));
-
       if (data && data?.payOrder) {
         const transaction = data.payOrder.transaction;
-        console.log('💳 [PAYMENT] Transaction created:', {
-          id: transaction.id,
-          type: transaction.type,
-          amount: transaction.amount,
-        });
-
         setTransaction(transaction);
 
         if (transaction.type === PAYMENT_TYPE.MCS) {
-          console.log('💳 [PAYMENT] MCS payment type detected, showing MCS modal');
           setVisibleMcs(true);
         } else {
-          console.log('💳 [PAYMENT] Non-MCS payment type, showing pending modal');
           setVisiblePending(true);
         }
       }
       setActivePaymentType(null);
     },
     onError(err) {
-      console.error('🔴 [PAYMENT] Payment mutation error:', err.message);
-      console.error('🔴 [PAYMENT] Error details:', err);
       setActivePaymentType(null);
       toast.show(err.message, {
         type: 'warning',
@@ -282,21 +263,22 @@ const Payment = () => {
 
   const [validateTransaction, { loading: validating }] = useMutation(VALIDATE_TRANSACTION, {
     onCompleted(data) {
-      console.log('✔️ [VALIDATE] Validation mutation completed');
-      console.log('✔️ [VALIDATE] Response data:', JSON.stringify(data, null, 2));
-      console.log('✔️ [VALIDATE] Payment state:', data.validateTransaction.paymentState);
+      const updatedOrder = data.validateTransaction;
 
-      if (data.validateTransaction.paymentState === 'PAID') {
-        console.log('✅ [VALIDATE] Order is PAID, navigating to success screen');
-        setVisiblePending(false);
+      if (updatedOrder.paymentState === 'PAID') {
         setVisibleMcs(false);
+        setVisiblePending(false);
         router.push({
           pathname: '/private/payment-success',
           params: { orderId: orderId },
         });
-      } else if (data.validateTransaction.paymentState !== 'PAID') {
-        console.log('⚠️ [VALIDATE] Order is NOT paid yet, state:', data.validateTransaction.paymentState);
-        toast.show(t('mainPage.NotPaidDescription'), {
+      } else {
+        const failedTransaction = updatedOrder.transactions?.find((t: ITransaction) => t.id === transaction?.id);
+
+        const errorMessage = failedTransaction?.comment || t('mainPage.NotPaidDescription');
+
+        setVisibleMcs(false);
+        toast.show(errorMessage, {
           type: 'warning',
           icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
           placement: 'top',
@@ -307,8 +289,7 @@ const Payment = () => {
       }
     },
     onError(err) {
-      console.error('🔴 [VALIDATE] Validation mutation error:', err.message);
-      console.error('🔴 [VALIDATE] Error details:', err);
+      setVisibleMcs(false);
       toast.show(err.message, {
         type: 'danger',
         placement: 'center',
@@ -355,29 +336,20 @@ const Payment = () => {
   };
 
   const onSelectBank = async (type?: any, id?: string) => {
-    console.log('🏦 [SELECT_BANK] Payment method selected:', type, 'Payment ID:', id);
-
     if (type === 'Cash') {
-      console.log('🏦 [SELECT_BANK] Cash payment selected');
       setVisibleCash(true);
       return;
     }
 
     if (type === 'MCS') {
-      // For MCS, first create the transaction, then launch scanner
-      console.log('🏦 [SELECT_BANK] MCS payment selected');
       if (id) {
-        console.log('🏦 [SELECT_BANK] Creating MCS transaction...');
         setActivePaymentType(type);
         onSubmit(id);
-      } else {
-        console.warn('🏦 [SELECT_BANK] No payment ID provided for MCS');
       }
       return;
     }
 
     if (id) {
-      console.log('🏦 [SELECT_BANK] Other payment type:', type);
       setActivePaymentType(type);
       onSubmit(id);
     }
@@ -472,9 +444,9 @@ const Payment = () => {
             setVisibleMcs(false);
           }}
           transaction={transaction}
-          refetch={(transactionId) => {
-            onRefetch(transactionId);
-          }}
+          // refetch={(transactionId) => {
+          //   onRefetch(transactionId);
+          // }}
         />
       )}
 

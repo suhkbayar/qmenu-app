@@ -109,8 +109,8 @@ export const GET_PAY_ORDER = gql`
 `;
 
 export const VALIDATE_TRANSACTION = gql`
-  mutation validateTransaction($id: ID!, $isInvoice: Boolean) {
-    validateTransaction(id: $id, isInvoice: $isInvoice) {
+  mutation validateTransaction($id: ID!, $isInvoice: Boolean, $data: String) {
+    validateTransaction(id: $id, isInvoice: $isInvoice, data: $data) {
       ...OrderFields
       table {
         ...TableFields
