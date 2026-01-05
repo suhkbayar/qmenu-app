@@ -13,7 +13,8 @@ export type Payload = {
 };
 
 const getAccessToken = async () => {
-  return await getStorage('token');
+  const token = await getStorage('token');
+  return token;
 };
 
 export const isValidToken = async () => {

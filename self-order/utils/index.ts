@@ -2,6 +2,7 @@ import { TableState } from '@/constants';
 import { IMenuProduct, IOrderItem } from '@/types';
 import { isEmpty } from 'lodash';
 import { Dimensions } from 'react-native';
+import moment from 'moment';
 
 export function responsive<T>(mobile: T, tablet?: T): T {
   return Dimensions.get('screen').width < 500 ? mobile : tablet || mobile;
@@ -108,4 +109,31 @@ export const calculateOrderItem = (item: IOrderItem) => {
   totalAmount += itemTotal;
 
   return totalAmount.toLocaleString();
+};
+
+export const isCurrentlyOpen = (timetable?: any): boolean => {
+  if (!timetable) return true;
+
+  const now = moment();
+  const day = now.format('ddd').toLowerCase(); // mon, tue, etc.
+
+  const isDayActive = timetable?.[day];
+  const open = timetable?.[`${day}Open`];
+  const close = timetable?.[`${day}Close`];
+
+  if (!isDayActive) return false;
+
+  if (!open || !close) return false;
+
+  // Use full datetime for today
+  const todayStr = now.format('YYYY-MM-DD');
+  const openTime = moment(`${todayStr} ${open}`, 'YYYY-MM-DD HH:mm');
+  let closeTime = moment(`${todayStr} ${close}`, 'YYYY-MM-DD HH:mm');
+
+  // Handle overnight shift (e.g. open: 22:00, close: 02:00 next day)
+  if (closeTime.isBefore(openTime)) {
+    closeTime.add(1, 'day');
+  }
+
+  return now.isBetween(openTime, closeTime);
 };

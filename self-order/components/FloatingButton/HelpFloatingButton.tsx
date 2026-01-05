@@ -24,6 +24,9 @@ const HelpFloatingButton = () => {
         animationType: 'slide-in',
       });
     },
+    onError: (err) => {
+      console.log('WAITER_CALL error:', err);
+    },
   });
   const handlePress = useCallback((state: { open: boolean }) => {
     setOpen(state.open);

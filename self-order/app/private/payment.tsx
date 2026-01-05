@@ -395,11 +395,11 @@ const Payment = () => {
             onSelect={onSelectBank}
             loading={paying && activePaymentType === 'Khan bank'}
           />
-          <McsForm
+          {/* <McsForm
             id={participant?.payments.find((payment) => payment.type === PAYMENT_TYPE.MCS)?.id}
             onSelect={onSelectBank}
             loading={paying && activePaymentType === 'MCS'}
-          />
+          /> */}
           {!participant?.advancePayment && <CashForm onSelect={onSelectBank} />}
         </View>
         {order && <OrderInfo order={order} />}

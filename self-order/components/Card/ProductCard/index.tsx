@@ -81,7 +81,7 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQua
         params: {
           product: JSON.stringify({
             ...product,
-            image: getCdnImageUrl(product.image, 'xl'),
+            image: product?.image,
           }),
         },
       });

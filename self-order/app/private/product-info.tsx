@@ -504,7 +504,7 @@ const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
       <View style={styles.content}>
         <View style={styles.leftColumn}>
           <Image
-            source={{ uri: product?.image }}
+            source={{ uri: product?.image.replace('/sm', '/md') }}
             style={styles.pizzaImage}
             resizeMode="cover"
             onError={(e) => console.log('Image load error:', e.nativeEvent.error)}

@@ -1,20 +1,19 @@
 import React, { useRef, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions, Animated } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons'; // or 'react-native-vector-icons/Ionicons'
+import { Ionicons } from '@expo/vector-icons';
 import { useCallStore } from '@/cache/cart.store';
 import { defaultColor } from '@/constants/Colors';
 import { IMenuCategory } from '@/types';
 
 type Props = {
   categories: IMenuCategory[];
-  activeIndex: number;
-  onSelect: (index: number) => void;
+  activeCategoryId: string | null;
+  onSelect: (categoryId: string) => void;
 };
 
-const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
+const Sidebar = ({ categories, activeCategoryId, onSelect }: Props) => {
   const { participant } = useCallStore();
-  // console.log('Sidebar activeIndex:', activeIndex);
   const scrollRef = useRef<ScrollView>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(true);
@@ -24,17 +23,12 @@ const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
     const contentHeight = event.nativeEvent.contentSize.height;
     const layoutHeight = event.nativeEvent.layoutMeasurement.height;
 
-    setShowScrollTop(y > 10); // Show scroll-to-top if not at the top
-    setShowScrollBottom(y + layoutHeight < contentHeight - 10); // Show scroll-to-bottom if not at the bottom
+    setShowScrollTop(y > 10);
+    setShowScrollBottom(y + layoutHeight < contentHeight - 10);
   };
 
-  const scrollToTop = () => {
-    scrollRef.current?.scrollTo({ y: 0, animated: true });
-  };
-
-  const scrollToBottom = () => {
-    scrollRef.current?.scrollToEnd({ animated: true });
-  };
+  const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
+  const scrollToBottom = () => scrollRef.current?.scrollToEnd({ animated: true });
 
   return (
     <View style={styles.sidebar}>
@@ -50,12 +44,12 @@ const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-        {categories.map((item, idx) => {
-          const isActive = activeIndex === idx;
+        {categories.map((item) => {
+          const isActive = activeCategoryId === item.id;
           return (
             <TouchableOpacity
-              key={idx}
-              onPress={() => onSelect(idx)}
+              key={item.id}
+              onPress={() => onSelect(item.id)}
               style={[styles.itemContainer, isActive && styles.activeItem]}
               activeOpacity={0.8}
             >
@@ -67,14 +61,12 @@ const Sidebar = ({ categories, activeIndex, onSelect }: Props) => {
         })}
       </ScrollView>
 
-      {/* Scroll to Top Button */}
       {showScrollTop && (
         <TouchableOpacity style={[styles.scrollButton, { top: 238 }]} onPress={scrollToTop}>
           <Ionicons name="arrow-up-circle" size={30} color="#888" />
         </TouchableOpacity>
       )}
 
-      {/* Scroll to Bottom Button */}
       {showScrollBottom && (
         <TouchableOpacity style={[styles.scrollButton, { bottom: 10 }]} onPress={scrollToBottom}>
           <Ionicons name="arrow-down-circle" size={30} color="#888" />
@@ -94,15 +86,14 @@ const styles = StyleSheet.create({
   },
   scroll: {
     alignItems: 'center',
-    paddingBottom: 60, // So button doesn't block last item
+    paddingBottom: 60,
   },
   scrollButton: {
     position: 'absolute',
     left: '50%',
-    transform: [{ translateX: -15 }], // Half of icon size (30/2) to center it perfectly
+    transform: [{ translateX: -15 }],
     zIndex: 10,
   },
-
   logoContainer: {
     width: '100%',
     borderRadius: 12,
@@ -125,28 +116,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-    position: 'relative',
   },
   activeItem: {
     backgroundColor: defaultColor,
     borderTopRightRadius: 12,
     borderBottomRightRadius: 12,
   },
-  itemContent: {
-    alignItems: 'center',
-  },
-  label: {
-    color: '#333',
-    fontWeight: 'bold',
-    fontSize: 18,
-    textAlign: 'right',
-  },
-  activeLabel: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 18,
-    textAlign: 'right',
-  },
+  itemContent: { alignItems: 'center' },
+  label: { color: '#333', fontWeight: 'bold', fontSize: 18, textAlign: 'right' },
+  activeLabel: { color: 'white', fontWeight: 'bold', fontSize: 18, textAlign: 'right' },
 });
 
 export default Sidebar;

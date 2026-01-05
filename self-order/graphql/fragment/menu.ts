@@ -1,4 +1,5 @@
 import { gql } from '@apollo/client';
+import { TIMETABLE_FIELDS } from './timetable';
 
 export const MENU_FIELDS = gql`
   fragment MenuFields on Menu {
@@ -17,7 +18,11 @@ export const MENU_CATEGORY_FIELDS = gql`
     sort
     color
     active
+    timetable {
+      ...TimeTableFields
+    }
   }
+  ${TIMETABLE_FIELDS}
 `;
 
 export const MENU_PRODUCT_FIELDS = gql`

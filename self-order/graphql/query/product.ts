@@ -17,3 +17,25 @@ export const GET_CROSS_SELLS = gql`
   ${MENU_OPTION_FIELDS}
   ${MENU_VARIANT_FIELDS}
 `;
+
+export const GET_CATEGORY_PRODUCTS = gql`
+  query getCategoryProducts($categoryId: ID!, $limit: Int, $offset: Int) {
+    getCategoryProducts(categoryId: $categoryId, limit: $limit, offset: $offset) {
+      categoryId
+      products {
+        ...MenuProductFields
+        variants {
+          ...MenuVariantFields
+          options {
+            ...MenuOptionFields
+          }
+        }
+      }
+      total
+      hasMore
+    }
+  }
+  ${MENU_PRODUCT_FIELDS}
+  ${MENU_VARIANT_FIELDS}
+  ${MENU_OPTION_FIELDS}
+`;

@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 import { OrderProvider } from '@/providers/OrderProvider';
 import { LogBox, Platform } from 'react-native';
 import { DrawerProvider } from '@/providers/drawerProvider';
+import * as Updates from 'expo-updates';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -94,6 +95,23 @@ export default function RootLayout() {
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync('transparent'); // optional
+  }, []);
+
+  useEffect(() => {
+    async function checkForUpdates() {
+      if (!__DEV__) {
+        try {
+          const update = await Updates.checkForUpdateAsync();
+          if (update.isAvailable) {
+            await Updates.fetchUpdateAsync();
+            await Updates.reloadAsync();
+          }
+        } catch (e) {
+          console.warn('Update check failed:', e);
+        }
+      }
+    }
+    checkForUpdates();
   }, []);
 
   if (!loaded) {

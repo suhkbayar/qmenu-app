@@ -6,3 +6,4 @@ export * from './song';
 export * from './loyalty';
 export * from './notification';
 export * from './form';
+export * from './product';
