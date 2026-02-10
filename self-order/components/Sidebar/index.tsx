@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, memo } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,7 @@ type Props = {
   onSelect: (categoryId: string) => void;
 };
 
-const Sidebar = ({ categories, activeCategoryId, onSelect }: Props) => {
+const Sidebar = memo(({ categories, activeCategoryId, onSelect }: Props) => {
   const { participant } = useCallStore();
   const scrollRef = useRef<ScrollView>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -74,7 +74,7 @@ const Sidebar = ({ categories, activeCategoryId, onSelect }: Props) => {
       )}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   sidebar: {

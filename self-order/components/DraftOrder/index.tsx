@@ -9,12 +9,11 @@ import { ICustomerOrder, IOrder, IOrderItem } from '@/types';
 import { CURRENCY, TYPE } from '@/constants';
 import { CREATE_ORDER } from '@/graphql/mutation/order';
 import { useMutation } from '@apollo/client';
-import { GET_ORDERS } from '@/graphql/query';
 import { router } from 'expo-router';
 import { isEmpty } from 'lodash';
 import { useCallStore } from '@/cache/cart.store';
 import { useTranslation } from 'react-i18next';
-import { useOrder } from '@/providers/OrderProvider';
+import { useOrderStore } from '@/cache/order.store';
 
 type Props = {
   visible: boolean;
@@ -22,20 +21,12 @@ type Props = {
 };
 
 const DraftOrder = memo(({ visible, onCloseModal }: Props) => {
-  const { orderState, setOrderState } = useOrder();
+  const orderState = useOrderStore((state) => state.orderState);
+  const setOrderState = useOrderStore((state) => state.setOrderState);
   const { t } = useTranslation('language');
   const { participant } = useCallStore();
 
   const [createOrder, { loading }] = useMutation(CREATE_ORDER, {
-    update(cache, { data: { createOrder } }) {
-      const caches = cache.readQuery<{ getOrders: IOrder[] }>({ query: GET_ORDERS });
-      if (caches && caches.getOrders) {
-        cache.writeQuery({
-          query: GET_ORDERS,
-          data: { getOrders: caches.getOrders.concat([createOrder]) },
-        });
-      }
-    },
     onCompleted: async (data) => {
       const path = participant?.vat ? '/private/vat' : '/private/payment';
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useMemo } from 'react';
 
 interface ValidContextType {
   valid: boolean;
@@ -22,5 +22,7 @@ interface ValidProviderProps {
 export const ValidProvider = ({ children }: ValidProviderProps) => {
   const [valid, setValid] = useState(false);
 
-  return <ValidContext.Provider value={{ valid, setValid }}>{children}</ValidContext.Provider>;
+  const value = useMemo(() => ({ valid, setValid }), [valid]);
+
+  return <ValidContext.Provider value={value}>{children}</ValidContext.Provider>;
 };

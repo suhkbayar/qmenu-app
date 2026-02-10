@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback, memo } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import React, { useState, useCallback, memo } from 'react';
+import { View, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import { FAB, Icon, Text } from 'react-native-paper';
 import { IMenuProduct, IOrderItem, IMenuVariant } from '@/types';
 import { CalculateProductPrice } from '@/tools/calculate';
@@ -12,9 +13,7 @@ import { getCdnImageUrl } from '@/utils/image';
 interface Props {
   product: IMenuProduct;
   orderItem?: IOrderItem;
-  drawerVisible: boolean;
   onQuantityChange: (product: IMenuProduct, quantity: number) => void;
-  languageKey?: string;
 }
 
 interface PriceComponentProps {
@@ -33,66 +32,54 @@ const MemoizedPriceComponent = memo(({ variants }: PriceComponentProps) => (
 
 const ProductImage = memo(({ source, style, onPress }: ProductImageProps) => (
   <Pressable onPress={onPress}>
-    <Image source={source} style={style} resizeMode="cover" />
+    <Image source={source} style={style} contentFit="cover" transition={200} />
   </Pressable>
 ));
 
-const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQuantityChange, languageKey }) => {
-  const [quantity, setQuantity] = useState<number>(0);
+const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) => {
   const { participant } = useCallStore();
   const [loading, setLoading] = useState<boolean>(false);
+
+  const quantity = orderItem?.quantity || 0;
+
+  const goProductInfo = useCallback(() => {
+    if (loading) return;
+
+    setLoading(true);
+    router.push({
+      pathname: '/private/product-info',
+      params: {
+        product: JSON.stringify({
+          ...product,
+          image: product?.image,
+        }),
+      },
+    });
+
+    setTimeout(() => {
+      setLoading(false);
+    }, 300);
+  }, [loading, product]);
 
   const increase = useCallback(() => {
     if (loading) return;
 
+    const t0 = performance.now();
     const { variants } = product;
     if (!variants || variants.length === 0) return;
 
     if (variants.length > 1 || variants[0]?.options?.length > 0) {
       goProductInfo();
     } else {
-      const newQty = quantity + 1;
-      setQuantity(newQty);
-      onQuantityChange(product, newQty);
+      onQuantityChange(product, quantity + 1);
     }
-  }, [loading, product, quantity, onQuantityChange]);
-
-  useEffect(() => {
-    const newQuantity = orderItem ? orderItem.quantity : 0;
-    if (newQuantity !== quantity) {
-      setQuantity(newQuantity);
-    }
-  }, [orderItem]);
+  }, [loading, product, quantity, onQuantityChange, goProductInfo]);
 
   const decrease = useCallback(() => {
     if (quantity === 0) return;
-    const newQty = quantity - 1;
-    setQuantity(newQty);
-    onQuantityChange(product, newQty);
+
+    onQuantityChange(product, quantity - 1);
   }, [quantity, product, onQuantityChange]);
-
-  const goProductInfo = useCallback(async () => {
-    if (loading) return;
-
-    try {
-      setLoading(true);
-      await router.push({
-        pathname: '/private/product-info',
-        params: {
-          product: JSON.stringify({
-            ...product,
-            image: product?.image,
-          }),
-        },
-      });
-    } catch (error) {
-      console.error('Navigation error:', error);
-    } finally {
-      setTimeout(() => {
-        setLoading(false);
-      }, 300);
-    }
-  }, [loading, product]);
 
   const imageSource = product.image
     ? { uri: getCdnImageUrl(product.image, 'md') }
@@ -117,16 +104,16 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, drawerVisible, onQua
         {product.variants && <MemoizedPriceComponent variants={product.variants} />}
         {quantity > 0 ? (
           <View style={styles.quantityControls}>
-            <TouchableOpacity activeOpacity={10} onPress={decrease}>
+            <TouchableOpacity activeOpacity={0.7} onPress={decrease}>
               <FAB animated={false} icon="minus" size="small" style={styles.secondfab} color={defaultColor} />
             </TouchableOpacity>
             <Text style={styles.quantityText}>{quantity}</Text>
-            <TouchableOpacity activeOpacity={10} onPress={increase}>
+            <TouchableOpacity activeOpacity={0.7} onPress={increase}>
               <FAB animated={false} icon="plus" size="small" style={styles.fab} color="white" />
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity activeOpacity={10} onPress={increase}>
+          <TouchableOpacity activeOpacity={0.7} onPress={increase}>
             <FAB animated={false} icon="plus" size="small" style={styles.fab} color="white" />
           </TouchableOpacity>
         )}
@@ -236,17 +223,8 @@ const styles = StyleSheet.create({
   },
 });
 
-export default memo(ProductCard, (prevProps, nextProps) => {
-  if (prevProps.languageKey !== nextProps.languageKey) return false;
-  if (
-    prevProps.product.name !== nextProps.product.name ||
-    prevProps.product.description !== nextProps.product.description
-  )
-    return false;
-
-  return (
-    prevProps.drawerVisible === nextProps.drawerVisible &&
-    prevProps.product.id === nextProps.product.id &&
-    prevProps.orderItem?.quantity === nextProps.orderItem?.quantity
-  );
-});
+export default memo(
+  ProductCard,
+  (prevProps, nextProps) =>
+    prevProps.product.id === nextProps.product.id && prevProps.orderItem?.quantity === nextProps.orderItem?.quantity,
+);

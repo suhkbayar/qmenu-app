@@ -7,16 +7,16 @@ import OrderInfo from '@/components/OrderInfo';
 import CashForm from '@/components/PaymentForms/cash';
 import QpayForm from '@/components/PaymentForms/qpay';
 import McsForm from '@/components/PaymentForms/mcs';
-import { CURRENCY, emptyOrder, PAYMENT_TYPE } from '@/constants';
+import { CURRENCY, PAYMENT_TYPE } from '@/constants';
 import { defaultColor } from '@/constants/Colors';
 import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/graphql/mutation/order';
-import { GET_ORDER, GET_ORDERS } from '@/graphql/query';
+import { GET_ORDER } from '@/graphql/query';
 import { ON_UPDATED_ORDER } from '@/graphql/subscription';
 import { getPayload } from '@/providers/auth';
 import { useDraw } from '@/providers/drawerProvider';
-import { useOrder } from '@/providers/OrderProvider';
+import { useOrderStore } from '@/cache/order.store';
 import { IOrder, ITransaction } from '@/types';
-import { useMutation, useQuery, useSubscription } from '@apollo/client';
+import { useMutation, useQuery, useSubscription, useApolloClient } from '@apollo/client';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +30,9 @@ const Payment = () => {
   const { orderId } = useLocalSearchParams();
   const [order, setOrder] = useState<IOrder>();
   const toast = useToast();
-  const { orderState, setOrderState } = useOrder();
+  const apolloClient = useApolloClient();
+  const orderState = useOrderStore((state) => state.orderState);
+  const clearOrder = useOrderStore((state) => state.clearOrder);
   const { setDrawerVisible } = useDraw();
   const [transaction, setTransaction] = useState<ITransaction>();
   const [visiblePending, setVisiblePending] = useState(false);
@@ -121,74 +123,19 @@ const Payment = () => {
   useSubscription(ON_UPDATED_ORDER, {
     variables: { customer: customerId },
     skip: !customerId,
-    onData: ({ client, data }) => {
+    onData: ({ data }) => {
       const updatedData = data?.data?.onUpdatedOrder;
       if (!updatedData) return;
 
-      const { event, order: subscriptionOrder } = updatedData;
+      const { order: subscriptionOrder } = updatedData;
 
-      try {
-        // 1️⃣ Update GET_ORDERS (list)
-        const cacheList = client.readQuery<{ getOrders: IOrder[] }>({
-          query: GET_ORDERS,
+      if (subscriptionOrder.id === orderId && subscriptionOrder.paymentState === 'PAID') {
+        setVisiblePending(false);
+        setVisibleMcs(false);
+        router.push({
+          pathname: '/private/payment-success',
+          params: { orderId: orderId },
         });
-
-        if (cacheList?.getOrders) {
-          let updatedOrders = [...cacheList.getOrders];
-          const index = updatedOrders.findIndex((order) => order.id === subscriptionOrder.id);
-          const exists = index !== -1;
-
-          switch (event) {
-            case 'CREATED':
-              if (!exists) {
-                updatedOrders.push(subscriptionOrder);
-              }
-              break;
-
-            case 'UPDATED':
-              if (exists) {
-                updatedOrders[index] = subscriptionOrder;
-              } else {
-                updatedOrders.push(subscriptionOrder);
-              }
-              break;
-
-            case 'DELETE':
-              updatedOrders = updatedOrders.filter((order) => order.id !== subscriptionOrder.id);
-              break;
-          }
-
-          client.writeQuery({
-            query: GET_ORDERS,
-            data: { getOrders: updatedOrders },
-          });
-        }
-
-        // 2️⃣ Update GET_ORDER (single)
-        if (event === 'UPDATED' || event === 'CREATED') {
-          client.writeQuery({
-            query: GET_ORDER,
-            variables: { id: subscriptionOrder.id },
-            data: { getOrder: subscriptionOrder },
-          });
-        } else if (event === 'DELETE') {
-          // Optionally clear GET_ORDER if needed
-          client.writeQuery({
-            query: GET_ORDER,
-            variables: { id: subscriptionOrder.id },
-            data: { getOrder: null },
-          });
-        }
-        if (subscriptionOrder.id === orderId) {
-          setVisiblePending(false);
-          setVisibleMcs(false);
-          router.push({
-            pathname: '/private/payment-success',
-            params: { orderId: orderId },
-          });
-        }
-      } catch (err) {
-        console.error('[SUBSCRIPTION] Cache update failed:', err);
       }
     },
   });
@@ -196,6 +143,7 @@ const Payment = () => {
   const { loading } = useQuery(GET_ORDER, {
     variables: { id: orderId },
     skip: !orderId,
+    fetchPolicy: 'no-cache',
     onCompleted: (data) => {
       setOrder(data.getOrder);
 
@@ -377,7 +325,7 @@ const Payment = () => {
       <View style={styles.content}>
         <Text style={styles.title}>{t('mainPage.your_payment')}</Text>
         <Text style={styles.amount}>
-          {order.totalAmount.toLocaleString()} {CURRENCY}
+          {order.grandTotal.toLocaleString()} {CURRENCY}
         </Text>
         <Text style={styles.subtitle}>{t('mainPage.SelectYourPaymentChannel')}</Text>
         <View
@@ -395,11 +343,13 @@ const Payment = () => {
             onSelect={onSelectBank}
             loading={paying && activePaymentType === 'Khan bank'}
           />
-          {/* <McsForm
-            id={participant?.payments.find((payment) => payment.type === PAYMENT_TYPE.MCS)?.id}
-            onSelect={onSelectBank}
-            loading={paying && activePaymentType === 'MCS'}
-          /> */}
+          {participant?.payments.find((payment) => payment.type === PAYMENT_TYPE.MCS) && (
+            <McsForm
+              id={participant?.payments.find((payment) => payment.type === PAYMENT_TYPE.MCS)?.id}
+              onSelect={onSelectBank}
+              loading={paying && activePaymentType === 'MCS'}
+            />
+          )}
           {!participant?.advancePayment && <CashForm onSelect={onSelectBank} />}
         </View>
         {order && <OrderInfo order={order} />}
@@ -413,9 +363,13 @@ const Payment = () => {
         <TouchableOpacity
           style={styles.footerButton}
           onPress={() => {
-            router.push('/');
-            setOrderState(emptyOrder);
+            clearOrder();
             setDrawerVisible(false);
+
+            apolloClient.clearStore();
+
+            router.dismissAll();
+            router.replace('/private');
           }}
         >
           <Text style={styles.footerButtonText}>{t('mainPage.NewOrder')}</Text>

@@ -2,16 +2,14 @@ import React, { memo, useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FAB } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { ICustomerOrder } from '@/types';
 import CustomBadge from '../Badge';
+import { useOrderStore } from '@/cache/order.store';
 
-type Props = {
-  order: ICustomerOrder;
-};
-
-const OrderFloatingButton = memo(({ order }: Props) => {
+const OrderFloatingButton = memo(() => {
   const router = useRouter();
-  const showBadge = (order?.totalQuantity || 0) > 0;
+
+  const totalQuantity = useOrderStore((state) => state.orderState.totalQuantity);
+  const showBadge = (totalQuantity || 0) > 0;
 
   const handlePress = useCallback(() => {
     router.push({ pathname: '/private/draft-order' });
@@ -20,7 +18,7 @@ const OrderFloatingButton = memo(({ order }: Props) => {
   return (
     <View style={styles.container}>
       <FAB animated={false} icon="cart-outline" style={styles.fab} onPress={handlePress} color="white" />
-      {showBadge && <CustomBadge value={order?.totalQuantity || 0} />}
+      {showBadge && <CustomBadge value={totalQuantity || 0} />}
     </View>
   );
 });

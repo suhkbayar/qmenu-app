@@ -20,12 +20,10 @@ import CustomToast from '@/components/CustomToast';
 import * as NavigationBar from 'expo-navigation-bar';
 import { CartProvider } from '@/context/CartContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import SubscriptionProvider from '@/providers/subscription';
 import { Camera } from 'expo-camera';
 import { ValidProvider } from '@/context/ValidContext';
 import { getStorage } from '@/cache';
 import { useTranslation } from 'react-i18next';
-import { OrderProvider } from '@/providers/OrderProvider';
 import { LogBox, Platform } from 'react-native';
 import { DrawerProvider } from '@/providers/drawerProvider';
 import * as Updates from 'expo-updates';
@@ -133,28 +131,24 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <PaperProvider>
               <ValidProvider>
-                <OrderProvider>
-                  <DrawerProvider>
-                    <CartProvider>
-                      <SubscriptionProvider>
-                        <ToastProvider
-                          renderType={{
-                            custom_type: (toast: ToastProps) => (
-                              <CustomToast type={toast.type ?? 'default'} message={toast.message} />
-                            ),
-                          }}
-                        >
-                          <StatusBar hidden />
-                          <Stack screenOptions={{ headerShown: false }}>
-                            <Stack.Screen name="index" />
-                            <Stack.Screen name="public" />
-                            <Stack.Screen name="private" />
-                          </Stack>
-                        </ToastProvider>
-                      </SubscriptionProvider>
-                    </CartProvider>
-                  </DrawerProvider>
-                </OrderProvider>
+                <DrawerProvider>
+                  <CartProvider>
+                    <ToastProvider
+                      renderType={{
+                        custom_type: (toast: ToastProps) => (
+                          <CustomToast type={toast.type ?? 'default'} message={toast.message} />
+                        ),
+                      }}
+                    >
+                      <StatusBar hidden />
+                      <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="index" />
+                        <Stack.Screen name="public" />
+                        <Stack.Screen name="private" />
+                      </Stack>
+                    </ToastProvider>
+                  </CartProvider>
+                </DrawerProvider>
               </ValidProvider>
             </PaperProvider>
           </SafeAreaProvider>

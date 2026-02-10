@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Text, Surface, TouchableRipple, Icon, SegmentedButtons, TextInput } from 'react-native-paper';
 import { FieldValues, useForm } from 'react-hook-form';
-import { useOrder } from '@/providers/OrderProvider';
+import { useOrderStore } from '@/cache/order.store';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useLazyQuery } from '@apollo/client';
 import { GET_VAT_PAYER } from '@/graphql/query/vat';
@@ -29,7 +29,7 @@ const EbarimtScreen = () => {
   const toast = useToast();
   const { t } = useTranslation('language');
   const { orderId } = useLocalSearchParams();
-  const { setOrderState } = useOrder();
+  const setOrderState = useOrderStore((state) => state.setOrderState);
 
   const [isError, setIsError] = useState<boolean>(false);
   const [companyType, setCompanyType] = useState<string>('company');

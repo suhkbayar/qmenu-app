@@ -26,7 +26,7 @@ const authLink = createAuthLink({ url, region, auth });
 
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
   if (graphQLErrors) {
-    graphQLErrors.forEach((element: any, index: any) => {
+    graphQLErrors.forEach((element: any) => {
       switch (element.errorType) {
         case 'UnauthorizedException': {
           return forward(operation);
@@ -62,7 +62,29 @@ const link = ApolloLink.from([retryLink, authLink, errorLink, subscriptionLink])
 
 const client = new ApolloClient({
   link,
-  cache: new InMemoryCache(),
+  cache: new InMemoryCache({
+    typePolicies: {
+      Query: {
+        fields: {
+          getBranch: {
+            merge(_existing, incoming) {
+              return incoming;
+            },
+          },
+        },
+      },
+
+      Branch: {
+        keyFields: ['id'],
+      },
+      Participant: {
+        keyFields: ['id'],
+      },
+      Product: {
+        keyFields: ['productId'],
+      },
+    },
+  }),
 });
 
 export default client;

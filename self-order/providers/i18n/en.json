@@ -120,6 +120,7 @@
     "OrderHistoryNotFound": "Order history not found...",
     "NewOrder": "New order",
     "NewOrderAmount": "New order amount",
+    "orderCreationFailed": "Failed to create order. Please try again.",
     "Confirmation": "Confirm order",
     "Order": "Order",
     "YourOrder": "Your order",

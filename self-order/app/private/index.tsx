@@ -49,8 +49,8 @@ const Private = () => {
   });
 
   const [getBranch, { loading: loadBranch, data }] = useLazyQuery(GET_BRANCH, {
-    fetchPolicy: 'network-only',
-    pollInterval: 180000,
+    fetchPolicy: 'cache-and-network', // Use cache while updating in background
+    pollInterval: 600000, // 10 minutes instead of 3 - reduces network load
     onCompleted(data) {
       setParticipant(data.getParticipant);
       if (data.getParticipant.orderable && isEmpty(order)) {

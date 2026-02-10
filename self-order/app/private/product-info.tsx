@@ -6,7 +6,7 @@ import { FAB, Icon } from 'react-native-paper';
 import { defaultColor } from '@/constants/Colors';
 import { IMenuOption, IMenuVariant, IOrderItem } from '@/types';
 import { isEmpty } from 'lodash';
-import { useOrder } from '@/providers/OrderProvider';
+import { useOrderStore } from '@/cache/order.store';
 import RenderHtml from 'react-native-render-html';
 import { LogBox } from 'react-native';
 import { CURRENCY } from '@/constants';
@@ -38,7 +38,8 @@ const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const { t } = useTranslation('language');
-  const { orderState, setOrderState } = useOrder();
+  const orderState = useOrderStore((state) => state.orderState);
+  const setOrderState = useOrderStore((state) => state.setOrderState);
   const [isExpanded, setIsExpanded] = useState(false);
   const [visibleValues, setVisibleValues] = useState(false);
   const [selectedOption, setSelectedOption] = useState<any>(null);

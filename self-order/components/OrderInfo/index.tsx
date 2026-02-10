@@ -33,7 +33,7 @@ const OrderInfo = ({ order }: OrderInfoProps) => {
       <View style={styles.summary}>
         <Text style={styles.amountTitle}>{t('mainPage.Total')}:</Text>
         <Text style={styles.summaryTotal}>
-          {order.totalAmount.toLocaleString()} {CURRENCY}
+          {order.grandTotal.toLocaleString()} {CURRENCY}
         </Text>
       </View>
     </View>

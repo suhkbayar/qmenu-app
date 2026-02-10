@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useMemo } from 'react';
 import { ICustomerOrder } from '@/types';
 import { emptyOrder } from '@/constants';
 
@@ -12,7 +12,9 @@ const OrderContext = createContext<OrderContextType | undefined>(undefined);
 export const OrderProvider = ({ children }: { children: ReactNode }) => {
   const [orderState, setOrderState] = useState<ICustomerOrder>(emptyOrder);
 
-  return <OrderContext.Provider value={{ orderState, setOrderState }}>{children}</OrderContext.Provider>;
+  const value = useMemo(() => ({ orderState, setOrderState }), [orderState]);
+
+  return <OrderContext.Provider value={value}>{children}</OrderContext.Provider>;
 };
 
 export const useOrder = () => {

@@ -1,38 +1,53 @@
-import React, { useEffect, useState } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import { Button, Icon } from 'react-native-paper';
-import { useLocalSearchParams, router } from 'expo-router';
-import { useLazyQuery } from '@apollo/client';
+import { useGlobalSearchParams, router, useFocusEffect } from 'expo-router';
+import { useQuery, useApolloClient } from '@apollo/client';
 import { GET_ORDER } from '@/graphql/query';
-import { IOrder } from '@/types';
 import Loader from '@/components/Loader';
-import { useOrder } from '@/providers/OrderProvider';
+import { useOrderStore } from '@/cache/order.store';
 import { useDraw } from '@/providers/drawerProvider';
-import { emptyOrder } from '@/constants';
 import { useTranslation } from 'react-i18next';
 
 const PaymentSuccess = () => {
-  const { orderId } = useLocalSearchParams();
+  const params = useGlobalSearchParams();
+  const orderId = params.orderId as string;
   const { t } = useTranslation('language');
-  const { setOrderState } = useOrder();
+  const apolloClient = useApolloClient();
+  const clearOrder = useOrderStore((state) => state.clearOrder);
   const { setDrawerVisible } = useDraw();
-  const [order, setOrder] = useState<IOrder>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [getOrder, { loading }] = useLazyQuery(GET_ORDER, {
-    onCompleted: (data) => {
-      setOrder(data.getOrder);
-    },
+  const { data, loading } = useQuery(GET_ORDER, {
+    variables: { id: orderId },
+    skip: !orderId,
+    fetchPolicy: 'no-cache',
   });
 
-  useEffect(() => {
-    if (orderId) {
-      getOrder({
-        variables: {
-          id: orderId,
-        },
-      });
-    }
-  }, [orderId]);
+  const order = data?.getOrder;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!order) return;
+
+      timerRef.current = setTimeout(() => {
+        clearOrder();
+        setDrawerVisible(false);
+
+        apolloClient.clearStore();
+
+        router.dismissAll();
+        router.replace('/private');
+      }, 30000);
+
+      return () => {
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+      };
+    }, [order, orderId, clearOrder, setDrawerVisible, apolloClient]),
+  );
 
   if (loading || !order) return <Loader />;
 
@@ -48,13 +63,18 @@ const PaymentSuccess = () => {
       <Text style={styles.label}>
         {t('mainPage.AmountPaid2')}: <Text style={styles.value}>{Number(order.paidAmount).toFixed(2)} MNT</Text>
       </Text>
+
       <Button
         mode="contained"
         style={styles.newOrderBtn}
         onPress={() => {
-          router.push('/');
-          setOrderState(emptyOrder);
+          clearOrder();
           setDrawerVisible(false);
+
+          apolloClient.clearStore();
+
+          router.dismissAll();
+          router.replace('/private');
         }}
       >
         {t('mainPage.NewOrder')}

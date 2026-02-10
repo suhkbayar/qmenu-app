@@ -4,7 +4,7 @@ import { Text, Icon } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useCallStore } from '@/cache/cart.store';
-import { useOrder } from '@/providers/OrderProvider';
+import { useOrderStore } from '@/cache/order.store';
 import { IOrder, IOrderItem } from '@/types';
 import { isEmpty } from 'lodash';
 import { CURRENCY, TYPE } from '@/constants';
@@ -13,29 +13,30 @@ import DraftList from '@/components/Card/DraftCard';
 import RecommendedCard from '@/components/Card/RecommendedCard';
 import { useLazyQuery, useMutation } from '@apollo/client';
 import { CREATE_ORDER } from '@/graphql/mutation/order';
-import { GET_ORDERS } from '@/graphql/query';
 import { GET_CROSS_SELLS } from '@/graphql/query/product';
+import { useToast } from 'react-native-toast-notifications';
 
 const DraftOrderPage = () => {
-  const { orderState, setOrderState } = useOrder();
+  const orderState = useOrderStore((state) => state.orderState);
+  const setOrderState = useOrderStore((state) => state.setOrderState);
   const { participant, order } = useCallStore();
   const { t } = useTranslation('language');
   const router = useRouter();
+  const toast = useToast();
 
   const [getCrossSells, { data: cross }] = useLazyQuery(GET_CROSS_SELLS);
   const [createOrder, { loading }] = useMutation(CREATE_ORDER, {
-    update(cache, { data: { createOrder } }) {
-      const existing = cache.readQuery<{ getOrders: IOrder[] }>({ query: GET_ORDERS });
-      if (existing?.getOrders) {
-        cache.writeQuery({
-          query: GET_ORDERS,
-          data: { getOrders: [...existing.getOrders, createOrder] },
-        });
-      }
-    },
     onCompleted: async (data) => {
       const path = participant?.vat ? '/private/vat' : '/private/payment';
       router.push({ pathname: path, params: { orderId: data.createOrder.id } });
+    },
+    onError: (error) => {
+      console.error('Create order error:', error);
+      toast.show(error.message || t('mainPage.orderCreationFailed') || 'Failed to create order. Please try again.', {
+        type: 'danger',
+        placement: 'top',
+        duration: 4000,
+      });
     },
   });
 
