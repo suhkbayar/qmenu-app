@@ -7,6 +7,7 @@ import OrderInfo from '@/components/OrderInfo';
 import CashForm from '@/components/PaymentForms/cash';
 import QpayForm from '@/components/PaymentForms/qpay';
 import McsForm from '@/components/PaymentForms/mcs';
+import TokiForm from '@/components/PaymentForms/toki';
 import { CURRENCY, PAYMENT_TYPE } from '@/constants';
 import { defaultColor } from '@/constants/Colors';
 import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/graphql/mutation/order';
@@ -348,6 +349,13 @@ const Payment = () => {
               id={participant?.payments.find((payment) => payment.type === PAYMENT_TYPE.MCS)?.id}
               onSelect={onSelectBank}
               loading={paying && activePaymentType === 'MCS'}
+            />
+          )}
+          {participant?.payments.find((payment) => payment.type === PAYMENT_TYPE.Toki) && (
+            <TokiForm
+              id={participant?.payments.find((payment) => payment.type === PAYMENT_TYPE.Toki)?.id}
+              onSelect={onSelectBank}
+              loading={paying && activePaymentType === 'Toki'}
             />
           )}
           {!participant?.advancePayment && <CashForm onSelect={onSelectBank} />}

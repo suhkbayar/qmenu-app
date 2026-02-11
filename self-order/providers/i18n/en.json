@@ -334,6 +334,24 @@
     "tax_payer": "Taxpayer",
     "call_waiter": "Call waiter",
     "request_bill": "Request bill",
-    "table_clean": "Request table cleaning"
+    "table_clean": "Request table cleaning",
+    "confirm": "Confirm",
+    "orderHistory": "Order History",
+    "noOrderHistory": "No order history found",
+    "moreItems": "more",
+    "orderState": {
+      "DRAFT": "Draft",
+      "PENDING": "Pending",
+      "ACCEPTED": "Accepted",
+      "PREPARING": "Preparing",
+      "PREPARED": "Prepared",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled"
+    },
+    "paymentState": {
+      "PAID": "Paid",
+      "UNPAID": "Unpaid",
+      "PARTIALLY": "Partially Paid"
+    }
   }
 }

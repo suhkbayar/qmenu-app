@@ -213,6 +213,39 @@ export const GET_ORDER = gql`
   ${ORDER_LOYALTY_FIELDS}
 `;
 
+export const GET_TABLET_ORDERS = gql`
+  query getTabletOrders($limit: Int) {
+    getTabletOrders(limit: $limit) {
+      ...OrderFields
+      table {
+        ...TableFields
+      }
+      items {
+        ...OrderItemFields
+      }
+      transactions {
+        ...TransactionFields
+      }
+      discounts {
+        ...DiscountsFields
+      }
+      charges {
+        ...ChargesFields
+      }
+      loyalties {
+        ...OrderLoyaltyFields
+      }
+    }
+  }
+  ${TABLE_FIELDS}
+  ${ORDER_FIELDS}
+  ${DISCOUNTS_FIELDS}
+  ${CHARGES_FIELDS}
+  ${ORDER_ITEM_FIELDS}
+  ${TRANSACTION_FIELDS}
+  ${ORDER_LOYALTY_FIELDS}
+`;
+
 export const GET_ORDERS = gql`
   {
     getOrders {

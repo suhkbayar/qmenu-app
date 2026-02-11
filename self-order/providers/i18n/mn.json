@@ -342,6 +342,24 @@
     "tax_payer": "Татвар төлөгч",
     "call_waiter": "Зөөгч дуудах",
     "request_bill": "Тооцоо авах",
-    "table_clean": "Ширээ цэвэрлүүлэх"
+    "table_clean": "Ширээ цэвэрлүүлэх",
+    "confirm": "Баталгаажуулах",
+    "orderHistory": "Захиалгын түүх",
+    "noOrderHistory": "Захиалгын түүх олдсонгүй",
+    "moreItems": "нэмэлт",
+    "orderState": {
+      "DRAFT": "Ноорог",
+      "PENDING": "Хүлээгдэж буй",
+      "ACCEPTED": "Хүлээн авсан",
+      "PREPARING": "Бэлтгэж байна",
+      "PREPARED": "Бэлэн",
+      "COMPLETED": "Дууссан",
+      "CANCELLED": "Цуцлагдсан"
+    },
+    "paymentState": {
+      "PAID": "Төлсөн",
+      "UNPAID": "Төлөгдөөгүй",
+      "PARTIALLY": "Хагас төлсөн"
+    }
   }
 }

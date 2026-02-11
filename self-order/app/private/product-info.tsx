@@ -12,7 +12,6 @@ import { LogBox } from 'react-native';
 import { CURRENCY } from '@/constants';
 import { calculateOrderItem, generateUUID } from '@/utils';
 import OptionValuesModal from '@/components/Modal/OptionValuesModal';
-import CustomBadge from '@/components/Badge';
 import { useLazyQuery } from '@apollo/client';
 import { GET_CROSS_SELLS } from '@/graphql/query/product';
 import { useCallStore } from '@/cache/cart.store';
@@ -434,8 +433,8 @@ const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
                     needsValidation
                       ? styles.validateText
                       : isSelected
-                      ? styles.selectedToppingText
-                      : styles.toppingText,
+                        ? styles.selectedToppingText
+                        : styles.toppingText,
                   ]}
                 >
                   {option.name}
@@ -467,39 +466,10 @@ const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
   const renderContent = () => (
     <View style={styles.page}>
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={goBack}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            padding: 8,
-            gap: 8,
-          }}
-        >
+        <TouchableOpacity onPress={goBack} style={styles.backButton}>
           <Icon source="arrow-left" size={24} color="#333" />
           <Text style={styles.backText}>{t('mainPage.GoBack')}</Text>
         </TouchableOpacity>
-        <View
-          style={{
-            position: 'absolute',
-            top: 20,
-            right: 0,
-          }}
-        >
-          <TouchableOpacity onPress={() => router.push('/private/draft-order')}>
-            <FAB
-              animated={false}
-              icon="cart-outline"
-              size="small"
-              style={styles.fab}
-              onPress={() => {
-                router.push('/private/draft-order');
-              }}
-              color="white"
-            />
-            {orderState?.totalQuantity > 0 && <CustomBadge value={orderState?.totalQuantity} />}
-          </TouchableOpacity>
-        </View>
       </View>
 
       <View style={styles.content}>
@@ -633,34 +603,21 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 20,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    gap: 8,
   },
   backText: {
     fontSize: 16,
     color: '#333',
     fontWeight: '600',
   },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIcon: {
-    backgroundColor: '#fde68a',
-    padding: 8,
-    borderRadius: 999,
-  },
-  statusBadge: {
-    backgroundColor: '#ef4444',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    marginLeft: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  plusFab: {
+    plusFab: {
     backgroundColor: defaultColor,
     width: 56,
     height: 56,
@@ -668,11 +625,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  statusBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-  },
-  secondfab: {
+    secondfab: {
     backgroundColor: 'white',
     width: 56,
     borderColor: '#f0f0f0',
@@ -823,23 +776,7 @@ const styles = StyleSheet.create({
   specificationContainer: {
     marginBottom: 16,
   },
-  fab: {
-    backgroundColor: '#EB1833',
-    width: 56,
-    height: 56,
-    borderRadius: 999,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: 'white',
-    color: '#EB1833',
-    fontWeight: 700,
-  },
-  ul: {
+    ul: {
     paddingLeft: 20,
     paddingBottom: 20,
     height: 400,

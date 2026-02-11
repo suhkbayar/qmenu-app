@@ -245,7 +245,7 @@ const DraftOrderPage = () => {
           hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
         >
           <Text style={styles.submitButtonText}>
-            {loading ? t('mainPage.loading') || 'Loading...' : t('mainPage.Order')}
+            {loading ? t('mainPage.loading') || 'Loading...' : t('mainPage.confirm')}
           </Text>
         </TouchableOpacity>
       </View>

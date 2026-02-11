@@ -165,7 +165,6 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
           refreshLanguage={() => {}}
         />
 
-        {/* Sub-tabs (only if parent has children) */}
         {subTabs.length > 0 && (
           <View style={styles.subTabsContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subTabsRow}>
@@ -181,7 +180,6 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
           </View>
         )}
 
-        {/* ✅ Simple FlatList - Only renders current category */}
         <FlatList
           data={displayedProducts}
           keyExtractor={keyExtractor}
@@ -202,8 +200,6 @@ const ContainerContent: React.FC<ContainerProps> = ({ participant }) => {
           })}
         />
       </View>
-
-      <OrderFloatingButton />
     </View>
   );
 };
@@ -217,6 +213,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 24,
     paddingTop: 6,
+    paddingBottom: 100,
   },
 
   gridCell: {

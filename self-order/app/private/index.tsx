@@ -6,6 +6,7 @@ import { GET_BANNERS, GET_BRANCH } from '@/graphql/query';
 import { useLazyQuery, useMutation } from '@apollo/client';
 import { isEmpty } from 'lodash';
 import HelpFloatingButton from '@/components/FloatingButton/HelpFloatingButton';
+import OrderFloatingButton from '@/components/FloatingButton/OrderFloatingButton';
 import Loader from '@/components/Loader';
 import Container from '@/template/container';
 import { AuthContext } from '@/providers/auth';
@@ -15,13 +16,12 @@ import { ICustomerTable } from '@/types';
 import * as Battery from 'expo-battery';
 
 import ScreensaverWrapper from '@/providers/ScreensaverWrapper';
-import TableQrFloatingButton from '@/components/FloatingButton/TableQrFloatingButtin';
 import { UPDATE_BATTERY } from '@/graphql/mutation/table';
 
 const MemoizedContainer = React.memo(({ participant }: any) => <Container participant={participant} />);
 
 const MemoizedHelpButton = React.memo(() => <HelpFloatingButton />);
-const MemoizedTableButton = React.memo(() => <TableQrFloatingButton />);
+const MemoizedOrderButton = React.memo(() => <OrderFloatingButton />);
 
 const Private = () => {
   const [loading, setLoading] = useState(true);
@@ -49,8 +49,8 @@ const Private = () => {
   });
 
   const [getBranch, { loading: loadBranch, data }] = useLazyQuery(GET_BRANCH, {
-    fetchPolicy: 'cache-and-network', // Use cache while updating in background
-    pollInterval: 600000, // 10 minutes instead of 3 - reduces network load
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 600000,
     onCompleted(data) {
       setParticipant(data.getParticipant);
       if (data.getParticipant.orderable && isEmpty(order)) {
@@ -131,7 +131,7 @@ const Private = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScreensaverWrapper images={images} delay={300000} interval={5000}>
         {participantData && <MemoizedContainer participant={participantData} />}
-        <MemoizedTableButton />
+        <MemoizedOrderButton />
         <MemoizedHelpButton />
       </ScreensaverWrapper>
     </SafeAreaView>
