@@ -335,15 +335,20 @@ const Payment = () => {
             gap: 16,
           }}
         >
-          <QpayForm
-            id={
-              participant?.payments.find(
-                (payment) => payment.type === PAYMENT_TYPE.QPay || payment.type === PAYMENT_TYPE.QPay2,
-              )?.id
-            }
-            onSelect={onSelectBank}
-            loading={paying && activePaymentType === 'Khan bank'}
-          />
+          {participant?.payments.find(
+            (payment) => payment.type === PAYMENT_TYPE.QPay || payment.type === PAYMENT_TYPE.QPay2,
+          ) && (
+            <QpayForm
+              id={
+                participant?.payments.find(
+                  (payment) => payment.type === PAYMENT_TYPE.QPay || payment.type === PAYMENT_TYPE.QPay2,
+                )?.id
+              }
+              onSelect={onSelectBank}
+              loading={paying && activePaymentType === 'Khan bank'}
+            />
+          )}
+
           {participant?.payments.find((payment) => payment.type === PAYMENT_TYPE.MCS) && (
             <McsForm
               id={participant?.payments.find((payment) => payment.type === PAYMENT_TYPE.MCS)?.id}
