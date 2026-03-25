@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
-import { SafeAreaView, StyleSheet, TouchableOpacity, View, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { SafeAreaView, StyleSheet, TouchableOpacity, View, ScrollView, Modal } from 'react-native';
 import { Text, Icon } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -23,14 +23,21 @@ const DraftOrderPage = () => {
   const { t } = useTranslation('language');
   const router = useRouter();
   const toast = useToast();
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
   const [getCrossSells, { data: cross }] = useLazyQuery(GET_CROSS_SELLS);
   const [createOrder, { loading }] = useMutation(CREATE_ORDER, {
     onCompleted: async (data) => {
-      const path = participant?.vat ? '/private/vat' : '/private/payment';
-      router.push({ pathname: path, params: { orderId: data.createOrder.id } });
+      if (!participant?.advancePayment) {
+        setConfirmVisible(false);
+        router.push({ pathname: '/private/payment-success', params: { orderId: data.createOrder.id } });
+      } else {
+        const path = participant?.vat ? '/private/vat' : '/private/payment';
+        router.push({ pathname: path, params: { orderId: data.createOrder.id } });
+      }
     },
     onError: (error) => {
+      setConfirmVisible(false);
       console.error('Create order error:', error);
       toast.show(error.message || t('mainPage.orderCreationFailed') || 'Failed to create order. Please try again.', {
         type: 'danger',
@@ -100,11 +107,7 @@ const DraftOrderPage = () => {
     }));
   }, [orderState.items]);
 
-  const onSubmit = useCallback(() => {
-    if (isEmpty(orderState.items) || isEmpty(participant)) {
-      return;
-    }
-
+  const doCreateOrder = useCallback(() => {
     createOrder({
       variables: {
         participant: participant?.id,
@@ -120,7 +123,19 @@ const DraftOrderPage = () => {
         },
       },
     });
-  }, [orderState.items, participant, preparedItems, createOrder]);
+  }, [participant, preparedItems, createOrder]);
+
+  const onSubmit = useCallback(() => {
+    if (isEmpty(orderState.items) || isEmpty(participant)) {
+      return;
+    }
+
+    if (!participant?.advancePayment) {
+      setConfirmVisible(true);
+    } else {
+      doCreateOrder();
+    }
+  }, [orderState.items, participant, doCreateOrder]);
 
   const formattedPrice = useMemo(() => {
     return `${(orderState.totalAmount || 0).toLocaleString()} ${CURRENCY}`;
@@ -234,20 +249,6 @@ const DraftOrderPage = () => {
             <Text style={styles.totalValue}>{formattedPrice}</Text>
           </View>
         </View>
-
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            (isEmpty(orderState.items) || isEmpty(participant) || loading) && styles.disabledButton,
-          ]}
-          onPress={onSubmit}
-          disabled={isEmpty(orderState.items) || isEmpty(participant) || loading}
-          hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-        >
-          <Text style={styles.submitButtonText}>
-            {loading ? t('mainPage.loading') || 'Loading...' : t('mainPage.confirm')}
-          </Text>
-        </TouchableOpacity>
       </View>
     );
   };
@@ -274,8 +275,43 @@ const DraftOrderPage = () => {
           {renderRecommendations()}
         </View>
 
-        <View style={styles.rightColumn}>{renderOrderSummary()}</View>
+        <View style={styles.rightColumn}>
+          {renderOrderSummary()}
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              (isEmpty(orderState.items) || isEmpty(participant) || loading) && styles.disabledButton,
+            ]}
+            onPress={onSubmit}
+            disabled={isEmpty(orderState.items) || isEmpty(participant) || loading}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+          >
+            <Text style={styles.submitButtonText}>
+              {loading ? t('mainPage.loading') || 'Loading...' : t('mainPage.confirm')}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      <Modal visible={confirmVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>{t('mainPage.confirmOrder') || 'Confirm Order'}</Text>
+            <Text style={styles.modalMessage}>{t('mainPage.cashierPayMessage') || 'Your order will be placed. Please pay at the cashier.'}</Text>
+            <Text style={styles.modalTotal}>{formattedPrice}</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalCancelButton} onPress={() => setConfirmVisible(false)} disabled={loading}>
+                <Text style={styles.modalCancelText}>{t('mainPage.cancel') || 'Cancel'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmButton} onPress={doCreateOrder} disabled={loading}>
+                <Text style={styles.modalConfirmText}>
+                  {loading ? t('mainPage.loading') || 'Loading...' : t('mainPage.confirm')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -322,7 +358,7 @@ const styles = StyleSheet.create({
   rightColumn: {
     width: 370,
     backgroundColor: '#f9f9f9',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     alignItems: 'stretch',
     paddingHorizontal: 16,
     paddingVertical: 24,
@@ -481,6 +517,65 @@ const styles = StyleSheet.create({
     marginRight: 12,
     width: 200,
     marginBottom: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 32,
+    width: 420,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#000',
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#555',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  modalTotal: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: defaultColor,
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 16,
+    color: '#555',
+  },
+  modalConfirmButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: defaultColor,
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
 

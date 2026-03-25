@@ -331,7 +331,7 @@ const EbarimtScreen = () => {
           disabled={vatType === '3' && isEmpty(buyer)}
           onPress={onSubmit}
         >
-          <Text style={styles.continueButtonText}>{t('mainPage.Confirmation')}</Text>
+          <Text style={styles.continueButtonText}>{t('mainPage.Payment')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

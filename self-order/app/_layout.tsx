@@ -4,7 +4,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -24,16 +24,40 @@ import { Camera } from 'expo-camera';
 import { ValidProvider } from '@/context/ValidContext';
 import { getStorage } from '@/cache';
 import { useTranslation } from 'react-i18next';
-import { LogBox, Platform } from 'react-native';
+import { LogBox, Platform, Pressable, StyleSheet } from 'react-native';
+import { useKioskExit } from '@/hooks/useKioskExit';
+import KioskPinModal from '@/components/KioskPinModal';
+import { KioskModule } from '@/modules/KioskModule';
 import { DrawerProvider } from '@/providers/drawerProvider';
 import * as Updates from 'expo-updates';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+const styles = StyleSheet.create({
+  hiddenTap: {
+    position: 'absolute',
+    top: 0,
+    left: '50%',
+    transform: [{ translateX: -30 }],
+    width: 60,
+    height: 60,
+    zIndex: 999,
+  },
+});
+
+function KioskOverlay() {
+  const { handleSecretTap, pinVisible, handlePinSubmit, handlePinCancel } = useKioskExit();
+  return (
+    <>
+      <Pressable onPress={handleSecretTap} style={styles.hiddenTap} />
+      <KioskPinModal visible={pinVisible} onSubmit={handlePinSubmit} onCancel={handlePinCancel} />
+    </>
+  );
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const { i18n } = useTranslation();
 
   const [loaded] = useFonts({
@@ -51,13 +75,7 @@ export default function RootLayout() {
   }, [loaded]);
 
   useEffect(() => {
-    const requestPermission = async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      if (status === 'granted') {
-        setHasPermission(status === 'granted');
-      }
-    };
-    requestPermission();
+    Camera.requestCameraPermissionsAsync();
   }, []);
 
   useEffect(() => {
@@ -93,6 +111,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync('transparent'); // optional
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      KioskModule.startKiosk().catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -141,6 +165,7 @@ export default function RootLayout() {
                       }}
                     >
                       <StatusBar hidden />
+                      <KioskOverlay />
                       <Stack screenOptions={{ headerShown: false }}>
                         <Stack.Screen name="index" />
                         <Stack.Screen name="public" />

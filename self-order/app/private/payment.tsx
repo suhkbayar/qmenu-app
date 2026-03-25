@@ -14,10 +14,9 @@ import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/graphql/mutation/order';
 import { GET_ORDER } from '@/graphql/query';
 import { ON_UPDATED_ORDER } from '@/graphql/subscription';
 import { getPayload } from '@/providers/auth';
-import { useDraw } from '@/providers/drawerProvider';
 import { useOrderStore } from '@/cache/order.store';
 import { IOrder, ITransaction } from '@/types';
-import { useMutation, useQuery, useSubscription, useApolloClient } from '@apollo/client';
+import { useMutation, useQuery, useSubscription } from '@apollo/client';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,10 +30,7 @@ const Payment = () => {
   const { orderId } = useLocalSearchParams();
   const [order, setOrder] = useState<IOrder>();
   const toast = useToast();
-  const apolloClient = useApolloClient();
   const orderState = useOrderStore((state) => state.orderState);
-  const clearOrder = useOrderStore((state) => state.clearOrder);
-  const { setDrawerVisible } = useDraw();
   const [transaction, setTransaction] = useState<ITransaction>();
   const [visiblePending, setVisiblePending] = useState(false);
   const { participant } = useCallStore();
@@ -363,7 +359,9 @@ const Payment = () => {
               loading={paying && activePaymentType === 'Toki'}
             />
           )}
-          {!participant?.advancePayment && <CashForm onSelect={onSelectBank} />}
+          {participant?.payments.find((payment) => payment.type === PAYMENT_TYPE.Cash) && (
+            <CashForm onSelect={onSelectBank} />
+          )}
         </View>
         {order && <OrderInfo order={order} />}
       </View>
@@ -373,20 +371,6 @@ const Payment = () => {
           <Text style={styles.footerButtonText}>{t('mainPage.GoBack')}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.footerButton}
-          onPress={() => {
-            clearOrder();
-            setDrawerVisible(false);
-
-            apolloClient.clearStore();
-
-            router.dismissAll();
-            router.replace('/private');
-          }}
-        >
-          <Text style={styles.footerButtonText}>{t('mainPage.NewOrder')}</Text>
-        </TouchableOpacity>
       </View>
 
       {transaction && transaction.type !== PAYMENT_TYPE.MCS && (
