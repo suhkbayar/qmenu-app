@@ -1,45 +1,46 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, StyleSheet, TouchableOpacity, View, ScrollView, Modal } from 'react-native';
-import { Text, Icon } from 'react-native-paper';
-import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
-import { useCallStore } from '@/cache/cart.store';
-import { useOrderStore } from '@/cache/order.store';
-import { IOrder, IOrderItem } from '@/types';
-import { isEmpty } from 'lodash';
-import { CURRENCY, TYPE } from '@/constants';
-import { defaultColor } from '@/constants/Colors';
-import DraftList from '@/components/Card/DraftCard';
-import RecommendedCard from '@/components/Card/RecommendedCard';
+import { Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Icon, Text } from 'react-native-paper';
+import { router } from 'expo-router';
 import { useLazyQuery, useMutation } from '@apollo/client';
-import { CREATE_ORDER } from '@/graphql/mutation/order';
-import { GET_CROSS_SELLS } from '@/graphql/query/product';
+import { useTranslation } from 'react-i18next';
 import { useToast } from 'react-native-toast-notifications';
+import { isEmpty } from 'lodash';
+
+import DraftList from '@/src/components/cards/DraftCard';
+import RecommendedCard from '@/src/components/cards/RecommendedCard';
+import { CURRENCY, TYPE } from '@/src/constants';
+import { defaultColor } from '@/src/constants/Colors';
+import { GET_CROSS_SELLS } from '@/src/graphql/queries/product';
+import { CREATE_ORDER, GET_PAY_ORDER } from '@/src/graphql/mutations/order';
+import { useCallStore } from '@/src/store/cart.store';
+import { useOrderStore } from '@/src/store/order.store';
+import { IMenuProduct, IOrderItem } from '@/src/types';
+
+const calcTotals = (items: IOrderItem[]) => ({
+  totalQuantity: items.reduce((s, i) => s + i.quantity, 0),
+  totalAmount: items.reduce((s, i) => s + i.quantity * i.price, 0),
+  grandTotal: items.reduce((s, i) => s + i.quantity * i.price, 0),
+});
 
 const DraftOrderPage = () => {
-  const orderState = useOrderStore((state) => state.orderState);
-  const setOrderState = useOrderStore((state) => state.setOrderState);
-  const { participant, order } = useCallStore();
   const { t } = useTranslation('language');
-  const router = useRouter();
   const toast = useToast();
-  const [confirmVisible, setConfirmVisible] = useState(false);
+  const { participant } = useCallStore();
+  const orderState = useOrderStore((s) => s.orderState);
+  const setOrderState = useOrderStore((s) => s.setOrderState);
 
   const [getCrossSells, { data: cross }] = useLazyQuery(GET_CROSS_SELLS);
-  const [createOrder, { loading }] = useMutation(CREATE_ORDER, {
-    onCompleted: async (data) => {
-      if (!participant?.advancePayment) {
-        setConfirmVisible(false);
-        router.push({ pathname: '/private/payment-success', params: { orderId: data.createOrder.id } });
-      } else {
-        const path = participant?.vat ? '/private/vat' : '/private/payment';
-        router.push({ pathname: path, params: { orderId: data.createOrder.id } });
-      }
+
+  const [createOrder, { loading: creating }] = useMutation(CREATE_ORDER, {
+    onCompleted(data) {
+      const orderId = data.createOrder.id;
+
+      const path = participant?.vat ? '/private/vat' : '/private/payment';
+      router.push({ pathname: path, params: { orderId } });
     },
-    onError: (error) => {
-      setConfirmVisible(false);
-      console.error('Create order error:', error);
-      toast.show(error.message || t('mainPage.orderCreationFailed') || 'Failed to create order. Please try again.', {
+    onError(err) {
+      toast.show(err.message || t('mainPage.orderCreationFailed'), {
         type: 'danger',
         placement: 'top',
         duration: 4000,
@@ -47,65 +48,47 @@ const DraftOrderPage = () => {
     },
   });
 
+  const loading = creating;
+
   useEffect(() => {
-    if (!isEmpty(orderState.items) && participant?.menu?.id) {
-      const productIds = orderState.items.map((item) => item.productId).filter(Boolean);
-      if (productIds.length > 0) {
-        getCrossSells({ variables: { menuId: participant.menu.id, ids: productIds } });
-      }
-    }
-  }, [orderState.items, participant?.menu?.id, getCrossSells]);
+    if (isEmpty(orderState.items) || !participant?.menu?.id) return;
+    const ids = orderState.items.map((i) => i.productId).filter(Boolean);
+    if (ids.length > 0) getCrossSells({ variables: { menuId: participant.menu.id, ids } });
+  }, [orderState.items, participant?.menu?.id]);
 
-  const calculateTotals = useCallback((items: IOrderItem[]) => {
-    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-    const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
-    return { totalAmount, grandTotal: totalAmount, totalQuantity };
-  }, []);
-
-  const increase = useCallback(
-    (uuid: string) => {
+  const update = useCallback(
+    (uuid: string, delta: 1 | -1) => {
       setOrderState((prev) => {
-        const updatedItems = prev.items.map((item) =>
-          item.uuid === uuid ? { ...item, quantity: item.quantity + 1 } : item,
-        );
-        const totals = calculateTotals(updatedItems);
-        return { ...prev, items: updatedItems, ...totals };
+        const updated = prev.items
+          .map((i) =>
+            i.uuid !== uuid
+              ? i
+              : delta === 1
+                ? { ...i, quantity: i.quantity + 1 }
+                : i.quantity > 1
+                  ? { ...i, quantity: i.quantity - 1 }
+                  : null,
+          )
+          .filter((i): i is IOrderItem => i !== null);
+        return { ...prev, items: updated, ...calcTotals(updated) };
       });
     },
-    [setOrderState, calculateTotals],
+    [setOrderState],
   );
 
-  const decrease = useCallback(
-    (uuid: string) => {
-      setOrderState((prev) => {
-        const updatedItems = prev.items
-          .map((item) => {
-            if (item.uuid === uuid) {
-              if (item.quantity > 1) {
-                return { ...item, quantity: item.quantity - 1 };
-              } else {
-                return null;
-              }
-            }
-            return item;
-          })
-          .filter((item): item is IOrderItem => item !== null);
+  const increase = useCallback((uuid: string) => update(uuid, 1), [update]);
+  const decrease = useCallback((uuid: string) => update(uuid, -1), [update]);
 
-        const totals = calculateTotals(updatedItems);
-        return { ...prev, items: updatedItems, ...totals };
-      });
-    },
-    [setOrderState, calculateTotals],
+  const preparedItems = useMemo(
+    () =>
+      orderState.items.map(({ id, quantity, comment, options }) => ({
+        id,
+        quantity,
+        comment,
+        options: options?.map(({ id, value }) => ({ id, value })) || [],
+      })),
+    [orderState.items],
   );
-
-  const preparedItems = useMemo(() => {
-    return orderState.items.map((item) => ({
-      id: item.id,
-      quantity: item.quantity,
-      comment: item.comment,
-      options: item.options?.map((opt) => ({ id: opt.id, value: opt.value })) || [],
-    }));
-  }, [orderState.items]);
 
   const doCreateOrder = useCallback(() => {
     createOrder({
@@ -126,132 +109,58 @@ const DraftOrderPage = () => {
   }, [participant, preparedItems, createOrder]);
 
   const onSubmit = useCallback(() => {
-    if (isEmpty(orderState.items) || isEmpty(participant)) {
-      return;
-    }
-
-    if (!participant?.advancePayment) {
-      setConfirmVisible(true);
-    } else {
-      doCreateOrder();
-    }
+    if (isEmpty(orderState.items) || isEmpty(participant)) return;
+    else doCreateOrder();
   }, [orderState.items, participant, doCreateOrder]);
 
-  const formattedPrice = useMemo(() => {
-    return `${(orderState.totalAmount || 0).toLocaleString()} ${CURRENCY}`;
-  }, [orderState.totalAmount]);
-
   const addToCart = useCallback(
-    (variant: any, productId: string) => {
+    (variant: { id: string; name?: string; price?: number }, productId: string) => {
+      const cp = cross?.getCrossSells?.find((p: { productId: string }) => p.productId === productId);
       const newItem: IOrderItem = {
         id: variant.id,
         uuid: `${variant.id}-${Date.now()}`,
-        productId: productId,
-        name: variant.name || cross?.getCrossSells?.find((p: any) => p.productId === productId)?.name || '',
+        productId,
+        name: variant.name || cp?.name || '',
         price: variant.price || 0,
         quantity: 1,
         comment: '',
         options: [],
         discount: 0,
         state: '',
-        image: cross?.getCrossSells?.find((p: any) => p.productId === productId)?.image,
+        image: cp?.image,
         reason: '',
       };
-
       setOrderState((prev) => {
-        const existingItemIndex = prev.items.findIndex((item) => item.id === variant.id);
-        let updatedItems;
-
-        if (existingItemIndex >= 0) {
-          updatedItems = prev.items.map((item, index) =>
-            index === existingItemIndex ? { ...item, quantity: item.quantity + 1 } : item,
-          );
-        } else {
-          updatedItems = [...prev.items, newItem];
-        }
-
-        const totals = calculateTotals(updatedItems);
-        return { ...prev, items: updatedItems, ...totals };
+        const idx = prev.items.findIndex((i) => i.id === variant.id);
+        const updated =
+          idx >= 0
+            ? prev.items.map((i, n) => (n === idx ? { ...i, quantity: i.quantity + 1 } : i))
+            : [...prev.items, newItem];
+        return { ...prev, items: updated, ...calcTotals(updated) };
       });
     },
-    [setOrderState, calculateTotals, cross?.getCrossSells],
+    [setOrderState, cross?.getCrossSells],
   );
 
   const removeFromCart = useCallback(
     (productId: string) => {
       setOrderState((prev) => {
-        const existingItemIndex = prev.items.findIndex((item) => item.productId === productId);
-        let updatedItems;
-
-        if (existingItemIndex >= 0) {
-          const existingItem = prev.items[existingItemIndex];
-          if (existingItem.quantity > 1) {
-            updatedItems = prev.items.map((item, index) =>
-              index === existingItemIndex ? { ...item, quantity: item.quantity - 1 } : item,
-            );
-          } else {
-            updatedItems = prev.items.filter((_, index) => index !== existingItemIndex);
-          }
-        } else {
-          updatedItems = prev.items;
-        }
-
-        const totals = calculateTotals(updatedItems);
-        return { ...prev, items: updatedItems, ...totals };
+        const idx = prev.items.findIndex((i) => i.productId === productId);
+        if (idx < 0) return prev;
+        const item = prev.items[idx];
+        const updated =
+          item.quantity > 1
+            ? prev.items.map((i, n) => (n === idx ? { ...i, quantity: i.quantity - 1 } : i))
+            : prev.items.filter((_, n) => n !== idx);
+        return { ...prev, items: updated, ...calcTotals(updated) };
       });
     },
-    [setOrderState, calculateTotals],
+    [setOrderState],
   );
 
-  const renderRecommendations = useCallback(() => {
-    if (isEmpty(cross?.getCrossSells)) return null;
-
-    const limited = cross.getCrossSells.slice(0, 3);
-    return (
-      <View style={styles.crossSellSection}>
-        <Text style={styles.crossSellTitle}>{t('mainPage.recommendedForYou')}</Text>
-        <View style={styles.recommendationsContainer}>
-          {limited.map((product: any) => (
-            <View key={product.id} style={styles.recommendationCard}>
-              <RecommendedCard
-                isFullWidth={false}
-                product={product}
-                orderItem={orderState.items?.find((item) => item.productId === product.id)}
-                onAdd={addToCart}
-                onRemove={removeFromCart}
-              />
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  }, [cross?.getCrossSells, t, orderState.items, addToCart, removeFromCart]);
-
-  const renderOrderSummary = () => {
-    if (isEmpty(orderState.items)) {
-      return (
-        <View style={styles.emptyOrderContainer}>
-          <Text style={styles.emptyOrderText}>{t('mainPage.noItems') || 'No items in order'}</Text>
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.orderSummaryContainer}>
-        <Text style={styles.orderSummaryTitle}>{t('mainPage.OrderSummary') || 'Order Summary'}</Text>
-        <View style={styles.totalContainer}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>{t('mainPage.totalItems') || 'Total Items'}:</Text>
-            <Text style={styles.totalValue}>{orderState.totalQuantity || 0}</Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>{t('mainPage.Total') || 'Total Amount'}:</Text>
-            <Text style={styles.totalValue}>{formattedPrice}</Text>
-          </View>
-        </View>
-      </View>
-    );
-  };
+  const crossSells = cross?.getCrossSells?.slice(0, 3) ?? [];
+  const totalPrice = `${(orderState.totalAmount || 0).toLocaleString()} ${CURRENCY}`;
+  const isDisabled = isEmpty(orderState.items) || isEmpty(participant) || loading;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -259,103 +168,93 @@ const DraftOrderPage = () => {
         <Text style={styles.headerText}>{t('mainPage.YourOrder')}</Text>
         <TouchableOpacity
           onPress={() => router.back()}
-          style={styles.closeButton}
+          style={styles.closeBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Icon source="close" color={defaultColor} size={28} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.mainContent}>
-        <View style={styles.leftColumn}>
-          <View style={styles.productListContainer}>
+      <View style={styles.body}>
+        <View style={styles.leftCol}>
+          <View style={styles.listWrap}>
             <DraftList items={orderState.items || []} increase={increase} decrease={decrease} />
           </View>
-
-          {renderRecommendations()}
+          {crossSells.length > 0 && (
+            <View style={styles.crossSection}>
+              <Text style={styles.crossTitle}>{t('mainPage.recommendedForYou')}</Text>
+              <View style={styles.crossRow}>
+                {crossSells.map((p: IMenuProduct) => (
+                  <View key={p.id} style={styles.crossCard}>
+                    <RecommendedCard
+                      isFullWidth={false}
+                      product={p}
+                      orderItem={orderState.items?.find((i) => i.productId === p.productId)}
+                      onAdd={addToCart}
+                      onRemove={removeFromCart}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
 
-        <View style={styles.rightColumn}>
-          {renderOrderSummary()}
+        <View style={styles.rightCol}>
+          {isEmpty(orderState.items) ? (
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyText}>{t('mainPage.noItems')}</Text>
+            </View>
+          ) : (
+            <View style={styles.summaryWrap}>
+              <Text style={styles.summaryTitle}>{t('mainPage.OrderSummary')}</Text>
+              <View style={styles.totals}>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>{t('mainPage.totalItems')}:</Text>
+                  <Text style={styles.totalValue}>{orderState.totalQuantity || 0}</Text>
+                </View>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>{t('mainPage.Total')}:</Text>
+                  <Text style={styles.totalValue}>{totalPrice}</Text>
+                </View>
+              </View>
+            </View>
+          )}
           <TouchableOpacity
-            style={[
-              styles.submitButton,
-              (isEmpty(orderState.items) || isEmpty(participant) || loading) && styles.disabledButton,
-            ]}
+            style={[styles.submitBtn, isDisabled && styles.disabledBtn]}
             onPress={onSubmit}
-            disabled={isEmpty(orderState.items) || isEmpty(participant) || loading}
-            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            disabled={isDisabled}
           >
-            <Text style={styles.submitButtonText}>
-              {loading ? t('mainPage.loading') || 'Loading...' : t('mainPage.confirm')}
-            </Text>
+            <Text style={styles.submitBtnText}>{loading ? t('mainPage.loading') : t('mainPage.confirm')}</Text>
           </TouchableOpacity>
         </View>
       </View>
-
-      <Modal visible={confirmVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>{t('mainPage.confirmOrder') || 'Confirm Order'}</Text>
-            <Text style={styles.modalMessage}>{t('mainPage.cashierPayMessage') || 'Your order will be placed. Please pay at the cashier.'}</Text>
-            <Text style={styles.modalTotal}>{formattedPrice}</Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalCancelButton} onPress={() => setConfirmVisible(false)} disabled={loading}>
-                <Text style={styles.modalCancelText}>{t('mainPage.cancel') || 'Cancel'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmButton} onPress={doCreateOrder} disabled={loading}>
-                <Text style={styles.modalConfirmText}>
-                  {loading ? t('mainPage.loading') || 'Loading...' : t('mainPage.confirm')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
 
+export default DraftOrderPage;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  headerText: {
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
-  closeButton: {
-    padding: 10,
-    borderRadius: 20,
-  },
-  mainContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  leftColumn: {
-    flex: 1,
-
-    flexDirection: 'column',
-  },
-  productListContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  productScrollView: {
-    flex: 1,
-  },
-  rightColumn: {
+  headerText: { fontWeight: 'bold', fontSize: 18 },
+  closeBtn: { padding: 10, borderRadius: 20 },
+  body: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  leftCol: { flex: 1, flexDirection: 'column' },
+  listWrap: { flex: 1, padding: 16 },
+  crossSection: { paddingVertical: 16, paddingHorizontal: 16, minHeight: 160 },
+  crossTitle: { fontSize: 16, fontWeight: '700', color: '#000', marginBottom: 12 },
+  crossRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  crossCard: { marginRight: 12, width: 200, marginBottom: 8 },
+  rightCol: {
     width: 370,
     backgroundColor: '#f9f9f9',
     justifyContent: 'space-between',
@@ -363,197 +262,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 24,
     height: 670,
-    marginRight: 30,
-    marginLeft: 30,
+    marginHorizontal: 30,
     borderRadius: 20,
   },
-  orderSummaryContainer: {
-    flex: 1,
-    maxHeight: '80%',
-    justifyContent: 'flex-start',
-    width: '100%',
-  },
-  orderSummaryScroll: {
-    flex: 1,
-    maxHeight: 400,
-  },
-  orderSummaryTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#000',
-    textAlign: 'center',
-  },
-  emptyOrderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyOrderText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  orderSummaryItem: {
-    backgroundColor: '#fff',
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  orderItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  orderItemName: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#000',
-    marginRight: 8,
-  },
-  orderItemPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: defaultColor,
-  },
-  quantityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 8,
-  },
-  quantityButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 8,
-  },
-  quantityText: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    minWidth: 30,
-    textAlign: 'center',
-  },
-  unitPrice: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  totalContainer: {
-    marginTop: 16,
-    marginBottom: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  totalLabel: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  totalValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: defaultColor,
-  },
-  submitButton: {
+  summaryWrap: { flex: 1, maxHeight: '80%' },
+  summaryTitle: { fontSize: 30, fontWeight: 'bold', marginBottom: 16, color: '#000', textAlign: 'center' },
+  emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { fontSize: 16, color: '#666', textAlign: 'center' },
+  totals: { marginTop: 16, marginBottom: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#e0e0e0' },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  totalLabel: { fontSize: 20, fontWeight: 'bold', color: '#000' },
+  totalValue: { fontSize: 20, fontWeight: 'bold', color: defaultColor },
+  submitBtn: {
     backgroundColor: defaultColor,
     borderRadius: 8,
     paddingVertical: 16,
-    paddingHorizontal: 16,
     alignItems: 'center',
-    justifyContent: 'center',
     minHeight: 52,
     marginTop: 10,
   },
-  disabledButton: {
-    backgroundColor: '#cccccc',
-    borderColor: '#cccccc',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  submitButtonPrice: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  crossSellSection: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-
-    minHeight: 160,
-  },
-  crossSellTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 12,
-  },
-  recommendationsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  recommendationCard: {
-    marginRight: 12,
-    width: 200,
-    marginBottom: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalBox: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 32,
-    width: 420,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#000',
-  },
-  modalMessage: {
-    fontSize: 16,
-    color: '#555',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  modalTotal: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: defaultColor,
-    marginBottom: 24,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  modalCancelButton: {
+  disabledBtn: { backgroundColor: '#cccccc' },
+  submitBtnText: { color: 'white', fontSize: 16, fontWeight: '600' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalBox: { backgroundColor: '#fff', borderRadius: 16, padding: 32, width: 420, alignItems: 'center' },
+  modalTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 12 },
+  modalMsg: { fontSize: 16, color: '#555', textAlign: 'center', marginBottom: 16 },
+  modalTotal: { fontSize: 28, fontWeight: 'bold', color: defaultColor, marginBottom: 24 },
+  modalBtns: { flexDirection: 'row', gap: 16 },
+  cancelBtn: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 8,
@@ -561,22 +297,7 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     alignItems: 'center',
   },
-  modalCancelText: {
-    fontSize: 16,
-    color: '#555',
-  },
-  modalConfirmButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    backgroundColor: defaultColor,
-    alignItems: 'center',
-  },
-  modalConfirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
+  cancelText: { fontSize: 16, color: '#555' },
+  confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, backgroundColor: defaultColor, alignItems: 'center' },
+  confirmText: { fontSize: 16, fontWeight: '600', color: '#fff' },
 });
-
-export default DraftOrderPage;

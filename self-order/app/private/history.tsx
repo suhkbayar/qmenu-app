@@ -1,14 +1,14 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { SafeAreaView, StyleSheet, TouchableOpacity, View, FlatList } from 'react-native';
 import { Text, Icon } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@apollo/client';
-import { GET_TABLET_ORDERS } from '@/graphql/query';
-import { defaultColor } from '@/constants/Colors';
-import { moneyFormat } from '@/utils/moneyFormat';
-import Loader from '@/components/Loader';
-import { IOrder, IOrderItem } from '@/types';
+import { GET_TABLET_ORDERS } from '@/src/graphql/queries';
+import { defaultColor } from '@/src/constants/Colors';
+import { moneyFormat } from '@/src/utils/moneyFormat';
+import Loader from '@/src/components/ui/Loader';
+import { IOrder, IOrderItem } from '@/src/types';
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);

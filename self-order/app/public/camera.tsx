@@ -1,15 +1,15 @@
 import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Button } from 'react-native';
 import { router } from 'expo-router';
 import { Icon } from 'react-native-paper';
-import Loader from '@/components/Loader';
+import Loader from '@/src/components/ui/Loader';
 import { useMutation } from '@apollo/client';
-import { CURRENT_TOKEN } from '@/graphql/mutation/token';
-import { setAccessToken, setParticipantId } from '@/providers/auth';
+import { CURRENT_TOKEN } from '@/src/graphql/mutations/token';
+import { setAccessToken, setParticipantId } from '@/src/providers/auth';
 import { useToast } from 'react-native-toast-notifications';
-import { defaultColor } from '@/constants/Colors';
-import { useValid } from '@/context/ValidContext';
+import { defaultColor } from '@/src/constants/Colors';
+import { useValid } from '@/src/providers/ValidProvider';
 
 const CameraScreen = () => {
   const [facing, setFacing] = useState<CameraType>('back');
@@ -37,25 +37,24 @@ const CameraScreen = () => {
     },
   });
 
-  function toggleCameraFacing() {
+  const toggleCameraFacing = useCallback(() => {
     setFacing((current) => (current === 'back' ? 'front' : 'back'));
-  }
+  }, []);
 
-  const takePicture = async (barcode: any) => {
-    if (scanned || !barcode?.data) return; // skip if already scanned
+  const takePicture = useCallback(
+    (barcode: { data?: string }) => {
+      if (scanned || !barcode?.data) return;
+      const code = barcode.data.split('/').pop();
+      if (code) {
+        setScanned(true);
+        getCurrentToken({ variables: { code, type: 'TB' } });
+      }
+    },
+    [scanned, getCurrentToken],
+  );
 
-    const qrData = barcode.data;
-    const code = qrData.split('/').pop(); // <-- This gets "ZzSx4OkU1"
-
-    if (code) {
-      setScanned(true); // mark as scanned
-
-      getCurrentToken({ variables: { code: code, type: 'TB' } });
-    }
-  };
-
-  if (!permission) return <View />;
-  if (!permission.granted) {
+  if (loading) return <Loader />;
+  if (permission && !permission.granted) {
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need your permission to show the camera</Text>
@@ -64,43 +63,34 @@ const CameraScreen = () => {
     );
   }
 
-  if (loading) return <Loader />;
-
   return (
     <View style={styles.container}>
       <CameraView
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-        style={styles.camera}
+        style={StyleSheet.absoluteFill}
         facing={facing}
         onBarcodeScanned={takePicture}
-      >
-        {/* Back Button */}
-        <TouchableOpacity onPress={router.back} style={styles.backButton}>
-          <Icon source="arrow-left" size={24} color="white" />
+      />
+      <TouchableOpacity onPress={router.back} style={styles.backButton}>
+        <Icon source="arrow-left" size={24} color="white" />
+      </TouchableOpacity>
+      <View style={styles.overlay}>
+        <View style={styles.barcodeFrame} />
+      </View>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
+          <Text style={styles.text}>Камер эргүүлэх</Text>
         </TouchableOpacity>
-
-        {/* Barcode Frame */}
-        <View style={styles.overlay}>
-          <View style={styles.barcodeFrame} />
-        </View>
-
-        {/* Flip Camera Button */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
-            <Text style={styles.text}>Камер эргүүлэх</Text>
-          </TouchableOpacity>
-        </View>
-      </CameraView>
+      </View>
     </View>
   );
 };
 
+export default CameraScreen;
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  message: {
-    textAlign: 'center',
-    paddingBottom: 10,
-  },
+  message: { textAlign: 'center', paddingBottom: 10 },
   camera: { flex: 1 },
   backButton: {
     position: 'absolute',
@@ -111,10 +101,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-  },
-  backText: {
-    color: '#fff',
-    fontSize: 20,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -138,14 +124,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
   },
-  button: {
-    alignItems: 'center',
-  },
-  text: {
-    fontSize: 18,
-    color: 'white',
-    fontWeight: 'bold',
-  },
+  button: { alignItems: 'center' },
+  text: { fontSize: 18, color: 'white', fontWeight: 'bold' },
 });
-
-export default CameraScreen;

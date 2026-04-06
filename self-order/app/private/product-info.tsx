@@ -1,217 +1,123 @@
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Modal } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { FAB, Icon } from 'react-native-paper';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { FAB, Icon } from 'react-native-paper';
-import { defaultColor } from '@/constants/Colors';
-import { IMenuOption, IMenuVariant, IOrderItem } from '@/types';
-import { isEmpty } from 'lodash';
-import { useOrderStore } from '@/cache/order.store';
-import RenderHtml from 'react-native-render-html';
-import { LogBox } from 'react-native';
-import { CURRENCY } from '@/constants';
-import { calculateOrderItem, generateUUID } from '@/utils';
-import OptionValuesModal from '@/components/Modal/OptionValuesModal';
 import { useLazyQuery } from '@apollo/client';
-import { GET_CROSS_SELLS } from '@/graphql/query/product';
-import { useCallStore } from '@/cache/cart.store';
-import RecommendedCard from '@/components/Card/RecommendedCard';
+import { isEmpty } from 'lodash';
+import RenderHtml from 'react-native-render-html';
 
-interface ValidationResult {
-  isValid: boolean;
-  missingMandatoryOptions: IMenuOption[];
-  productId: string | null;
-}
+import OptionValuesModal from '@/src/components/modals/OptionValuesModal';
+import RecommendedCard from '@/src/components/cards/RecommendedCard';
+import { defaultColor } from '@/src/constants/Colors';
+import { CURRENCY } from '@/src/constants';
+import { GET_CROSS_SELLS } from '@/src/graphql/queries/product';
+import { useCallStore } from '@/src/store/cart.store';
+import { useOrderStore } from '@/src/store/order.store';
+import { IMenuOption, IMenuVariant, IOrderItem } from '@/src/types';
+import { calculateOrderItem, generateUUID } from '@/src/utils';
 
-interface ProductDetailsScreenProps {
+interface Props {
   visible?: boolean;
   onClose?: () => void;
   product?: any;
 }
 
-const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
-  visible = true,
-  onClose,
-  product: propProduct,
-}) => {
+const calculateTotals = (items: IOrderItem[]) => {
+  const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0);
+  const totalAmount = items.reduce((sum, i) => {
+    const optTotal = i.options?.reduce((s, o) => s + (o.price || 0), 0) ?? 0;
+    return sum + (i.price + optTotal) * i.quantity;
+  }, 0);
+  return { totalAmount, grandTotal: totalAmount, totalQuantity };
+};
+
+const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: propProduct }) => {
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const { t } = useTranslation('language');
-  const orderState = useOrderStore((state) => state.orderState);
-  const setOrderState = useOrderStore((state) => state.setOrderState);
+  const { participant } = useCallStore();
+  const orderState = useOrderStore((s) => s.orderState);
+  const setOrderState = useOrderStore((s) => s.setOrderState);
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [visibleValues, setVisibleValues] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<any>(null);
-  const [validationError, setValidationError] = useState<string>('');
-  const [selectedItem, setSelectedItem] = useState<IOrderItem | null>();
+  const [selectedOption, setSelectedOption] = useState<IMenuOption | null>(null);
+  const [validationError, setValidationError] = useState('');
   const [validateOptions, setValidateOptions] = useState<IMenuOption[]>([]);
-  const [getCrossSells, { data: cross }] = useLazyQuery(GET_CROSS_SELLS);
-  const { participant, order } = useCallStore();
+  const [selectedItem, setSelectedItem] = useState<IOrderItem | null>(null);
 
-  // Use prop product if provided, otherwise parse from params
+  const [getCrossSells, { data: cross }] = useLazyQuery(GET_CROSS_SELLS);
+
   const product = useMemo(() => {
     if (propProduct) return propProduct;
     try {
       return JSON.parse(params.product as string);
-    } catch (e) {
-      console.error('Error parsing product:', e);
+    } catch {
       return null;
     }
   }, [propProduct, params.product]);
 
-  // Memoize current variant
-  const currentVariant = useMemo(() => {
-    if (!product || !selectedItem) return null;
-    return product.variants.find((variant: IMenuVariant) => variant.id === selectedItem.id);
-  }, [product, selectedItem?.id]);
-
-  LogBox.ignoreLogs(['Support for defaultProps will be removed from function components']);
-
-  // Calculate totals helper function
-  const calculateTotals = useCallback((items: IOrderItem[]) => {
-    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-    const totalAmount = items.reduce((sum, item) => {
-      const optionTotal = item.options?.reduce((optSum, opt) => optSum + (opt.price || 0), 0) ?? 0;
-      return sum + (item.price + optionTotal) * item.quantity;
-    }, 0);
-    return { totalAmount, grandTotal: totalAmount, totalQuantity };
-  }, []);
-
-  const addToCart = useCallback(
-    (variant: any, productId: string) => {
-      const newItem: IOrderItem = {
-        id: variant.id,
-        uuid: generateUUID(),
-        productId: productId,
-        name: variant.name || cross?.getCrossSells?.find((p: any) => p.productId === productId).name || '',
-        price: variant.price || variant.salePrice || 0,
-        quantity: 1,
-        comment: '',
-        reason: '',
-        state: 'DRAFT',
-        options: [],
-        discount: 0,
-        image: cross?.getCrossSells?.find((p: any) => p.productId === productId)?.image,
-      };
-
-      setOrderState((prev) => {
-        const existingItemIndex = prev.items.findIndex((item) => item.id === variant.id);
-        let updatedItems;
-
-        if (existingItemIndex >= 0) {
-          updatedItems = prev.items.map((item, index) =>
-            index === existingItemIndex ? { ...item, quantity: item.quantity + 1 } : item,
-          );
-        } else {
-          updatedItems = [...prev.items, newItem];
-        }
-
-        const totals = calculateTotals(updatedItems);
-        return { ...prev, items: updatedItems, ...totals };
-      });
-    },
-    [setOrderState, calculateTotals, cross?.getCrossSells],
+  const currentVariant = useMemo(
+    () => product?.variants?.find((v: IMenuVariant) => v.id === selectedItem?.id) ?? null,
+    [product, selectedItem?.id],
   );
-
-  const removeFromCart = useCallback(
-    (productId: string) => {
-      setOrderState((prev) => {
-        const existingItemIndex = prev.items.findIndex((item) => item.productId === productId);
-        let updatedItems;
-
-        if (existingItemIndex >= 0) {
-          const existingItem = prev.items[existingItemIndex];
-          if (existingItem.quantity > 1) {
-            updatedItems = prev.items.map((item, index) =>
-              index === existingItemIndex ? { ...item, quantity: item.quantity - 1 } : item,
-            );
-          } else {
-            updatedItems = prev.items.filter((_, index) => index !== existingItemIndex);
-          }
-        } else {
-          updatedItems = prev.items;
-        }
-
-        const totals = calculateTotals(updatedItems);
-        return { ...prev, items: updatedItems, ...totals };
-      });
-    },
-    [setOrderState, calculateTotals],
-  );
-
-  const toggleOption = useCallback((option: IMenuOption, value?: string) => {
-    setValidateOptions([]);
-    if (!isEmpty(option.values) && isEmpty(value)) {
-      setSelectedOption(option);
-      setVisibleValues(true);
-    } else {
-      handleSelectOption(option);
-    }
-  }, []);
 
   useEffect(() => {
-    if (product && product.variants?.[0]) {
-      const item: IOrderItem = {
-        id: product.variants[0].id,
-        uuid: generateUUID(),
-        productId: product.productId,
-        name: product.variants[0].name,
-        reason: '',
-        state: 'DRAFT',
-        quantity: 1,
-        options: [],
-        price: product.variants[0].salePrice,
-        discount: 0,
-        comment: '',
-        image: product.image ?? '',
-      };
-
-      getCrossSells({
-        variables: {
-          menuId: participant?.menu.id,
-          ids: [product.productId],
-        },
-      });
-      setSelectedItem(item);
-      setValidationError('');
-    } else {
+    if (!product?.variants?.[0]) {
       setSelectedItem(null);
-      setValidationError('');
+      return;
+    }
+    const v = product.variants[0];
+    setSelectedItem({
+      id: v.id,
+      uuid: generateUUID(),
+      productId: product.productId,
+      name: v.name,
+      reason: '',
+      state: 'DRAFT',
+      quantity: 1,
+      options: [],
+      price: v.salePrice,
+      discount: 0,
+      comment: '',
+      image: product.image ?? '',
+    });
+    setValidationError('');
+    if (participant?.menu?.id) {
+      getCrossSells({ variables: { menuId: participant.menu.id, ids: [product.productId] } });
     }
   }, [product]);
 
-  const renderRecommendations = (result: any[]) => {
-    const limitedResults = result?.slice(0, 3) || [];
+  const handleSelectOption = useCallback((option: IMenuOption & { value?: string }) => {
+    setSelectedItem((prev) => {
+      if (!prev) return prev;
+      const already = prev.options.some((o) => o.id === option.id);
+      return { ...prev, options: already ? prev.options.filter((o) => o.id !== option.id) : [...prev.options, option] };
+    });
+    setValidationError('');
+  }, []);
 
-    return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.recommendationsScroll}
-      >
-        {limitedResults.map((product) => (
-          <View key={product.id} style={styles.recommendationCard}>
-            <RecommendedCard
-              isFullWidth
-              product={product}
-              orderItem={orderState.items?.find((item: any) => item.productId === product.productId)}
-              onAdd={addToCart}
-              onRemove={removeFromCart}
-            />
-          </View>
-        ))}
-      </ScrollView>
-    );
-  };
+  const toggleOption = useCallback(
+    (option: IMenuOption, value?: string) => {
+      setValidateOptions([]);
+      if (!isEmpty(option.values) && isEmpty(value)) {
+        setSelectedOption(option);
+        setVisibleValues(true);
+      } else {
+        handleSelectOption(option);
+      }
+    },
+    [handleSelectOption],
+  );
 
   const onSelect = useCallback(
     (variant: IMenuVariant) => {
       if (!selectedItem || !product) return;
-
       if (selectedItem.id === variant.id) {
         setSelectedItem({ ...selectedItem, quantity: selectedItem.quantity + 1 });
       } else {
-        const item: IOrderItem = {
+        setSelectedItem({
           id: variant.id,
           uuid: generateUUID(),
           productId: product.productId,
@@ -223,8 +129,8 @@ const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
           price: variant.salePrice,
           discount: 0,
           image: product.image ?? '',
-        };
-        setSelectedItem(item);
+          comment: '',
+        });
       }
       setValidationError('');
       setValidateOptions([]);
@@ -232,238 +138,108 @@ const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
     [selectedItem, product],
   );
 
-  const validateMandatoryOptions = useCallback(
-    (item: IOrderItem): ValidationResult => {
-      try {
-        if (!product) {
-          return {
-            isValid: false,
-            missingMandatoryOptions: [],
-            productId: null,
-          };
-        }
-
-        const currentVariant = product.variants.find((variant: IMenuVariant) => variant.id === item.id);
-
-        if (!currentVariant) {
-          return {
-            isValid: false,
-            missingMandatoryOptions: [],
-            productId: product.productId,
-          };
-        }
-
-        const mandatoryOptions = currentVariant.options?.filter((option: IMenuOption) => option.mandatory) || [];
-
-        if (mandatoryOptions.length === 0) {
-          return {
-            isValid: true,
-            missingMandatoryOptions: [],
-            productId: null,
-          };
-        }
-
-        const selectedOptionIds = new Set(item.options.map((option) => option.id));
-        const missingOptions = mandatoryOptions.filter((option: IMenuOption) => !selectedOptionIds.has(option.id));
-
-        return {
-          isValid: missingOptions.length === 0,
-          missingMandatoryOptions: missingOptions,
-          productId: missingOptions.length > 0 ? product.productId : null,
-        };
-      } catch (error) {
-        console.error('Error in validateMandatoryOptions:', error);
-        return {
-          isValid: false,
-          missingMandatoryOptions: [],
-          productId: null,
-        };
-      }
-    },
-    [product],
-  );
-
-  const validationResult = useMemo(() => {
-    if (!selectedItem) {
-      return {
-        isValid: false,
-        missingMandatoryOptions: [],
-        productId: null,
-      };
-    }
-    return validateMandatoryOptions(selectedItem);
-  }, [selectedItem, validateMandatoryOptions]);
-
-  const handleSelectOption = useCallback((option: any & { value?: string }) => {
-    setSelectedItem((prev) => {
-      if (!prev) return prev;
-
-      const isOptionSelected = prev.options.some((selectedOption) => selectedOption.id === option.id);
-
-      const updatedOptions = isOptionSelected
-        ? prev.options.filter((item) => item.id !== option.id)
-        : [...prev.options, option];
-
-      return { ...prev, options: updatedOptions };
-    });
-    setValidationError('');
-  }, []);
-
   const onRemove = useCallback(() => {
-    if (!selectedItem) return;
-
-    if (selectedItem.quantity > 1) {
-      setSelectedItem({
-        ...selectedItem,
-        quantity: selectedItem.quantity - 1,
-      });
-    }
+    if (!selectedItem || selectedItem.quantity <= 1) return;
+    setSelectedItem({ ...selectedItem, quantity: selectedItem.quantity - 1 });
   }, [selectedItem]);
 
   const onSelectValue = useCallback(
-    (value: any) => {
-      if (!selectedOption) {
-        return;
-      }
-
+    (value: string) => {
+      if (!selectedOption) return;
       setVisibleValues(false);
-      handleSelectOption({ ...selectedOption, value: value });
+      handleSelectOption({ ...selectedOption, value });
     },
     [selectedOption, handleSelectOption],
   );
 
+  const goBack = useCallback(() => {
+    setSelectedOption(null);
+    setValidationError('');
+    setSelectedItem(null);
+    setValidateOptions([]);
+    if (onClose) onClose();
+    else router.back();
+  }, [onClose]);
+
+  const addToCart = useCallback(
+    (variant: { id: string; name?: string; price?: number }, productId: string) => {
+      const cp = cross?.getCrossSells?.find((p: any) => p.productId === productId);
+      const newItem: IOrderItem = {
+        id: variant.id,
+        uuid: `${variant.id}-${Date.now()}`,
+        productId,
+        name: variant.name || cp?.name || '',
+        price: variant.price || 0,
+        quantity: 1,
+        comment: '',
+        options: [],
+        discount: 0,
+        state: '',
+        image: cp?.image,
+        reason: '',
+      };
+      setOrderState((prev) => {
+        const idx = prev.items.findIndex((i) => i.id === variant.id);
+        const updated =
+          idx >= 0
+            ? prev.items.map((i, n) => (n === idx ? { ...i, quantity: i.quantity + 1 } : i))
+            : [...prev.items, newItem];
+        return { ...prev, items: updated, ...calculateTotals(updated) };
+      });
+    },
+    [setOrderState, cross?.getCrossSells],
+  );
+
+  const removeFromCart = useCallback(
+    (productId: string) => {
+      setOrderState((prev) => {
+        const idx = prev.items.findIndex((i) => i.productId === productId);
+        if (idx < 0) return prev;
+        const existing = prev.items[idx];
+        const updated =
+          existing.quantity > 1
+            ? prev.items.map((i, n) => (n === idx ? { ...i, quantity: i.quantity - 1 } : i))
+            : prev.items.filter((_, n) => n !== idx);
+        return { ...prev, items: updated, ...calculateTotals(updated) };
+      });
+    },
+    [setOrderState],
+  );
+
   const addItem = useCallback(() => {
     if (!selectedItem) return;
+    const variant = product?.variants?.find((v: IMenuVariant) => v.id === selectedItem.id);
+    const mandatory = variant?.options?.filter((o: IMenuOption) => o.mandatory) || [];
+    const selected = new Set(selectedItem.options.map((o) => o.id));
+    const missing = mandatory.filter((o: IMenuOption) => !selected.has(o.id));
 
-    if (!validationResult.isValid) {
-      setValidateOptions(validationResult.missingMandatoryOptions);
-      const missingOptionsText = validationResult.missingMandatoryOptions.map((option) => option.name).join(', ');
-      setValidationError(t('mainPage.validation.mandatoryOptions', { options: missingOptionsText }));
+    if (missing.length > 0) {
+      setValidateOptions(missing);
+      setValidationError(
+        t('mainPage.validation.mandatoryOptions', { options: missing.map((o: IMenuOption) => o.name).join(', ') }),
+      );
       return;
     }
 
-    setOrderState((prevState) => {
-      const items = [...prevState.items, selectedItem];
-      const totals = calculateTotals(items);
-
-      return {
-        items,
-        ...totals,
-        state: 'DRAFT',
-      };
+    setOrderState((prev) => {
+      const items = [...prev.items, selectedItem];
+      return { items, ...calculateTotals(items), state: 'DRAFT' };
     });
 
-    if (onClose) {
-      onClose();
-    } else {
-      router.back();
-    }
+    goBack();
+  }, [selectedItem, product, t, setOrderState, goBack]);
 
-    setSelectedOption(null);
-    setValidationError('');
-    setSelectedItem(null);
-    setValidateOptions([]);
-  }, [selectedItem, validationResult, t, setOrderState, onClose, calculateTotals]);
+  const crossSells = cross?.getCrossSells?.slice(0, 3) ?? [];
+  const htmlSource = useMemo(
+    () => (product?.specification ? { html: product.specification } : null),
+    [product?.specification],
+  );
+  const priceDisplay = useMemo(
+    () => (selectedItem ? calculateOrderItem(selectedItem) + CURRENCY : '0' + CURRENCY),
+    [selectedItem],
+  );
 
-  const goBack = useCallback(() => {
-    if (onClose) {
-      onClose();
-    } else {
-      router.back();
-    }
-
-    setSelectedOption(null);
-    setValidationError('');
-    setSelectedItem(null);
-    setValidateOptions([]);
-  }, [onClose]);
-
-  const renderVariants = useMemo(() => {
-    if (!product || !product.variants) return null;
-
-    return (
-      <>
-        <Text style={styles.sectionTitle}>{t('mainPage.Variants')}</Text>
-        <Text style={styles.extraDesc}>{t('mainPage.chooseOption')}</Text>
-        <View style={styles.sizeSelector}>
-          {product.variants.map((variant: IMenuVariant) => (
-            <TouchableOpacity
-              key={variant.id}
-              onPress={() => onSelect(variant)}
-              style={[styles.sizeButton, selectedItem?.id === variant.id && styles.sizeButtonSelected]}
-            >
-              <Text style={[selectedItem?.id === variant.id ? styles.selectedSizeText : styles.sizeText]}>
-                {variant.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </>
-    );
-  }, [product?.variants, selectedItem?.id, t, onSelect]);
-
-  const renderOptions = useMemo(() => {
-    if (!currentVariant || isEmpty(currentVariant.options)) return null;
-
-    return (
-      <>
-        <Text style={styles.sectionTitle}>{t('mainPage.extra')}</Text>
-        <Text style={[validationError ? styles.validateDesc : styles.extraDesc]}>
-          {validationError ? 'Шаардлагатай сонголтуудыг сонгоно уу' : t('mainPage.chooseIngredients')}{' '}
-        </Text>
-        <View style={styles.toppingsWrapper}>
-          {currentVariant.options?.map((option: IMenuOption) => {
-            const isSelected = selectedItem?.options.some((selectedOption) => selectedOption.id === option.id);
-            const needsValidation = validateOptions.some((opt) => opt.id === option.id);
-            const selectedValue = selectedItem?.options.find(
-              (selectedOption) => selectedOption.id === option.id,
-            )?.value;
-
-            return (
-              <TouchableOpacity
-                key={option.id}
-                onPress={() => toggleOption(option, selectedValue)}
-                style={[
-                  styles.sizeButton,
-                  needsValidation ? styles.validateButtonSelected : isSelected && styles.sizeButtonSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    needsValidation
-                      ? styles.validateText
-                      : isSelected
-                        ? styles.selectedToppingText
-                        : styles.toppingText,
-                  ]}
-                >
-                  {option.name}
-                  {!isEmpty(selectedValue) && `: ${selectedValue}`}
-                </Text>
-                {option.mandatory && (
-                  <Text style={[needsValidation ? { marginLeft: 4, color: 'white' } : { marginLeft: 4, color: 'red' }]}>
-                    *
-                  </Text>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </>
-    );
-  }, [currentVariant, selectedItem?.options, validateOptions, validationError, t, toggleOption]);
-
-  const priceDisplay = useMemo(() => {
-    if (!selectedItem) return '0' + CURRENCY;
-    return calculateOrderItem(selectedItem) + CURRENCY;
-  }, [selectedItem]);
-
-  const htmlContent = useMemo(() => {
-    if (!product?.specification) return null;
-    return { html: product.specification };
-  }, [product?.specification]);
-
-  const renderContent = () => (
+  const content = (
     <View style={styles.page}>
       <View style={styles.header}>
         <TouchableOpacity onPress={goBack} style={styles.backButton}>
@@ -473,29 +249,39 @@ const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
       </View>
 
       <View style={styles.content}>
-        <View style={styles.leftColumn}>
+        <View style={styles.leftCol}>
           <Image
-            source={{ uri: product?.image.replace('/sm', '/md') }}
-            style={styles.pizzaImage}
+            source={{ uri: product?.image?.replace('/sm', '/md') }}
+            style={styles.productImage}
             resizeMode="cover"
-            onError={(e) => console.log('Image load error:', e.nativeEvent.error)}
           />
-
-          {!isEmpty(cross?.getCrossSells) && (
-            <View style={styles.crossSellSection}>
-              <Text style={styles.crossSellTitle}>{t('mainPage.recommendedForYou')}</Text>
-              {renderRecommendations(cross?.getCrossSells)}
+          {!isEmpty(crossSells) && (
+            <View style={styles.crossSection}>
+              <Text style={styles.crossTitle}>{t('mainPage.recommendedForYou')}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.crossScroll}>
+                {crossSells.map((p: any) => (
+                  <View key={p.id} style={styles.crossCard}>
+                    <RecommendedCard
+                      isFullWidth
+                      product={p}
+                      orderItem={orderState.items?.find((i) => i.productId === p.productId)}
+                      onAdd={addToCart}
+                      onRemove={removeFromCart}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
             </View>
           )}
         </View>
 
-        <ScrollView style={styles.rightColumn} contentContainerStyle={styles.rightContent}>
-          <Text style={styles.title}>{product?.name || 'Roberto'}</Text>
+        <ScrollView style={styles.rightCol} contentContainerStyle={styles.rightContent}>
+          <Text style={styles.title}>{product?.name}</Text>
 
-          {htmlContent && (
-            <View style={styles.specificationContainer}>
+          {htmlSource && (
+            <View style={styles.specContainer}>
               <View style={!isExpanded ? styles.htmlClamp : undefined}>
-                <RenderHtml contentWidth={width} source={htmlContent} />
+                <RenderHtml contentWidth={width} source={htmlSource} />
               </View>
               <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
                 <Text style={styles.expandToggle}>{isExpanded ? 'Хураах' : 'Илүү их'}</Text>
@@ -503,313 +289,166 @@ const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
             </View>
           )}
 
-          {renderVariants}
+          {/* Variants */}
+          {product?.variants?.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>{t('mainPage.Variants')}</Text>
+              <Text style={styles.sectionDesc}>{t('mainPage.chooseOption')}</Text>
+              <View style={styles.chipRow}>
+                {product.variants.map((v: IMenuVariant) => (
+                  <TouchableOpacity
+                    key={v.id}
+                    onPress={() => onSelect(v)}
+                    style={[styles.chip, selectedItem?.id === v.id && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, selectedItem?.id === v.id && styles.chipTextActive]}>{v.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
 
-          {renderOptions}
+          {/* Options */}
+          {currentVariant && !isEmpty(currentVariant.options) && (
+            <>
+              <Text style={styles.sectionTitle}>{t('mainPage.extra')}</Text>
+              <Text style={[styles.sectionDesc, validationError ? styles.errorDesc : undefined]}>
+                {validationError ? 'Шаардлагатай сонголтуудыг сонгоно уу' : t('mainPage.chooseIngredients')}
+              </Text>
+              <View style={styles.chipRow}>
+                {currentVariant.options.map((opt: IMenuOption) => {
+                  const isSelected = selectedItem?.options.some((o) => o.id === opt.id);
+                  const needsValidation = validateOptions.some((o) => o.id === opt.id);
+                  const selectedValue = selectedItem?.options.find((o) => o.id === opt.id)?.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      onPress={() => toggleOption(opt, selectedValue)}
+                      style={[styles.chip, needsValidation ? styles.chipError : isSelected && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, (needsValidation || isSelected) && styles.chipTextActive]}>
+                        {opt.name}
+                        {!isEmpty(selectedValue) && `: ${selectedValue}`}
+                      </Text>
+                      {opt.mandatory && (
+                        <Text style={{ marginLeft: 4, color: needsValidation ? 'white' : 'red' }}>*</Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
 
-          <View style={styles.priceSection}>
-            <Text style={styles.priceText}>{priceDisplay}</Text>
-
-            <View style={styles.quantityControls}>
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{priceDisplay}</Text>
+            <View style={styles.qtyRow}>
               <TouchableOpacity onPress={onRemove}>
-                <FAB animated={false} icon="minus" size="small" style={styles.secondfab} color={defaultColor} />
+                <FAB animated={false} icon="minus" size="small" style={styles.fabOutline} color={defaultColor} />
               </TouchableOpacity>
-
-              <Text style={styles.qtyNumber}>{selectedItem?.quantity || 0}</Text>
+              <Text style={styles.qty}>{selectedItem?.quantity || 0}</Text>
               <TouchableOpacity onPress={() => currentVariant && onSelect(currentVariant)}>
-                <FAB animated={false} icon="plus" size="small" style={styles.plusFab} color="white" />
+                <FAB animated={false} icon="plus" size="small" style={styles.fabFill} color="white" />
               </TouchableOpacity>
             </View>
           </View>
 
-          <TouchableOpacity style={styles.orderButton} onPress={addItem}>
-            <Text style={styles.orderButtonText}>{t('mainPage.AddToCard')}</Text>
+          <TouchableOpacity style={styles.addBtn} onPress={addItem}>
+            <Text style={styles.addBtnText}>{t('mainPage.AddToCard')}</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
 
-      {visibleValues && (
-        <OptionValuesModal
-          visible={visibleValues}
-          values={selectedOption.values}
-          onClose={() => {
-            setVisibleValues(false);
-          }}
-          onSelectValue={onSelectValue}
-        />
-      )}
+      <OptionValuesModal
+        visible={visibleValues}
+        values={selectedOption?.values ?? []}
+        onClose={() => setVisibleValues(false)}
+        onSelectValue={onSelectValue}
+      />
     </View>
   );
 
-  if (visible === false) {
-    return null;
-  }
-
-  if (onClose) {
+  if (!visible) return null;
+  if (onClose)
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-        {renderContent()}
+        {content}
       </Modal>
     );
-  }
-
-  return renderContent();
+  return content;
 };
 
+export default ProductDetails;
+
 const styles = StyleSheet.create({
-  page: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 24,
-    flex: 1,
-  },
-  scrollContainer: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-  },
-  cardContainer: {
-    marginRight: 12,
-    marginBottom: 8,
-  },
-  clamped: {
-    maxHeight: 100,
-    overflow: 'hidden',
-  },
-  expanded: {
-    height: 'auto',
-  },
-  expandToggle: {
-    color: '#007BFF',
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  content: {
-    flexDirection: 'row',
-    gap: 16,
-    height: '86%',
-    marginBottom: 24,
-  },
-  leftColumn: {
-    flex: 1,
-    height: '100%',
-    justifyContent: 'center',
-  },
-  rightColumn: {
-    flex: 1,
-    alignSelf: 'center',
-  },
-  rightContent: {
-    padding: 18,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 20,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    gap: 8,
-  },
-  backText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '600',
-  },
-    plusFab: {
-    backgroundColor: defaultColor,
-    width: 56,
-    height: 56,
-    borderRadius: 999,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-    secondfab: {
-    backgroundColor: 'white',
-    width: 56,
-    borderColor: '#f0f0f0',
-    borderWidth: 1,
-    height: 56,
-    borderRadius: 999,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pizzaImage: {
-    height: 400,
-    width: '100%',
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  description: {
-    color: '#6b7280',
-    fontSize: 14,
-    marginBottom: 16,
-  },
-  extraDesc: {
-    color: '#6b7280',
-    fontSize: 13,
-    marginBottom: 16,
-  },
-  validateDesc: {
-    color: 'red',
-    fontSize: 13,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  sizeSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  sizeButton: {
+  page: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 24 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 20 },
+  backButton: { flexDirection: 'row', alignItems: 'center', padding: 8, gap: 8 },
+  backText: { fontSize: 16, color: '#333', fontWeight: '600' },
+  content: { flexDirection: 'row', gap: 16, height: '100%', marginBottom: 24 },
+  leftCol: { flex: 1, height: '100%', justifyContent: 'flex-start' },
+  rightCol: { flex: 1, alignSelf: 'flex-start', marginTop: 50 },
+  rightContent: { padding: 18 },
+  productImage: { height: 400, width: '100%', borderRadius: 16, marginBottom: 16, marginTop: 26 },
+  title: { fontSize: 28, fontWeight: '700', marginBottom: 8 },
+  specContainer: { marginBottom: 16 },
+  htmlClamp: { maxHeight: 80, overflow: 'hidden' },
+  expandToggle: { color: '#007BFF', fontWeight: '600', marginTop: 8 },
+  sectionTitle: { fontWeight: '600', fontSize: 16 },
+  sectionDesc: { color: '#6b7280', fontSize: 13, marginBottom: 16 },
+  errorDesc: { color: 'red' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  chip: {
     paddingHorizontal: 16,
-    flexDirection: 'row',
     paddingVertical: 8,
     marginBottom: 16,
     backgroundColor: '#f3f4f6',
     borderRadius: 999,
     marginRight: 8,
-  },
-  sizeButtonSelected: {
-    backgroundColor: defaultColor,
-  },
-  validateButtonSelected: {
-    backgroundColor: 'red',
-  },
-  selectedSizeText: {
-    fontWeight: '600',
-    fontSize: 14,
-    color: 'white',
-  },
-  sizeText: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  toppingsWrapper: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 24,
   },
-  topping: {
-    backgroundColor: '#fef3c7',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  selectedToppingText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'white',
-  },
-  toppingText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  validateText: {
-    fontSize: 14,
-    color: 'white',
-    fontWeight: '500',
-  },
-  moreToppings: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginBottom: 8,
-  },
-  moreToppingsText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-  },
-  priceSection: {
+  chipActive: { backgroundColor: defaultColor },
+  chipError: { backgroundColor: 'red' },
+  chipText: { fontWeight: '600', fontSize: 14 },
+  chipTextActive: { color: 'white' },
+  crossSection: { marginTop: 10, flex: 1 },
+  crossTitle: { fontSize: 16, fontWeight: '600', color: '#000', marginBottom: 12 },
+  crossScroll: {},
+  crossCard: { borderRadius: 12, marginRight: 12 },
+  priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
     marginTop: 14,
   },
-  priceText: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  quantityControls: {
-    flexDirection: 'row',
+  price: { fontSize: 24, fontWeight: '700' },
+  qtyRow: { flexDirection: 'row', alignItems: 'center' },
+  qty: { fontSize: 20, marginHorizontal: 12 },
+  fabFill: {
+    backgroundColor: defaultColor,
+    width: 56,
+    height: 56,
+    borderRadius: 999,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  qtyButton: {
-    backgroundColor: '#e5e7eb',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  fabOutline: {
+    backgroundColor: 'white',
+    width: 56,
+    height: 56,
     borderRadius: 999,
+    borderColor: '#f0f0f0',
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  qtyButtonText: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  qtyNumber: {
-    fontSize: 20,
-    marginHorizontal: 12,
-  },
-  orderButton: {
+  addBtn: {
     backgroundColor: defaultColor,
     borderRadius: 999,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 12,
   },
-  orderButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  specificationContainer: {
-    marginBottom: 16,
-  },
-    ul: {
-    paddingLeft: 20,
-    paddingBottom: 20,
-    height: 400,
-  },
-  li: {
-    fontWeight: '300',
-    height: 20,
-  },
-  htmlClamp: {
-    maxHeight: 80, // 4 lines × 20 lineHeight = 80
-    overflow: 'hidden',
-  },
-  // Updated styles for cross-sell section - now positioned below product image
-  crossSellSection: {
-    marginTop: 16,
-    flex: 1,
-  },
-  crossSellTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 12,
-  },
-  // Horizontal scroll layout for recommendations
-  recommendationsScroll: {
-    paddingHorizontal: 4,
-    paddingVertical: 8,
-  },
-  recommendationCard: {
-    borderRadius: 12,
-    padding: 4,
-    marginRight: 12,
-  },
+  addBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
 });
-
-export default ProductDetailsScreen;

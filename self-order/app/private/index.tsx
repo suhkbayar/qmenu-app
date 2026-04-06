@@ -1,138 +1,108 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Platform, SafeAreaView, StyleSheet, View, Text, AppState } from 'react-native';
-import { getStorage } from '@/cache';
-import { useCallStore } from '@/cache/cart.store';
-import { GET_BANNERS, GET_BRANCH } from '@/graphql/query';
-import { useLazyQuery, useMutation } from '@apollo/client';
-import { isEmpty } from 'lodash';
-import HelpFloatingButton from '@/components/FloatingButton/HelpFloatingButton';
-import OrderFloatingButton from '@/components/FloatingButton/OrderFloatingButton';
-import Loader from '@/components/Loader';
-import Container from '@/template/container';
-import { AuthContext } from '@/providers/auth';
-import { router } from 'expo-router';
-import { emptyOrder } from '@/constants';
-import { ICustomerTable } from '@/types';
+import React, { useContext, useEffect, useState } from 'react';
+import { Platform, SafeAreaView, StyleSheet } from 'react-native';
+import { useQuery } from '@apollo/client';
 import * as Battery from 'expo-battery';
+import { router } from 'expo-router';
 
-import ScreensaverWrapper from '@/providers/ScreensaverWrapper';
-import { UPDATE_BATTERY } from '@/graphql/mutation/table';
-
-const MemoizedContainer = React.memo(({ participant }: any) => <Container participant={participant} />);
-
-const MemoizedHelpButton = React.memo(() => <HelpFloatingButton />);
-const MemoizedOrderButton = React.memo(() => <OrderFloatingButton />);
+import Container from '@/src/components/Container';
+import HelpFloatingButton from '@/src/components/HelpFloatingButton';
+import OrderFloatingButton from '@/src/components/OrderFloatingButton';
+import Loader from '@/src/components/ui/Loader';
+import { emptyOrder } from '@/src/constants';
+import { GET_BANNERS, GET_BRANCH } from '@/src/graphql/queries';
+import { UPDATE_BATTERY } from '@/src/graphql/mutations/table';
+import { AuthContext } from '@/src/providers/auth';
+import ScreensaverWrapper from '@/src/providers/ScreensaverWrapper';
+import { useCallStore } from '@/src/store/cart.store';
+import { getStorage } from '@/src/store/storage';
+import { useLazyQuery, useMutation } from '@apollo/client';
 
 const Private = () => {
-  const [loading, setLoading] = useState(true);
-  const [images, setImages] = useState<any[]>([]);
-  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const [participantId, setParticipantId] = useState<string | null>(null);
+  const [images, setImages] = useState<{ uri: string }[]>([]);
   const { signOut } = useContext(AuthContext);
   const { setParticipant, order, load, setTables } = useCallStore();
 
-  const [getBanners, { loading: loadBanners }] = useLazyQuery(GET_BANNERS, {
-    fetchPolicy: 'network-only',
-    onCompleted(data) {
-      let imageUrls: string[] = [];
-      data.getBanners.forEach((banner: any) => {
-        if (banner.image && banner.type === 'TB') {
-          imageUrls.push(banner.image);
-        }
-      });
-      const screensaverImages = imageUrls.map((url) => ({ uri: url }));
-      setImages(screensaverImages);
-    },
-    onError(err) {
-      console.log(err, 'error fetching banners');
-    },
-  });
+  // Load participantId from storage once on mount
+  useEffect(() => {
+    getStorage('participantId').then((id) => {
+      if (id) setParticipantId(id);
+    });
+  }, []);
 
-  const [getBranch, { loading: loadBranch, data }] = useLazyQuery(GET_BRANCH, {
+  const { data, loading } = useQuery(GET_BRANCH, {
+    variables: { id: participantId },
+    skip: !participantId,
     fetchPolicy: 'cache-and-network',
     pollInterval: 600000,
-    onCompleted(data) {
-      setParticipant(data.getParticipant);
-      if (data.getParticipant.orderable && isEmpty(order)) {
-        load(emptyOrder);
-      }
-
-      if (data.getParticipant.table) {
-        const incomingTables: ICustomerTable[] = [
-          {
-            id: data.getParticipant.id,
-            branchName: data.getParticipant.branch.name,
-            branchId: data.getParticipant.branch.id,
-            branchLogo: data.getParticipant.branch.logo,
-            tableName: data.getParticipant.table.name,
-            tableId: data.getParticipant.table.id,
-            code: data.getParticipant.table.code,
-          },
-        ];
-
-        setTables(incomingTables);
-      }
-    },
-    onError(err) {
-      console.log(err, 'error fetching branch');
+    onError() {
       signOut();
       router.navigate('/');
     },
   });
 
-  const getParticipantId = async () => {
-    return await getStorage('participantId');
-  };
+  const [getBanners] = useLazyQuery(GET_BANNERS, { fetchPolicy: 'network-only' });
 
+  // When participant data arrives, sync to store
   useEffect(() => {
-    const fetchInitialData = async () => {
-      const participantId = await getParticipantId();
-      if (participantId) {
-        getBranch({ variables: { id: participantId } });
-        getBanners();
-      }
-      setLoading(false);
-    };
+    if (!data?.getParticipant) return;
+    const p = data.getParticipant;
+    setParticipant(p);
+    if (p.orderable && !order) load(emptyOrder);
+    if (p.table) {
+      setTables([
+        {
+          id: p.id,
+          branchName: p.branch.name,
+          branchId: p.branch.id,
+          branchLogo: p.branch.logo,
+          tableName: p.table.name,
+          tableId: p.table.id,
+          code: p.table.code,
+        },
+      ]);
+    }
+  }, [data]);
 
-    fetchInitialData();
+  // Fetch banners once participantId is ready
+  useEffect(() => {
+    if (!participantId) return;
+    getBanners().then(({ data: bannerData }) => {
+      const urls = (bannerData?.getBanners ?? [])
+        .filter((b: { image: string; type: string }) => b.image && b.type === 'TB')
+        .map((b: { image: string }) => ({ uri: b.image }));
+      setImages(urls);
+    });
+  }, [participantId]);
 
-    return () => {
-      if (inactivityTimer.current) {
-        clearTimeout(inactivityTimer.current);
-      }
-    };
-  }, []);
-
+  // Battery reporting
   const [sendBattery] = useMutation(UPDATE_BATTERY);
   const tableId = data?.getParticipant?.table?.id;
 
   useEffect(() => {
-    if (Platform.OS === 'web' || !tableId || !sendBattery) return;
-
+    if (Platform.OS === 'web' || !tableId) return;
     const push = async () => {
       const state = await Battery.getPowerStateAsync();
       const percent = Math.round((state?.batteryLevel ?? 0) * 100);
       const charging =
         state?.batteryState === Battery.BatteryState.CHARGING || state?.batteryState === Battery.BatteryState.FULL;
-      await sendBattery({ variables: { id: tableId, battery: percent, charging } });
+      sendBattery({ variables: { id: tableId, battery: percent, charging } });
     };
-
     push();
     const id = setInterval(push, 5 * 60 * 1000);
-
     return () => clearInterval(id);
-  }, [tableId, sendBattery]);
+  }, [tableId]);
 
-  if (loading || loadBranch || loadBanners) return <Loader />;
+  const participant = data?.getParticipant;
 
-  const participantData = data?.getParticipant;
+  if (!participantId || (loading && !participant)) return <Loader />;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScreensaverWrapper images={images} delay={300000} interval={5000}>
-        {participantData && <MemoizedContainer participant={participantData} />}
-        <MemoizedOrderButton />
-        <MemoizedHelpButton />
+    <SafeAreaView style={styles.fill}>
+      <ScreensaverWrapper images={images} delay={10000} interval={5000}>
+        {participant && <Container participant={participant} />}
+        <OrderFloatingButton />
+        <HelpFloatingButton />
       </ScreensaverWrapper>
     </SafeAreaView>
   );
@@ -141,7 +111,5 @@ const Private = () => {
 export default Private;
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
+  fill: { flex: 1 },
 });

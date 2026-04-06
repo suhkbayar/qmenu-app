@@ -2,7 +2,7 @@
   "expo": {
     "name": "self-order",
     "slug": "self-order",
-    "version": "1.0.1",
+    "version": "1.0.0",
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "scheme": "qmenu-self-order",
@@ -18,14 +18,14 @@
     "android": {
       "theme": "Theme.AppCompat.Light.NoActionBar",
       "bundleIdentifier": "com.mn.qmenu.selforder",
-      "versionCode": 9,
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.mn.qmenu.selforder",
       "enableProguardInReleaseBuilds": false,
-      "runtimeVersion": "1.0.1",
+      "runtimeVersion": "1.0.0",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
