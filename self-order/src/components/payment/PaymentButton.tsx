@@ -16,7 +16,7 @@ const icons: Record<PaymentType, React.ReactNode> = {
   MCS: <MaterialCommunityIcons name="credit-card-scan" size={60} color="#fff" />,
   Toki: <Image source={require('@/assets/icon/new_toki.png')} style={{ width: 60, height: 60 }} resizeMode="contain" />,
   Cash: <MaterialCommunityIcons name="cash-register" size={60} color="#fff" />,
-  MPY: <Image source={require('@/assets/icon/mpay.png')} style={{ width: 60, height: 60 }} resizeMode="contain" />,
+  MPY: <Image source={require('@/assets/icon/mpay.png')} style={{ width: 120, height: 60 }} resizeMode="contain" />,
 };
 
 const PaymentButton = ({ type, id, loading = false, onSelect }: Props) => {
@@ -27,7 +27,15 @@ const PaymentButton = ({ type, id, loading = false, onSelect }: Props) => {
     MCS: t('mainPage.CardScanner'),
     Toki: 'Toki',
     Cash: t('mainPage.PayAtTheBoxOffice'),
-    MPY: 'MPay',
+    MPY: 'М Банк',
+  };
+
+  const bgColors: Record<PaymentType, string> = {
+    QPay: '#facc15',
+    MCS: '#facc15',
+    Toki: '#facc15',
+    Cash: '#facc15',
+    MPY: '#1dc9a7',
   };
 
   const handlePress = () => {
@@ -36,7 +44,7 @@ const PaymentButton = ({ type, id, loading = false, onSelect }: Props) => {
   };
 
   return (
-    <TouchableOpacity style={styles.button} onPress={handlePress}>
+    <TouchableOpacity style={[styles.button, { backgroundColor: bgColors[type] }]} onPress={handlePress}>
       {icons[type]}
       {loading ? (
         <ActivityIndicator animating size="large" color="#fff" style={{ marginTop: 8 }} />
