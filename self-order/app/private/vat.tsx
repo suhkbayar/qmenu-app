@@ -14,6 +14,7 @@ import { isEmpty } from 'lodash';
 import PaperDropdown from '@/src/components/ui/Dropdown';
 import RegisterForm from '@/src/components/forms/RegisterForm';
 import { defaultColor } from '@/src/constants/Colors';
+import { useThemeStore } from '@/src/store/theme.store';
 import { validPrefixes } from '@/src/constants';
 import { GET_VAT_PAYER } from '@/src/graphql/queries/vat';
 import { useOrderStore } from '@/src/store/order.store';
@@ -24,6 +25,7 @@ const VatScreen = () => {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const setOrderState = useOrderStore((state) => state.setOrderState);
 
+  const { theme } = useThemeStore();
   const [isError, setIsError] = useState(false);
   const [companyType, setCompanyType] = useState('company');
 
@@ -101,32 +103,32 @@ const VatScreen = () => {
     : !isEmpty(buyer)
     ? <TextInput.Icon icon="check-circle-outline" color="#1ecb84" />
     : loading
-    ? <TextInput.Icon icon="loading" color={defaultColor} />
+    ? <TextInput.Icon icon="loading" color={theme.primary} />
     : undefined;
 
   const prefixOptions = validPrefixes.map((p) => ({ label: p, value: p }));
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.fill}>
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
             <View style={styles.logoContainer}>
               <Image source={require('../../assets/icon/eBarimt_logo.png')} style={styles.logo} resizeMode="contain" />
-              <Text style={styles.subtitle}>{t('mainPage.VATreceipt')}</Text>
+              <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t('mainPage.VATreceipt')}</Text>
             </View>
 
             <View style={styles.cardRow}>
               {(['1', '3'] as const).map((type) => (
-                <Surface key={type} style={[styles.card, vatType === type && styles.activeCard]}>
+                <Surface key={type} style={[styles.card, { backgroundColor: theme.backgroundSecondary }, vatType === type && { backgroundColor: theme.primary }]}>
                   <TouchableRipple onPress={() => setValue('vatType', type)} style={styles.cardTouch} borderless>
                     <View style={styles.cardInner}>
                       <Icon
                         source={type === '1' ? 'account-outline' : 'bank'}
                         size={60}
-                        color={vatType === type ? 'white' : '#a9a9a9'}
+                        color={vatType === type ? 'white' : theme.textMuted}
                       />
-                      <Text style={[styles.cardText, vatType === type && styles.activeCardText]}>
+                      <Text style={[styles.cardText, { color: theme.textSecondary }, vatType === type && styles.activeCardText]}>
                         {type === '1' ? t('mainPage.Individual') : t('mainPage.tax_payer')}
                       </Text>
                     </View>
@@ -138,7 +140,7 @@ const VatScreen = () => {
             {vatType === '3' && (
               <View>
                 <View style={styles.centerRow}>
-                  <Text style={styles.subtitle}>{t('mainPage.taxpayer_type')}</Text>
+                  <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t('mainPage.taxpayer_type')}</Text>
                 </View>
 
                 <View style={styles.cardRow}>
@@ -152,17 +154,17 @@ const VatScreen = () => {
                         value: 'company',
                         label: t('mainPage.Institution'),
                         checkedColor: 'white',
-                        uncheckedColor: '#525252',
+                        uncheckedColor: theme.textMuted,
                         labelStyle: styles.segLabel,
-                        style: { ...styles.segBtn, backgroundColor: companyType === 'company' ? defaultColor : '#efefef' },
+                        style: { ...styles.segBtn, backgroundColor: companyType === 'company' ? theme.primary : theme.backgroundSecondary },
                       },
                       {
                         value: 'person',
                         label: t('mainPage.citizen'),
                         checkedColor: 'white',
-                        uncheckedColor: '#525252',
+                        uncheckedColor: theme.textMuted,
                         labelStyle: styles.segLabel,
-                        style: { ...styles.segBtn, backgroundColor: companyType === 'person' ? defaultColor : '#efefef' },
+                        style: { ...styles.segBtn, backgroundColor: companyType === 'person' ? theme.primary : theme.backgroundSecondary },
                       },
                     ]}
                   />
@@ -215,11 +217,11 @@ const VatScreen = () => {
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backBtnText}>{t('mainPage.GoBack')}</Text>
+        <TouchableOpacity style={[styles.backBtn, { backgroundColor: theme.backgroundSecondary }]} onPress={() => router.back()}>
+          <Text style={[styles.backBtnText, { color: theme.textSecondary }]}>{t('mainPage.GoBack')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.continueBtn, vatType === '3' && isEmpty(buyer) && styles.disabledBtn]}
+          style={[styles.continueBtn, { backgroundColor: theme.primary }, vatType === '3' && isEmpty(buyer) && styles.disabledBtn]}
           disabled={vatType === '3' && isEmpty(buyer)}
           onPress={onSubmit}
         >

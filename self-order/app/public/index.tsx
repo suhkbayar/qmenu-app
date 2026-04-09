@@ -15,6 +15,7 @@ import {
 import { Button, Icon, TextInput } from 'react-native-paper';
 import { Image } from '@/src/components/ui/Image';
 import { defaultColor } from '@/src/constants/Colors';
+import { useThemeStore } from '@/src/store/theme.store';
 import { useMutation } from '@apollo/client';
 import { CURRENT_TOKEN } from '@/src/graphql/mutations/token';
 import { setAccessToken, setParticipantId } from '@/src/providers/auth';
@@ -29,6 +30,7 @@ import { useValid } from '@/src/providers/ValidProvider';
 
 const Public = () => {
   const { tables, deleteTable } = useCallStore();
+  const { theme, isDark, toggleTheme } = useThemeStore();
   const [isNew, setIsNew] = useState(true);
   const { setValid } = useValid();
 
@@ -53,19 +55,30 @@ const Public = () => {
     if (!isEmpty(tables)) setIsNew(false);
   }, [tables]);
 
-  const goCamera = useCallback(() => { router.push('/public/camera'); }, []);
+  const goCamera = useCallback(() => {
+    router.push('/public/camera');
+  }, []);
 
   const onSubmit = useCallback(
-    (data: FieldValues) => { getCurrentToken({ variables: { code: data.code, type: 'TB' } }); },
+    (data: FieldValues) => {
+      getCurrentToken({ variables: { code: data.code, type: 'TB' } });
+    },
     [getCurrentToken],
   );
 
   const goTable = useCallback(
-    (table: { code: string }) => { getCurrentToken({ variables: { code: table.code, type: 'TB' } }); },
+    (table: { code: string }) => {
+      getCurrentToken({ variables: { code: table.code, type: 'TB' } });
+    },
     [getCurrentToken],
   );
 
-  const handleDeleteTable = useCallback((code: string) => { deleteTable(code); }, [deleteTable]);
+  const handleDeleteTable = useCallback(
+    (code: string) => {
+      deleteTable(code);
+    },
+    [deleteTable],
+  );
 
   const confirmDeleteTable = useCallback(
     (table: { code: string; tableName: string }) => {
@@ -83,15 +96,21 @@ const Public = () => {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.flex}>
+          <View style={[styles.flex, { backgroundColor: theme.background }]}>
             {isNew && (
               <TouchableOpacity onPress={() => setIsNew(false)} style={styles.backBtn}>
                 <Icon source="arrow-left" size={24} color="white" />
               </TouchableOpacity>
             )}
+            <TouchableOpacity
+              onPress={toggleTheme}
+              style={[styles.themeBtn, { borderColor: theme.border, backgroundColor: theme.card }]}
+            >
+              <Icon source={isDark ? 'weather-sunny' : 'weather-night'} size={32} color={theme.text} />
+            </TouchableOpacity>
             <View style={styles.container}>
               {isNew ? (
                 <>
@@ -132,17 +151,17 @@ const Public = () => {
                         onPress={() => goTable(table)}
                         onLongPress={() => confirmDeleteTable(table)}
                         activeOpacity={0.8}
-                        style={styles.tableCard}
+                        style={[styles.tableCard, { backgroundColor: theme.card }]}
                       >
                         <Image source={{ uri: table.branchLogo }} style={styles.tableLogo} />
-                        <Text style={styles.branchName}>{table.branchName}</Text>
-                        <Text style={styles.tableName}>{table.tableName}</Text>
+                        <Text style={[styles.branchName, { color: theme.text }]}>{table.branchName}</Text>
+                        <Text style={[styles.tableName, { color: theme.textMuted }]}>{table.tableName}</Text>
                       </TouchableOpacity>
                     ))}
                     <TouchableOpacity
                       onPress={() => setIsNew(true)}
                       activeOpacity={0.8}
-                      style={[styles.tableCard, styles.addCard]}
+                      style={[styles.tableCard, styles.addCard, { backgroundColor: theme.primary }]}
                     >
                       <Text style={styles.addIcon}>+</Text>
                       <Text style={styles.addLabel}>Ширээ нэмэх</Text>
@@ -207,4 +226,5 @@ const styles = StyleSheet.create({
   addCard: { backgroundColor: defaultColor },
   addIcon: { fontWeight: 'bold', fontSize: 52, color: '#fff' },
   addLabel: { color: '#fff', fontSize: 14, marginTop: 8 },
+  themeBtn: { position: 'absolute', top: 20, right: 20, zIndex: 1, padding: 8, borderRadius: 8, borderWidth: 1 },
 });

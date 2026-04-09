@@ -11,6 +11,7 @@ import { GET_ORDER } from '@/src/graphql/queries';
 import { useDraw } from '@/src/providers/DrawerProvider';
 import { useOrderStore } from '@/src/store/order.store';
 import { moneyFormat } from '@/src/utils';
+import { useThemeStore } from '@/src/store/theme.store';
 
 const REDIRECT_SECONDS = 30;
 
@@ -22,6 +23,8 @@ const PaymentSuccess = () => {
   const { setDrawerVisible } = useDraw();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
+
+  const { theme } = useThemeStore();
 
   const { data, loading } = useQuery(GET_ORDER, {
     variables: { id: orderId },
@@ -65,31 +68,31 @@ const PaymentSuccess = () => {
   const hasVat = order.vatBillId && order.vatData;
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
-      <View style={styles.container}>
+    <ScrollView contentContainerStyle={[styles.scroll, { backgroundColor: theme.background }]}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <Icon source="check-circle" size={180} color="#4ade80" />
 
-        <Text style={styles.title}>{t('mainPage.YourOrderSuccess')}</Text>
-        <Text style={styles.label}>
-          {t('mainPage.YourOrderNumber')}: <Text style={styles.value}>#{order.number?.slice(-4)}</Text>
+        <Text style={[styles.title, { color: theme.textSecondary }]}>{t('mainPage.YourOrderSuccess')}</Text>
+        <Text style={[styles.label, { color: theme.textMuted }]}>
+          {t('mainPage.YourOrderNumber')}: <Text style={[styles.value, { color: theme.text }]}>#{order.number?.slice(-4)}</Text>
         </Text>
-        <Text style={styles.label}>
-          {t('mainPage.AmountPaid2')}: <Text style={styles.value}>{Number(order.paidAmount).toLocaleString()}₮</Text>
+        <Text style={[styles.label, { color: theme.textMuted }]}>
+          {t('mainPage.AmountPaid2')}: <Text style={[styles.value, { color: theme.text }]}>{Number(order.paidAmount).toLocaleString()}₮</Text>
         </Text>
         <Text style={styles.countdown}>{countdown} секундийн дараа шинэ захиалга руу шилжинэ...</Text>
 
         {hasVat && (
-          <View style={styles.vatBox}>
+          <View style={[styles.vatBox, { backgroundColor: theme.backgroundSecondary }]}>
             <Image source={require('../../assets/icon/eBarimt_logo.png')} style={styles.vatLogo} resizeMode="contain" />
-            <View style={styles.qrWrap}>
+            <View style={[styles.qrWrap, { backgroundColor: theme.card }]}>
               <QRCode value={order.vatData} size={150} />
             </View>
-            <Text style={styles.vatLabel}>ДДТД: <Text style={styles.vatValue}>{order.vatBillId}</Text></Text>
+            <Text style={[styles.vatLabel, { color: theme.textMuted }]}>ДДТД: <Text style={[styles.vatValue, { color: theme.text }]}>{order.vatBillId}</Text></Text>
             {order.vatLottery && (
-              <Text style={styles.vatLabel}>Сугалааны №: <Text style={styles.vatValue}>{order.vatLottery}</Text></Text>
+              <Text style={[styles.vatLabel, { color: theme.textMuted }]}>Сугалааны №: <Text style={[styles.vatValue, { color: theme.text }]}>{order.vatLottery}</Text></Text>
             )}
-            <Text style={styles.vatLabel}>
-              Бүртгэх дүн: <Text style={styles.vatValue}>{moneyFormat(Number(order.vatIncludeAmount))}</Text>
+            <Text style={[styles.vatLabel, { color: theme.textMuted }]}>
+              Бүртгэх дүн: <Text style={[styles.vatValue, { color: theme.text }]}>{moneyFormat(Number(order.vatIncludeAmount))}</Text>
             </Text>
           </View>
         )}

@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState, useMemo, memo } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Menu, Text } from 'react-native-paper';
+import { Icon, Menu, Text } from 'react-native-paper';
 import { useCallStore } from '@/src/store/cart.store';
 import { useTranslation } from 'react-i18next';
 import { getStorage, setStorage } from '@/src/store/storage';
 import { Image } from './ui/Image';
 import { IMenuCategory } from '@/src/types';
 import { defaultColor, accentColor } from '@/src/constants/Colors';
+import { useThemeStore } from '@/src/store/theme.store';
 import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
 import { UPDATE_PROFILE } from '@/src/graphql/mutations/register';
 import { GET_BRANCH, ME } from '@/src/graphql/queries';
@@ -67,6 +68,7 @@ const Header: React.FC<Props> = ({
   activeCategoryId,
 }) => {
   const { participant, setParticipant } = useCallStore();
+  const { theme, isDark, toggleTheme } = useThemeStore();
   const [visible, setVisible] = useState(false);
   const { i18n } = useTranslation('language');
   const [loading, setLoading] = useState(false);
@@ -163,24 +165,36 @@ const Header: React.FC<Props> = ({
   const tableName = useMemo(() => participant?.table?.name?.toLocaleUpperCase() || '', [participant?.table?.name]);
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
       <View style={styles.left}>
-        <Text style={styles.title}>{activeCategoryName}</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{activeCategoryName}</Text>
       </View>
 
       <View style={styles.right}>
         {tableName ? (
-          <View style={styles.tableBadge}>
-            <Text style={styles.tableText}>{tableName}</Text>
+          <View style={[styles.headerBtn, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+            <Text style={[styles.tableText, { color: theme.text }]}>{tableName}</Text>
           </View>
         ) : null}
+
+        <TouchableOpacity
+          onPress={toggleTheme}
+          style={[styles.headerBtn, { borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
+          activeOpacity={0.7}
+        >
+          <Icon source={isDark ? 'weather-sunny' : 'weather-night'} size={26} color={theme.text} />
+        </TouchableOpacity>
 
         <Menu
           visible={visible}
           onDismiss={() => setVisible(false)}
-          contentStyle={styles.menuContent}
+          contentStyle={[styles.menuContent, { backgroundColor: theme.card }]}
           anchor={
-            <TouchableOpacity onPress={() => setVisible(true)} style={styles.langButton} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={() => setVisible(true)}
+              style={[styles.headerBtn, { borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
+              activeOpacity={0.7}
+            >
               <Image source={selectedCountry.path} style={styles.flag} />
             </TouchableOpacity>
           }
@@ -197,7 +211,7 @@ const Header: React.FC<Props> = ({
                   ) : (
                     <>
                       <Image source={country.path} style={styles.flag} />
-                      <Text style={styles.countryLabel}>{country.label}</Text>
+                      <Text style={[styles.countryLabel, { color: theme.text }]}>{country.label}</Text>
                     </>
                   )}
                 </View>
@@ -231,20 +245,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   right: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  tableBadge: {
-    backgroundColor: '#F0F0F0',
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  tableText: { fontSize: 18, color: accentColor, fontWeight: '700', letterSpacing: 0.5 },
-  langButton: {
-    padding: 6,
-    borderRadius: 8,
+  headerBtn: {
+    height: 54,
+    minWidth: 54,
+    paddingHorizontal: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#EBEBEB',
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
   },
+  tableText: { fontSize: 18, color: accentColor, fontWeight: '700', letterSpacing: 0.5 },
   flag: { height: 24, width: 36, borderRadius: 3 },
   menuContent: { borderRadius: 12, marginTop: 4 },
   menuItem: { paddingVertical: 4 },

@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useOrderStore } from '@/src/store/order.store';
+import { useThemeStore } from '@/src/store/theme.store';
 
 const OrderFloatingButton = memo(() => {
   const router = useRouter();
@@ -10,12 +11,13 @@ const OrderFloatingButton = memo(() => {
   const totalQuantity = useOrderStore((s) => s.orderState.totalQuantity);
   const totalAmount = useOrderStore((s) => s.orderState.totalAmount);
 
+  const { theme } = useThemeStore();
   const handlePress = useCallback(() => router.push({ pathname: '/private/draft-order' }), [router]);
 
   if (!totalQuantity) return null;
 
   return (
-    <TouchableOpacity style={styles.button} onPress={handlePress} activeOpacity={0.85}>
+    <TouchableOpacity style={[styles.button, { backgroundColor: theme.danger }]} onPress={handlePress} activeOpacity={0.85}>
       <Text style={styles.label}>
         {t('mainPage.Order')} ({totalQuantity})
       </Text>

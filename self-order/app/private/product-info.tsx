@@ -10,6 +10,7 @@ import RenderHtml from 'react-native-render-html';
 import OptionValuesModal from '@/src/components/modals/OptionValuesModal';
 import RecommendedCard from '@/src/components/cards/RecommendedCard';
 import { defaultColor } from '@/src/constants/Colors';
+import { useThemeStore } from '@/src/store/theme.store';
 import { CURRENCY } from '@/src/constants';
 import { GET_CROSS_SELLS } from '@/src/graphql/queries/product';
 import { useCallStore } from '@/src/store/cart.store';
@@ -37,6 +38,7 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
   const { width } = useWindowDimensions();
   const { t } = useTranslation('language');
   const { participant } = useCallStore();
+  const { theme } = useThemeStore();
   const orderState = useOrderStore((s) => s.orderState);
   const setOrderState = useOrderStore((s) => s.setOrderState);
 
@@ -240,11 +242,11 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
   );
 
   const content = (
-    <View style={styles.page}>
-      <View style={styles.header}>
+    <View style={[styles.page, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.background }]}>
         <TouchableOpacity onPress={goBack} style={styles.backButton}>
-          <Icon source="arrow-left" size={24} color="#333" />
-          <Text style={styles.backText}>{t('mainPage.GoBack')}</Text>
+          <Icon source="arrow-left" size={24} color={theme.text} />
+          <Text style={[styles.backText, { color: theme.text }]}>{t('mainPage.GoBack')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -257,7 +259,7 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
           />
           {!isEmpty(crossSells) && (
             <View style={styles.crossSection}>
-              <Text style={styles.crossTitle}>{t('mainPage.recommendedForYou')}</Text>
+              <Text style={[styles.crossTitle, { color: theme.text }]}>{t('mainPage.recommendedForYou')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.crossScroll}>
                 {crossSells.map((p: any) => (
                   <View key={p.id} style={styles.crossCard}>
@@ -276,7 +278,7 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
         </View>
 
         <ScrollView style={styles.rightCol} contentContainerStyle={styles.rightContent}>
-          <Text style={styles.title}>{product?.name}</Text>
+          <Text style={[styles.title, { color: theme.text }]}>{product?.name}</Text>
 
           {htmlSource && (
             <View style={styles.specContainer}>
@@ -292,16 +294,16 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
           {/* Variants */}
           {product?.variants?.length > 0 && (
             <>
-              <Text style={styles.sectionTitle}>{t('mainPage.Variants')}</Text>
-              <Text style={styles.sectionDesc}>{t('mainPage.chooseOption')}</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('mainPage.Variants')}</Text>
+              <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>{t('mainPage.chooseOption')}</Text>
               <View style={styles.chipRow}>
                 {product.variants.map((v: IMenuVariant) => (
                   <TouchableOpacity
                     key={v.id}
                     onPress={() => onSelect(v)}
-                    style={[styles.chip, selectedItem?.id === v.id && styles.chipActive]}
+                    style={[styles.chip, { backgroundColor: theme.backgroundSecondary }, selectedItem?.id === v.id && { backgroundColor: theme.primary }]}
                   >
-                    <Text style={[styles.chipText, selectedItem?.id === v.id && styles.chipTextActive]}>{v.name}</Text>
+                    <Text style={[styles.chipText, { color: theme.text }, selectedItem?.id === v.id && styles.chipTextActive]}>{v.name}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -311,8 +313,8 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
           {/* Options */}
           {currentVariant && !isEmpty(currentVariant.options) && (
             <>
-              <Text style={styles.sectionTitle}>{t('mainPage.extra')}</Text>
-              <Text style={[styles.sectionDesc, validationError ? styles.errorDesc : undefined]}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('mainPage.extra')}</Text>
+              <Text style={[styles.sectionDesc, { color: theme.textMuted }, validationError ? styles.errorDesc : undefined]}>
                 {validationError ? 'Шаардлагатай сонголтуудыг сонгоно уу' : t('mainPage.chooseIngredients')}
               </Text>
               <View style={styles.chipRow}>
@@ -324,9 +326,9 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
                     <TouchableOpacity
                       key={opt.id}
                       onPress={() => toggleOption(opt, selectedValue)}
-                      style={[styles.chip, needsValidation ? styles.chipError : isSelected && styles.chipActive]}
+                      style={[styles.chip, { backgroundColor: theme.backgroundSecondary }, needsValidation ? styles.chipError : isSelected && { backgroundColor: theme.primary }]}
                     >
-                      <Text style={[styles.chipText, (needsValidation || isSelected) && styles.chipTextActive]}>
+                      <Text style={[styles.chipText, { color: theme.text }, (needsValidation || isSelected) && styles.chipTextActive]}>
                         {opt.name}
                         {!isEmpty(selectedValue) && `: ${selectedValue}`}
                       </Text>
@@ -340,20 +342,20 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
             </>
           )}
 
-          <View style={styles.priceRow}>
-            <Text style={styles.price}>{priceDisplay}</Text>
+          <View style={[styles.priceRow, { borderTopColor: theme.border }]}>
+            <Text style={[styles.price, { color: theme.text }]}>{priceDisplay}</Text>
             <View style={styles.qtyRow}>
               <TouchableOpacity onPress={onRemove}>
-                <FAB animated={false} icon="minus" size="small" style={styles.fabOutline} color={defaultColor} />
+                <FAB animated={false} icon="minus" size="small" style={[styles.fabOutline, { backgroundColor: theme.background }]} color={theme.primary} />
               </TouchableOpacity>
-              <Text style={styles.qty}>{selectedItem?.quantity || 0}</Text>
+              <Text style={[styles.qty, { color: theme.text }]}>{selectedItem?.quantity || 0}</Text>
               <TouchableOpacity onPress={() => currentVariant && onSelect(currentVariant)}>
-                <FAB animated={false} icon="plus" size="small" style={styles.fabFill} color="white" />
+                <FAB animated={false} icon="plus" size="small" style={[styles.fabFill, { backgroundColor: theme.primary }]} color="white" />
               </TouchableOpacity>
             </View>
           </View>
 
-          <TouchableOpacity style={styles.addBtn} onPress={addItem}>
+          <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.primary }]} onPress={addItem}>
             <Text style={styles.addBtnText}>{t('mainPage.AddToCard')}</Text>
           </TouchableOpacity>
         </ScrollView>

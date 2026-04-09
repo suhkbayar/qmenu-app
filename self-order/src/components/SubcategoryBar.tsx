@@ -3,6 +3,7 @@ import { ScrollView, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { IMenuCategory } from '@/src/types';
 import { defaultColor } from '@/src/constants/Colors';
+import { useThemeStore } from '@/src/store/theme.store';
 
 type Props = {
   childrenCats: IMenuCategory[];
@@ -11,21 +12,22 @@ type Props = {
 };
 
 export default memo(function SubcategoryBar({ childrenCats, activeChildId, onSelectChild }: Props) {
+  const { theme } = useThemeStore();
   if (!childrenCats?.length) return null;
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {childrenCats.map((c, idx) => {
           const active = activeChildId === c.id;
           return (
             <TouchableOpacity
               key={c.id}
-              style={[styles.pill, active && styles.pillActive]}
+              style={[styles.pill, { backgroundColor: theme.backgroundSecondary }, active && { backgroundColor: theme.primary }]}
               onPress={() => onSelectChild(c, idx)}
               activeOpacity={0.75}
             >
-              <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
+              <Text style={[styles.label, { color: theme.textSecondary }, active && styles.labelActive]} numberOfLines={1}>
                 {c.name}
               </Text>
             </TouchableOpacity>

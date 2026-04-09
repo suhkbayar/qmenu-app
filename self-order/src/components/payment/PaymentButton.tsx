@@ -1,3 +1,4 @@
+import { useThemeStore } from '@/src/store/theme.store';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { TouchableOpacity, StyleSheet, Text, ActivityIndicator, Image } from 'react-native';
@@ -21,6 +22,7 @@ const icons: Record<PaymentType, React.ReactNode> = {
 
 const PaymentButton = ({ type, id, loading = false, onSelect }: Props) => {
   const { t } = useTranslation('language');
+  const { theme, isDark } = useThemeStore();
 
   const labelMap: Record<PaymentType, string> = {
     QPay: 'QPay',
@@ -31,10 +33,10 @@ const PaymentButton = ({ type, id, loading = false, onSelect }: Props) => {
   };
 
   const bgColors: Record<PaymentType, string> = {
-    QPay: '#facc15',
-    MCS: '#facc15',
-    Toki: '#facc15',
-    Cash: '#facc15',
+    QPay: theme.primary,
+    MCS: theme.primary,
+    Toki: theme.primary,
+    Cash: theme.primary,
     MPY: '#1dc9a7',
   };
 

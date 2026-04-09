@@ -8,6 +8,7 @@ import { MenuItemState } from '@/src/constants/index';
 import { useCallStore } from '@/src/store/cart.store';
 import { isConfigurable } from '@/src/utils';
 import { defaultColor } from '@/src/constants/Colors';
+import { useThemeStore } from '@/src/store/theme.store';
 import ProductDetailsScreen from '@/app/private/product-info';
 import Icon from '@react-native-vector-icons/feather';
 
@@ -25,6 +26,7 @@ type Props = {
 const RecommendedCard = ({ product, orderItem, onAdd, onRemove }: Props) => {
   const { t } = useTranslation('language');
   const { participant, config, add, remove } = useCallStore();
+  const { theme } = useThemeStore();
   const [visible, setVisible] = useState(false);
   const [animatedValue] = useState(new Animated.Value(1));
 
@@ -61,7 +63,7 @@ const RecommendedCard = ({ product, orderItem, onAdd, onRemove }: Props) => {
 
   return (
     <>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.card, borderColor: theme.border }]}>
         {product.bonus && (
           <View style={styles.ribbon}>
             <Text style={styles.ribbonText}>{product.bonus}</Text>
@@ -84,7 +86,7 @@ const RecommendedCard = ({ product, orderItem, onAdd, onRemove }: Props) => {
         </TouchableOpacity>
 
         <View style={styles.content}>
-          <Text style={styles.title} numberOfLines={2}>
+          <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
             {product.name}
           </Text>
           <View style={styles.footer}>
@@ -92,20 +94,20 @@ const RecommendedCard = ({ product, orderItem, onAdd, onRemove }: Props) => {
             {participant?.orderable && (
               <View style={styles.action}>
                 {orderItem ? (
-                  <View style={styles.quantityRow}>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={onRemoveItem}>
+                  <View style={[styles.quantityRow, { backgroundColor: theme.backgroundSecondary }]}>
+                    <TouchableOpacity style={[styles.qtyBtn, { backgroundColor: theme.primary }]} onPress={onRemoveItem}>
                       <Icon name="minus" size={13} color="#fff" />
                     </TouchableOpacity>
                     <Animated.View style={{ transform: [{ scale: animatedValue }] }}>
-                      <Text style={styles.qty}>{orderItem.quantity}</Text>
+                      <Text style={[styles.qty, { color: theme.text }]}>{orderItem.quantity}</Text>
                     </Animated.View>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => onSelect(product.productId)}>
+                    <TouchableOpacity style={[styles.qtyBtn, { backgroundColor: theme.primary }]} onPress={() => onSelect(product.productId)}>
                       <Icon name="plus" size={13} color="#fff" />
                     </TouchableOpacity>
                   </View>
                 ) : (
                   <TouchableOpacity
-                    style={styles.addButton}
+                    style={[styles.addButton, { backgroundColor: theme.primary }]}
                     onPress={() => (!isConfigurable(product) ? onSelect(product.productId) : setVisible(true))}
                   >
                     <Icon name="plus" size={16} color="#fff" />
@@ -174,7 +176,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: defaultColor,
+    backgroundColor: defaultColor, // overridden inline
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -5,6 +5,7 @@ import { FAB, Icon, Text } from 'react-native-paper';
 import { IMenuProduct, IOrderItem, IMenuVariant } from '@/src/types';
 import { CURRENCY } from '@/src/constants';
 import { defaultColor } from '@/src/constants/Colors';
+import { useThemeStore } from '@/src/store/theme.store';
 import { router } from 'expo-router';
 import { useCallStore } from '@/src/store/cart.store';
 import { isConfigurable } from '@/src/utils';
@@ -17,21 +18,23 @@ interface Props {
 }
 
 const MemoizedPrice = memo(({ variants }: { variants: IMenuVariant[] }) => {
+  const { theme } = useThemeStore();
   const min = Math.min(...variants.map((v) => v.salePrice));
   const max = Math.max(...variants.map((v) => v.salePrice));
   const label =
     min === max ? `${min.toLocaleString()}${CURRENCY}` : `${min.toLocaleString()} - ${max.toLocaleString()}${CURRENCY}`;
-  return <Text style={{ fontSize: 15, fontWeight: '700', color: '#333' }}>{label}</Text>;
+  return <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>{label}</Text>;
 });
 
-const ProductImage = memo(({ source, style, onPress }: { source: any; style: object; onPress: () => void }) => (
-  <Pressable onPress={onPress}>
+const ProductImage = memo(({ source, style }: { source: any; style: object }) => (
+  <Pressable>
     <Image source={source} style={style} contentFit="cover" transition={200} />
   </Pressable>
 ));
 
 const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) => {
   const { participant } = useCallStore();
+  const { theme } = useThemeStore();
   const [loading, setLoading] = useState(false);
   const quantity = orderItem?.quantity || 0;
 
@@ -73,7 +76,7 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) 
         <View style={styles.controls}>
           {product.variants && <MemoizedPrice variants={product.variants} />}
           <TouchableOpacity onPress={increase}>
-            <FAB animated={false} icon="plus" size="small" style={styles.fab} color="white" />
+            <FAB animated={false} icon="plus" size="small" style={[styles.fab, { backgroundColor: theme.primary }]} color="white" />
           </TouchableOpacity>
         </View>
       );
@@ -85,16 +88,22 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) 
         {quantity > 0 ? (
           <View style={styles.quantityRow}>
             <TouchableOpacity activeOpacity={0.7} onPress={decrease}>
-              <FAB animated={false} icon="minus" size="small" style={styles.fabOutline} color={defaultColor} />
+              <FAB
+                animated={false}
+                icon="minus"
+                size="small"
+                style={[styles.fabOutline, { backgroundColor: theme.card, borderColor: theme.border }]}
+                color={theme.primary}
+              />
             </TouchableOpacity>
-            <Text style={styles.qty}>{quantity}</Text>
+            <Text style={[styles.qty, { color: theme.text }]}>{quantity}</Text>
             <TouchableOpacity activeOpacity={0.7} onPress={increase}>
-              <FAB animated={false} icon="plus" size="small" style={styles.fab} color="white" />
+              <FAB animated={false} icon="plus" size="small" style={[styles.fab, { backgroundColor: theme.primary }]} color="white" />
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity activeOpacity={0.7} onPress={increase}>
-            <FAB animated={false} icon="plus" size="small" style={styles.fab} color="white" />
+            <FAB animated={false} icon="plus" size="small" style={[styles.fab, { backgroundColor: theme.primary }]} color="white" />
           </TouchableOpacity>
         )}
       </View>
@@ -102,8 +111,8 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) 
   };
 
   return (
-    <View style={styles.card}>
-      <ProductImage source={imageSource} style={styles.image} onPress={increase} />
+    <View style={[styles.card, { backgroundColor: theme.card }]}>
+      <ProductImage source={imageSource} style={styles.image} />
       {product.bonus && (
         <View style={styles.bonusTag}>
           <Text style={styles.bonusText}>{product.bonus}</Text>
@@ -115,10 +124,10 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) 
         </View>
       </TouchableOpacity>
       <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>
+        <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
           {product.name}
         </Text>
-        <Text style={styles.description} numberOfLines={2}>
+        <Text style={[styles.description, { color: theme.textMuted }]} numberOfLines={2}>
           {product.description}
         </Text>
       </View>
@@ -152,7 +161,7 @@ const styles = StyleSheet.create({
   description: { fontSize: 14, fontWeight: '600', color: '#77798c' },
   quantityRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   fab: {
-    backgroundColor: defaultColor,
+    backgroundColor: defaultColor, // overridden inline via theme.primary where needed
     width: 56,
     height: 56,
     borderRadius: 999,

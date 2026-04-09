@@ -11,6 +11,7 @@ import DraftList from '@/src/components/cards/DraftCard';
 import RecommendedCard from '@/src/components/cards/RecommendedCard';
 import { CURRENCY, TYPE } from '@/src/constants';
 import { defaultColor } from '@/src/constants/Colors';
+import { useThemeStore } from '@/src/store/theme.store';
 import { GET_CROSS_SELLS } from '@/src/graphql/queries/product';
 import { CREATE_ORDER, GET_PAY_ORDER } from '@/src/graphql/mutations/order';
 import { useCallStore } from '@/src/store/cart.store';
@@ -27,19 +28,43 @@ const DraftOrderPage = () => {
   const { t } = useTranslation('language');
   const toast = useToast();
   const { participant } = useCallStore();
+  const { theme } = useThemeStore();
   const orderState = useOrderStore((s) => s.orderState);
   const setOrderState = useOrderStore((s) => s.setOrderState);
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
   const [getCrossSells, { data: cross }] = useLazyQuery(GET_CROSS_SELLS);
+
+  const [payCash, { loading: cashing }] = useMutation(GET_PAY_ORDER, {
+    onCompleted(data) {
+      if (data?.payOrder) {
+        setConfirmVisible(false);
+        router.push({ pathname: '/private/payment-success', params: { orderId: data.payOrder.order.id } });
+      }
+    },
+    onError(err) {
+      setConfirmVisible(false);
+      toast.show(err.message, { type: 'danger', placement: 'top', duration: 4000 });
+    },
+  });
 
   const [createOrder, { loading: creating }] = useMutation(CREATE_ORDER, {
     onCompleted(data) {
       const orderId = data.createOrder.id;
-
-      const path = participant?.vat ? '/private/vat' : '/private/payment';
-      router.push({ pathname: path, params: { orderId } });
+      const hasPayments = (participant?.payments?.length ?? 0) > 0;
+      if (hasPayments) {
+        const path = participant?.vat ? '/private/vat' : '/private/payment';
+        router.push({ pathname: path, params: { orderId } });
+      } else {
+        payCash({
+          variables: {
+            input: { order: orderId, confirm: true, payment: '', vatType: participant?.vat ? orderState.vatType : 0 },
+          },
+        });
+      }
     },
     onError(err) {
+      setConfirmVisible(false);
       toast.show(err.message || t('mainPage.orderCreationFailed'), {
         type: 'danger',
         placement: 'top',
@@ -48,7 +73,7 @@ const DraftOrderPage = () => {
     },
   });
 
-  const loading = creating;
+  const loading = creating || cashing;
 
   useEffect(() => {
     if (isEmpty(orderState.items) || !participant?.menu?.id) return;
@@ -110,7 +135,12 @@ const DraftOrderPage = () => {
 
   const onSubmit = useCallback(() => {
     if (isEmpty(orderState.items) || isEmpty(participant)) return;
-    else doCreateOrder();
+    const hasPayments = (participant.payments?.length ?? 0) > 0;
+    if (!hasPayments && !participant.advancePayment) {
+      setConfirmVisible(true);
+    } else {
+      doCreateOrder();
+    }
   }, [orderState.items, participant, doCreateOrder]);
 
   const addToCart = useCallback(
@@ -163,15 +193,15 @@ const DraftOrderPage = () => {
   const isDisabled = isEmpty(orderState.items) || isEmpty(participant) || loading;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>{t('mainPage.YourOrder')}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <Text style={[styles.headerText, { color: theme.text }]}>{t('mainPage.YourOrder')}</Text>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.closeBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Icon source="close" color={defaultColor} size={28} />
+          <Icon source="close" color={theme.primary} size={28} />
         </TouchableOpacity>
       </View>
 
@@ -182,7 +212,7 @@ const DraftOrderPage = () => {
           </View>
           {crossSells.length > 0 && (
             <View style={styles.crossSection}>
-              <Text style={styles.crossTitle}>{t('mainPage.recommendedForYou')}</Text>
+              <Text style={[styles.crossTitle, { color: theme.text }]}>{t('mainPage.recommendedForYou')}</Text>
               <View style={styles.crossRow}>
                 {crossSells.map((p: IMenuProduct) => (
                   <View key={p.id} style={styles.crossCard}>
@@ -200,28 +230,28 @@ const DraftOrderPage = () => {
           )}
         </View>
 
-        <View style={styles.rightCol}>
+        <View style={[styles.rightCol, { backgroundColor: theme.backgroundSecondary }]}>
           {isEmpty(orderState.items) ? (
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>{t('mainPage.noItems')}</Text>
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>{t('mainPage.noItems')}</Text>
             </View>
           ) : (
             <View style={styles.summaryWrap}>
-              <Text style={styles.summaryTitle}>{t('mainPage.OrderSummary')}</Text>
-              <View style={styles.totals}>
+              <Text style={[styles.summaryTitle, { color: theme.text }]}>{t('mainPage.OrderSummary')}</Text>
+              <View style={[styles.totals, { borderTopColor: theme.border }]}>
                 <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>{t('mainPage.totalItems')}:</Text>
-                  <Text style={styles.totalValue}>{orderState.totalQuantity || 0}</Text>
+                  <Text style={[styles.totalLabel, { color: theme.text }]}>{t('mainPage.totalItems')}:</Text>
+                  <Text style={[styles.totalValue, { color: theme.primary }]}>{orderState.totalQuantity || 0}</Text>
                 </View>
                 <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>{t('mainPage.Total')}:</Text>
-                  <Text style={styles.totalValue}>{totalPrice}</Text>
+                  <Text style={[styles.totalLabel, { color: theme.text }]}>{t('mainPage.Total')}:</Text>
+                  <Text style={[styles.totalValue, { color: theme.primary }]}>{totalPrice}</Text>
                 </View>
               </View>
             </View>
           )}
           <TouchableOpacity
-            style={[styles.submitBtn, isDisabled && styles.disabledBtn]}
+            style={[styles.submitBtn, { backgroundColor: theme.primary }, isDisabled && styles.disabledBtn]}
             onPress={onSubmit}
             disabled={isDisabled}
           >
@@ -229,6 +259,40 @@ const DraftOrderPage = () => {
           </TouchableOpacity>
         </View>
       </View>
+
+      <Modal visible={confirmVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { backgroundColor: theme.card }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              {t('mainPage.confirmOrder') || 'Confirm Order'}
+            </Text>
+            <Text style={[styles.modalMessage, { color: theme.textMuted }]}>
+              {t('mainPage.cashierPayMessage') || 'Your order will be placed. Please pay at the cashier.'}
+            </Text>
+            <Text style={[styles.modalTotal, { color: theme.primary }]}>{totalPrice}</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalCancelButton, { borderColor: theme.border }]}
+                onPress={() => setConfirmVisible(false)}
+                disabled={loading}
+              >
+                <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>
+                  {t('mainPage.cancel') || 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmButton, { backgroundColor: theme.primary }]}
+                onPress={doCreateOrder}
+                disabled={loading}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {loading ? t('mainPage.loading') || 'Loading...' : t('mainPage.confirm')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -252,7 +316,7 @@ const styles = StyleSheet.create({
   listWrap: { flex: 1, padding: 16 },
   crossSection: { paddingVertical: 16, paddingHorizontal: 16, minHeight: 160 },
   crossTitle: { fontSize: 16, fontWeight: '700', color: '#000', marginBottom: 12 },
-  crossRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  crossRow: { flexDirection: 'row', gap: 20 },
   crossCard: { marginRight: 12, width: 200, marginBottom: 8 },
   rightCol: {
     width: 370,
@@ -284,10 +348,10 @@ const styles = StyleSheet.create({
   disabledBtn: { backgroundColor: '#cccccc' },
   submitBtnText: { color: 'white', fontSize: 16, fontWeight: '600' },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalBox: { backgroundColor: '#fff', borderRadius: 16, padding: 32, width: 420, alignItems: 'center' },
+  modalBox: { borderRadius: 16, padding: 32, width: 420, alignItems: 'center' },
   modalTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 12 },
-  modalMsg: { fontSize: 16, color: '#555', textAlign: 'center', marginBottom: 16 },
-  modalTotal: { fontSize: 28, fontWeight: 'bold', color: defaultColor, marginBottom: 24 },
+  modalMsg: { fontSize: 16, textAlign: 'center', marginBottom: 16 },
+  modalTotal: { fontSize: 28, fontWeight: 'bold', marginBottom: 24 },
   modalBtns: { flexDirection: 'row', gap: 16 },
   cancelBtn: {
     flex: 1,
@@ -300,4 +364,41 @@ const styles = StyleSheet.create({
   cancelText: { fontSize: 16, color: '#555' },
   confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, backgroundColor: defaultColor, alignItems: 'center' },
   confirmText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 16,
+  },
+  modalConfirmButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
 });

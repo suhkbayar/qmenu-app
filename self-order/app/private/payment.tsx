@@ -14,6 +14,7 @@ import PendingTransactionModal from '@/src/components/modals/PendingTransactionM
 import McsPaymentModal from '@/src/components/modals/McsPaymentModal';
 import { CURRENCY, PAYMENT_TYPE } from '@/src/constants';
 import { defaultColor } from '@/src/constants/Colors';
+import { useThemeStore } from '@/src/store/theme.store';
 import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/src/graphql/mutations/order';
 import { GET_ORDER } from '@/src/graphql/queries';
 import { ON_UPDATED_ORDER } from '@/src/graphql/subscriptions';
@@ -28,6 +29,7 @@ const Payment = () => {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const toast = useToast();
   const { participant } = useCallStore();
+  const { theme } = useThemeStore();
   const orderState = useOrderStore((state) => state.orderState);
 
   const [order, setOrder] = useState<IOrder>();
@@ -134,6 +136,7 @@ const Payment = () => {
       }
     },
     onError(err) {
+      console.log(err.graphQLErrors);
       showWarning(err.message);
     },
   });
@@ -187,7 +190,6 @@ const Payment = () => {
       }
       if (!id) return;
       setActiveType(type);
-      console.log('payOrder input:', { ...baseInput, confirm: false, payment: id });
       payOrder({ variables: { input: { ...baseInput, confirm: false, payment: id } } });
     },
     [baseInput, payOrder],
@@ -203,18 +205,17 @@ const Payment = () => {
     },
     [validateTransaction, showWarning, t],
   );
-
   const findPayment = (type: string) => participant?.payments.find((p) => p.type === type);
 
   if (loading || !order) return <Loader />;
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
-        <Text style={styles.title}>{t('mainPage.your_payment')}</Text>
+        <Text style={[styles.title, { color: theme.textSecondary }]}>{t('mainPage.your_payment')}</Text>
         <Text style={styles.amount}>
           {order.grandTotal.toLocaleString()} {CURRENCY}
         </Text>
-        <Text style={styles.subtitle}>{t('mainPage.SelectYourPaymentChannel')}</Text>
+        <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t('mainPage.SelectYourPaymentChannel')}</Text>
 
         <View style={styles.buttons}>
           {(findPayment(PAYMENT_TYPE.QPay) || findPayment(PAYMENT_TYPE.QPay2)) && (
@@ -256,8 +257,11 @@ const Payment = () => {
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backBtnText}>{t('mainPage.GoBack')}</Text>
+        <TouchableOpacity
+          style={[styles.backBtn, { backgroundColor: theme.backgroundSecondary }]}
+          onPress={() => router.back()}
+        >
+          <Text style={[styles.backBtnText, { color: theme.textSecondary }]}>{t('mainPage.GoBack')}</Text>
         </TouchableOpacity>
       </View>
 

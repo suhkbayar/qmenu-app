@@ -8,6 +8,7 @@ import { IMenuCategory, IMenuProduct, IOrderItem, IParticipant } from '@/src/typ
 import ProductCard from '@/src/components/cards/ProductCard';
 import { useTranslation } from 'react-i18next';
 import { useOrderStore } from '@/src/store/order.store';
+import { useThemeStore } from '@/src/store/theme.store';
 import { isCurrentlyOpen } from '@/src/utils';
 
 const NUM_COLS = 3;
@@ -61,11 +62,14 @@ function buildRows(categories: IMenuCategory[]): ListRow[] {
   return rows;
 }
 
-const SectionHeader = memo(({ label, isSubCategory }: { label: string; isSubCategory: boolean }) => (
-  <View style={[styles.sectionHeader, isSubCategory && styles.sectionHeaderSub]}>
-    <Text style={isSubCategory ? styles.sectionLabelSub : styles.sectionLabel}>{label}</Text>
-  </View>
-));
+const SectionHeader = memo(({ label, isSubCategory }: { label: string; isSubCategory: boolean }) => {
+  const { theme } = useThemeStore();
+  return (
+    <View style={[styles.sectionHeader, isSubCategory && styles.sectionHeaderSub]}>
+      <Text style={[isSubCategory ? styles.sectionLabelSub : styles.sectionLabel, { color: isSubCategory ? theme.textMuted : theme.text }]}>{label}</Text>
+    </View>
+  );
+});
 
 const GridRow = memo(
   ({
@@ -97,6 +101,7 @@ const GridRow = memo(
 
 const ContainerContent: React.FC<{ participant: IParticipant }> = ({ participant }) => {
   const { i18n } = useTranslation();
+  const { theme } = useThemeStore();
   const orderItems = useOrderStore((s) => s.orderState.items);
   const updateQuantity = useOrderStore((s) => s.updateQuantity);
 
@@ -228,7 +233,7 @@ const ContainerContent: React.FC<{ participant: IParticipant }> = ({ participant
     <View style={styles.container}>
       {!collapsedMenu && <Sidebar categories={categories} activeCategoryId={activeParentId} onSelect={scrollTo} />}
 
-      <View style={styles.content}>
+      <View style={[styles.content, { backgroundColor: theme.background }]}>
         <Header
           collapsedMenu={collapsedMenu}
           setCollapsedMenu={setCollapsedMenu}
