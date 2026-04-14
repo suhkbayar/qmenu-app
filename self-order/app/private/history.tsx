@@ -9,6 +9,8 @@ import { defaultColor } from '@/src/constants/Colors';
 import { moneyFormat } from '@/src/utils/moneyFormat';
 import Loader from '@/src/components/ui/Loader';
 import { IOrder, IOrderItem } from '@/src/types';
+import { useThemeStore } from '@/src/store/theme.store';
+import { ORDER_STATE_COLOR, ORDER_STATE_LABEL, PAYMENT_STATE_COLOR, PAYMENT_STATE_LABEL } from '@/src/utils/orderState';
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -27,37 +29,60 @@ interface OrderCardProps {
 }
 
 const OrderCard = ({ order, t }: OrderCardProps) => {
+  const { theme } = useThemeStore();
+  const stateColor = ORDER_STATE_COLOR[order.state] || '#6b7280';
+  const paymentColor = PAYMENT_STATE_COLOR[order.paymentState] || '#6b7280';
   return (
-    <View style={styles.orderCard}>
-      <View style={styles.orderHeader}>
-        <Text style={styles.orderNumber}>#{order.number?.slice(-4)}</Text>
-        <Text style={styles.orderDate}>{formatDate(order.createdAt?.toString() || '')}</Text>
+    <View style={[styles.orderCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={[styles.orderHeader, { borderBottomColor: theme.border }]}>
+        <View>
+          <Text style={[styles.orderNumber, { color: theme.primary }]}>#{order.number?.slice(-4)}</Text>
+          <Text style={[styles.orderDate, { color: theme.textMuted }]}>
+            {formatDate(order.createdAt?.toString() || '')}
+          </Text>
+        </View>
+        <View style={styles.stateBadges}>
+          {order.state ? (
+            <View style={[styles.badge, { backgroundColor: stateColor + '22', borderColor: stateColor }]}>
+              <Text style={[styles.badgeText, { color: stateColor }]}>
+                {ORDER_STATE_LABEL[order.state] ?? order.state}
+              </Text>
+            </View>
+          ) : null}
+          {order.paymentState ? (
+            <View style={[styles.badge, { backgroundColor: paymentColor + '22', borderColor: paymentColor }]}>
+              <Text style={[styles.badgeText, { color: paymentColor }]}>
+                {PAYMENT_STATE_LABEL[order.paymentState] ?? order.paymentState}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.orderItems}>
         {order.items?.map((item: IOrderItem, index: number) => (
-          <View key={index} style={styles.itemRow}>
+          <View key={index} style={[styles.itemRow, { borderBottomColor: theme.border }]}>
             <View style={styles.itemLeft}>
-              <Text style={styles.itemQuantity}>{item.quantity}x</Text>
+              <Text style={[styles.itemQuantity, { color: theme.primary }]}>{item.quantity}x</Text>
               <View style={styles.itemDetails}>
-                <Text style={styles.itemName} numberOfLines={2}>
+                <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={2}>
                   {item.variantName || item.name}
                 </Text>
                 {item.options && item.options.length > 0 && (
-                  <Text style={styles.itemOptions} numberOfLines={2}>
+                  <Text style={[styles.itemOptions, { color: theme.textMuted }]} numberOfLines={2}>
                     {item.options.map((opt: any) => opt.value || opt.name).join(', ')}
                   </Text>
                 )}
               </View>
             </View>
-            <Text style={styles.itemPrice}>{moneyFormat(item.price * item.quantity)}₮</Text>
+            <Text style={[styles.itemPrice, { color: theme.text }]}>{moneyFormat(item.price * item.quantity)}₮</Text>
           </View>
         ))}
       </View>
 
-      <View style={styles.orderFooter}>
-        <Text style={styles.totalLabel}>{t('mainPage.Total')}</Text>
-        <Text style={styles.totalAmount}>{moneyFormat(order.grandTotal)}₮</Text>
+      <View style={[styles.orderFooter, { borderTopColor: theme.border }]}>
+        <Text style={[styles.totalLabel, { color: theme.textSecondary }]}>{t('mainPage.Total')}</Text>
+        <Text style={[styles.totalAmount, { color: theme.primary }]}>{moneyFormat(order.grandTotal)}₮</Text>
       </View>
     </View>
   );
@@ -66,6 +91,7 @@ const OrderCard = ({ order, t }: OrderCardProps) => {
 const HistoryPage = () => {
   const { t } = useTranslation('language');
   const router = useRouter();
+  const { theme } = useThemeStore();
 
   const { data, loading, refetch } = useQuery(GET_TABLET_ORDERS, {
     variables: { limit: 10 },
@@ -86,14 +112,17 @@ const HistoryPage = () => {
   if (loading) return <Loader />;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.backgroundSecondary }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Icon source="arrow-left" size={24} color="#333" />
-          <Text style={styles.backText}>{t('mainPage.GoBack')}</Text>
+          <Icon source="arrow-left" size={24} color={theme.text} />
+          <Text style={[styles.backText, { color: theme.text }]}>{t('mainPage.GoBack')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerText}>{t('mainPage.orderHistory')}</Text>
-        <TouchableOpacity onPress={() => refetch()} style={styles.refreshButton}>
+        <Text style={[styles.headerText, { color: theme.text }]}>{t('mainPage.orderHistory')}</Text>
+        <TouchableOpacity
+          onPress={() => refetch()}
+          style={[styles.refreshButton, { backgroundColor: theme.backgroundTertiary }]}
+        >
           <Icon source="refresh" size={24} color={defaultColor} />
         </TouchableOpacity>
       </View>
@@ -156,8 +185,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   orderCard: {
-    backgroundColor: '#fff',
     borderRadius: 20,
+    borderWidth: 1,
     padding: 20,
     width: '48%',
     shadowColor: '#000',
@@ -166,10 +195,25 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  stateBadges: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  badge: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  badgeText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
