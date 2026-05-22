@@ -11,7 +11,7 @@ import OptionValuesModal from '@/src/components/modals/OptionValuesModal';
 import RecommendedCard from '@/src/components/cards/RecommendedCard';
 import { defaultColor } from '@/src/constants/Colors';
 import { useThemeStore } from '@/src/store/theme.store';
-import { CURRENCY } from '@/src/constants';
+import { CURRENCY, MenuItemState } from '@/src/constants';
 import { GET_CROSS_SELLS } from '@/src/graphql/queries/product';
 import { useCallStore } from '@/src/store/cart.store';
 import { useOrderStore } from '@/src/store/order.store';
@@ -231,6 +231,8 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
     goBack();
   }, [selectedItem, product, t, setOrderState, goBack]);
 
+  const isDisabled = product?.state === MenuItemState.DISABLED;
+
   const crossSells = cross?.getCrossSells?.slice(0, 3) ?? [];
   const htmlSource = useMemo(
     () => (product?.specification ? { html: product.specification } : null),
@@ -344,18 +346,24 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
 
           <View style={[styles.priceRow, { borderTopColor: theme.border }]}>
             <Text style={[styles.price, { color: theme.text }]}>{priceDisplay}</Text>
-            <View style={styles.qtyRow}>
-              <TouchableOpacity onPress={onRemove}>
-                <FAB animated={false} icon="minus" size="small" style={[styles.fabOutline, { backgroundColor: theme.background }]} color={theme.primary} />
-              </TouchableOpacity>
-              <Text style={[styles.qty, { color: theme.text }]}>{selectedItem?.quantity || 0}</Text>
-              <TouchableOpacity onPress={() => currentVariant && onSelect(currentVariant)}>
-                <FAB animated={false} icon="plus" size="small" style={[styles.fabFill, { backgroundColor: theme.primary }]} color="white" />
-              </TouchableOpacity>
-            </View>
+            {!isDisabled && (
+              <View style={styles.qtyRow}>
+                <TouchableOpacity onPress={onRemove}>
+                  <FAB animated={false} icon="minus" size="small" style={[styles.fabOutline, { backgroundColor: theme.background }]} color={theme.primary} />
+                </TouchableOpacity>
+                <Text style={[styles.qty, { color: theme.text }]}>{selectedItem?.quantity || 0}</Text>
+                <TouchableOpacity onPress={() => currentVariant && onSelect(currentVariant)}>
+                  <FAB animated={false} icon="plus" size="small" style={[styles.fabFill, { backgroundColor: theme.primary }]} color="white" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
-          <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.primary }]} onPress={addItem}>
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: isDisabled ? '#ccc' : theme.primary }]}
+            onPress={isDisabled ? undefined : addItem}
+            activeOpacity={isDisabled ? 1 : 0.7}
+          >
             <Text style={styles.addBtnText}>{t('mainPage.AddToCard')}</Text>
           </TouchableOpacity>
         </ScrollView>

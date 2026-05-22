@@ -3,7 +3,7 @@ import { View, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { FAB, Icon, Text } from 'react-native-paper';
 import { IMenuProduct, IOrderItem, IMenuVariant } from '@/src/types';
-import { CURRENCY } from '@/src/constants';
+import { CURRENCY, MenuItemState } from '@/src/constants';
 import { defaultColor } from '@/src/constants/Colors';
 import { useThemeStore } from '@/src/store/theme.store';
 import { router } from 'expo-router';
@@ -68,8 +68,19 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) 
     ? { uri: getCdnImageUrl(product.image, 'md') }
     : require('../../../assets/images/noImage.jpg');
 
+  const isDisabled = product.state === MenuItemState.DISABLED;
+
   const renderControls = () => {
     if (!participant?.orderable) return null;
+
+    if (isDisabled) {
+      return (
+        <View style={styles.controls}>
+          {product.variants && <MemoizedPrice variants={product.variants} />}
+          <FAB animated={false} icon="plus" size="small" style={[styles.fab, { backgroundColor: '#ccc' }]} color="white" />
+        </View>
+      );
+    }
 
     if (isConfigurable(product)) {
       return (

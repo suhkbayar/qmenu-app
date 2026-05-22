@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useOrderStore } from '@/src/store/order.store';
 import { useThemeStore } from '@/src/store/theme.store';
 import { isCurrentlyOpen } from '@/src/utils';
+import { MenuItemState } from '@/src/constants';
 
 const NUM_COLS = 3;
 const ROW_HEIGHT = 378;
@@ -44,14 +45,14 @@ function buildRows(categories: IMenuCategory[]): ListRow[] {
           isSubCategory: true,
           height: SUB_HEADER_HEIGHT,
         });
-        const products = child.products?.filter((p: IMenuProduct) => p.state === 'ACTIVE') ?? [];
+        const products = child.products?.filter((p: IMenuProduct) => p.state !== MenuItemState.INACTIVE) ?? [];
         for (let i = 0; i < products.length; i += NUM_COLS) {
           const chunk = products.slice(i, i + NUM_COLS);
           rows.push({ type: 'row', key: `r${seq++}`, rowKey: `${child.id}-${i}`, items: chunk, height: ROW_HEIGHT });
         }
       }
     } else {
-      const products = parent.products?.filter((p: IMenuProduct) => p.state === 'ACTIVE') ?? [];
+      const products = parent.products?.filter((p: IMenuProduct) => p.state !== MenuItemState.INACTIVE) ?? [];
       for (let i = 0; i < products.length; i += NUM_COLS) {
         const chunk = products.slice(i, i + NUM_COLS);
         rows.push({ type: 'row', key: `r${seq++}`, rowKey: `${parent.id}-${i}`, items: chunk, height: ROW_HEIGHT });

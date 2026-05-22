@@ -235,6 +235,7 @@ export enum TaskState {
 export enum MenuItemState {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
+  DISABLED = 'DISABLED',
   SOLD_OUT = 'SOLD_OUT',
 }
 
