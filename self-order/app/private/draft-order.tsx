@@ -33,6 +33,9 @@ const DraftOrderPage = () => {
   const setOrderState = useOrderStore((s) => s.setOrderState);
   const [confirmVisible, setConfirmVisible] = useState(false);
 
+  const showTakeAway = useMemo(() => participant?.services?.includes(TYPE.TAKE_AWAY) ?? false, [participant?.services]);
+  const [serviceType, setServiceType] = useState<string>(TYPE.DINIG);
+
   const [getCrossSells, { data: cross }] = useLazyQuery(GET_CROSS_SELLS);
 
   const [payCash, { loading: cashing }] = useMutation(GET_PAY_ORDER, {
@@ -120,7 +123,7 @@ const DraftOrderPage = () => {
       variables: {
         participant: participant?.id,
         input: {
-          type: TYPE.DINIG,
+          type: serviceType,
           deliveryDate: '',
           contact: '',
           address: '',
@@ -131,7 +134,7 @@ const DraftOrderPage = () => {
         },
       },
     });
-  }, [participant, preparedItems, createOrder]);
+  }, [participant, preparedItems, createOrder, serviceType]);
 
   const onSubmit = useCallback(() => {
     if (isEmpty(orderState.items) || isEmpty(participant)) return;
@@ -238,6 +241,33 @@ const DraftOrderPage = () => {
           ) : (
             <View style={styles.summaryWrap}>
               <Text style={[styles.summaryTitle, { color: theme.text }]}>{t('mainPage.OrderSummary')}</Text>
+              {showTakeAway && (
+                <View style={styles.serviceSection}>
+                  <Text style={[styles.serviceLabel, { color: theme.textMuted }]}>{t('mainPage.OrderType')}</Text>
+                  <View style={[styles.serviceTrack, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                    {[TYPE.DINIG, TYPE.TAKE_AWAY].map((type) => {
+                      const active = serviceType === type;
+                      return (
+                        <TouchableOpacity
+                          key={type}
+                          style={[styles.serviceSegment, active && { backgroundColor: theme.primary }]}
+                          onPress={() => setServiceType(type)}
+                          activeOpacity={0.9}
+                        >
+                          <Icon
+                            source={type === TYPE.TAKE_AWAY ? 'bag-personal-outline' : 'silverware-fork-knife'}
+                            size={22}
+                            color={active ? '#fff' : theme.textMuted}
+                          />
+                          <Text style={[styles.serviceText, { color: active ? '#fff' : theme.textMuted }]}>
+                            {t(`mainPage.${type}`)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
               <View style={[styles.totals, { borderTopColor: theme.border }]}>
                 <View style={styles.totalRow}>
                   <Text style={[styles.totalLabel, { color: theme.text }]}>{t('mainPage.totalItems')}:</Text>
@@ -331,6 +361,25 @@ const styles = StyleSheet.create({
   },
   summaryWrap: { flex: 1, maxHeight: '80%' },
   summaryTitle: { fontSize: 30, fontWeight: 'bold', marginBottom: 16, color: '#000', textAlign: 'center' },
+  serviceSection: { marginBottom: 20 },
+  serviceLabel: { fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 },
+  serviceTrack: {
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 4,
+  },
+  serviceSegment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  serviceText: { fontSize: 16, fontWeight: '700' },
   emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { fontSize: 16, color: '#666', textAlign: 'center' },
   totals: { marginTop: 16, marginBottom: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#e0e0e0' },

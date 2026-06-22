@@ -10,12 +10,13 @@ import OrderFloatingButton from '@/src/components/OrderFloatingButton';
 import Loader from '@/src/components/ui/Loader';
 import { emptyOrder } from '@/src/constants';
 import { GET_BANNERS, GET_BRANCH } from '@/src/graphql/queries';
+import { ON_UPDATED_MENU } from '@/src/graphql/subscriptions';
 import { UPDATE_BATTERY } from '@/src/graphql/mutations/table';
 import { AuthContext } from '@/src/providers/auth';
 import ScreensaverWrapper from '@/src/providers/ScreensaverWrapper';
 import { useCallStore } from '@/src/store/cart.store';
 import { getStorage } from '@/src/store/storage';
-import { useLazyQuery, useMutation } from '@apollo/client';
+import { useLazyQuery, useMutation, useSubscription } from '@apollo/client';
 
 const Private = () => {
   const [participantId, setParticipantId] = useState<string | null>(null);
@@ -30,7 +31,7 @@ const Private = () => {
     });
   }, []);
 
-  const { data, loading } = useQuery(GET_BRANCH, {
+  const { data, loading, refetch } = useQuery(GET_BRANCH, {
     variables: { id: participantId },
     skip: !participantId,
     fetchPolicy: 'cache-and-network',
@@ -38,6 +39,16 @@ const Private = () => {
     onError() {
       signOut();
       router.navigate('/');
+    },
+  });
+
+  const branchId = data?.getParticipant?.branch?.id;
+
+  useSubscription(ON_UPDATED_MENU, {
+    variables: { branch: branchId },
+    skip: !branchId,
+    onData: () => {
+      if (participantId) refetch();
     },
   });
 

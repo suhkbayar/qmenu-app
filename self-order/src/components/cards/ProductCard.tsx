@@ -207,5 +207,7 @@ const styles = StyleSheet.create({
 export default memo(
   ProductCard,
   (prev, next) =>
-    prev.product.productId === next.product.productId && prev.orderItem?.quantity === next.orderItem?.quantity,
+    prev.product.productId === next.product.productId &&
+    prev.product.state === next.product.state &&
+    prev.orderItem?.quantity === next.orderItem?.quantity,
 );
