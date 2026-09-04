@@ -49,7 +49,10 @@ const PaymentSuccess = () => {
 
       const interval = setInterval(() => {
         setCountdown((prev) => {
-          if (prev <= 1) { clearInterval(interval); return 0; }
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
           return prev - 1;
         });
       }, 1000);
@@ -58,7 +61,10 @@ const PaymentSuccess = () => {
 
       return () => {
         clearInterval(interval);
-        if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
       };
     }, [order, goHome]),
   );
@@ -70,34 +76,51 @@ const PaymentSuccess = () => {
   return (
     <ScrollView contentContainerStyle={[styles.scroll, { backgroundColor: theme.background }]}>
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <Icon source="check-circle" size={180} color="#4ade80" />
+        <Icon source="check-circle" size={200} color="#4ade80" />
 
         <Text style={[styles.title, { color: theme.textSecondary }]}>{t('mainPage.YourOrderSuccess')}</Text>
         <Text style={[styles.label, { color: theme.textMuted }]}>
-          {t('mainPage.YourOrderNumber')}: <Text style={[styles.value, { color: theme.text }]}>#{order.number?.slice(-4)}</Text>
+          {t('mainPage.YourOrderNumber')}:{' '}
+          <Text style={[styles.value, { color: theme.text }]}>#{order.number?.slice(-4)}</Text>
         </Text>
         <Text style={[styles.label, { color: theme.textMuted }]}>
-          {t('mainPage.AmountPaid2')}: <Text style={[styles.value, { color: theme.text }]}>{Number(order.paidAmount).toLocaleString()}₮</Text>
+          {t('mainPage.AmountPaid2')}:{' '}
+          <Text style={[styles.value, { color: theme.text }]}>{Number(order.paidAmount).toLocaleString()}₮</Text>
         </Text>
-        <Text style={styles.countdown}>{countdown} секундийн дараа шинэ захиалга руу шилжинэ...</Text>
+        <Text style={[styles.countdown, { color: theme.textMuted }]}>
+          {countdown} секундийн дараа шинэ захиалга руу шилжинэ...
+        </Text>
 
         {hasVat && (
           <View style={[styles.vatBox, { backgroundColor: theme.backgroundSecondary }]}>
             <Image source={require('../../assets/icon/eBarimt_logo.png')} style={styles.vatLogo} resizeMode="contain" />
             <View style={[styles.qrWrap, { backgroundColor: theme.card }]}>
-              <QRCode value={order.vatData} size={150} />
+              <QRCode value={order.vatData} size={170} />
             </View>
-            <Text style={[styles.vatLabel, { color: theme.textMuted }]}>ДДТД: <Text style={[styles.vatValue, { color: theme.text }]}>{order.vatBillId}</Text></Text>
+            <Text style={[styles.vatLabel, { color: theme.textMuted }]}>
+              ДДТД: <Text style={[styles.vatValue, { color: theme.text }]}>{order.vatBillId}</Text>
+            </Text>
             {order.vatLottery && (
-              <Text style={[styles.vatLabel, { color: theme.textMuted }]}>Сугалааны №: <Text style={[styles.vatValue, { color: theme.text }]}>{order.vatLottery}</Text></Text>
+              <Text style={[styles.vatLabel, { color: theme.textMuted }]}>
+                Сугалааны №: <Text style={[styles.vatValue, { color: theme.text }]}>{order.vatLottery}</Text>
+              </Text>
             )}
             <Text style={[styles.vatLabel, { color: theme.textMuted }]}>
-              Бүртгэх дүн: <Text style={[styles.vatValue, { color: theme.text }]}>{moneyFormat(Number(order.vatIncludeAmount))}</Text>
+              Бүртгэх дүн:{' '}
+              <Text style={[styles.vatValue, { color: theme.text }]}>
+                {moneyFormat(Number(order.vatIncludeAmount))}
+              </Text>
             </Text>
           </View>
         )}
 
-        <Button mode="contained" style={styles.newOrderBtn} onPress={goHome}>
+        <Button
+          mode="contained"
+          style={styles.newOrderBtn}
+          labelStyle={styles.newOrderBtnLabel}
+          contentStyle={styles.newOrderBtnContent}
+          onPress={goHome}
+        >
           {t('mainPage.NewOrder')}
         </Button>
       </View>
@@ -108,16 +131,18 @@ const PaymentSuccess = () => {
 export default PaymentSuccess;
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 1, backgroundColor: '#fff' },
-  container: { flex: 1, backgroundColor: '#fff', paddingTop: 60, paddingHorizontal: 24, paddingBottom: 40, alignItems: 'center' },
-  title: { fontSize: 32, fontWeight: '700', color: '#4B5563', marginBottom: 24, marginTop: 24 },
-  label: { fontSize: 18, color: '#6B7280', marginBottom: 8 },
-  value: { fontWeight: 'bold', color: '#111827' },
-  countdown: { marginTop: 24, fontSize: 16, color: '#9ca3af' },
-  vatBox: { marginTop: 32, padding: 24, backgroundColor: '#f9fafb', borderRadius: 16, alignItems: 'center', width: '100%', maxWidth: 400 },
-  vatLogo: { width: 120, height: 40, marginBottom: 16 },
-  qrWrap: { padding: 16, backgroundColor: '#fff', borderRadius: 12, marginBottom: 16 },
-  vatLabel: { fontSize: 14, color: '#6B7280', marginBottom: 4 },
-  vatValue: { fontWeight: '600', color: '#111827' },
-  newOrderBtn: { marginTop: 32, backgroundColor: '#facc15', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 24 },
+  scroll: { flexGrow: 1 },
+  container: { flex: 1, paddingTop: 60, paddingHorizontal: 24, paddingBottom: 40, alignItems: 'center' },
+  title: { fontSize: 36, fontWeight: '700', marginBottom: 26, marginTop: 26 },
+  label: { fontSize: 20, marginBottom: 10 },
+  value: { fontWeight: 'bold' },
+  countdown: { marginTop: 26, fontSize: 18 },
+  vatBox: { marginTop: 34, padding: 26, borderRadius: 18, alignItems: 'center', width: '100%', maxWidth: 440 },
+  vatLogo: { width: 140, height: 48, marginBottom: 18 },
+  qrWrap: { padding: 18, borderRadius: 14, marginBottom: 18 },
+  vatLabel: { fontSize: 16, marginBottom: 6 },
+  vatValue: { fontWeight: '600' },
+  newOrderBtn: { marginTop: 34, backgroundColor: '#facc15', borderRadius: 12 },
+  newOrderBtnLabel: { fontSize: 19, fontWeight: '700' },
+  newOrderBtnContent: { paddingVertical: 10, paddingHorizontal: 20 },
 });

@@ -9,9 +9,10 @@ import { isEmpty } from 'lodash';
 
 import DraftList from '@/src/components/cards/DraftCard';
 import RecommendedCard from '@/src/components/cards/RecommendedCard';
-import { CURRENCY, TYPE } from '@/src/constants';
-import { defaultColor } from '@/src/constants/Colors';
+import { CURRENCY, TABLE_MESSAGE_STICKERS, TYPE } from '@/src/constants';
+import Medallion from '@/src/components/ui/Medallion';
 import { useThemeStore } from '@/src/store/theme.store';
+import { useGiftTheme } from '@/src/hooks/useGiftTheme';
 import { GET_CROSS_SELLS } from '@/src/graphql/queries/product';
 import { CREATE_ORDER, GET_PAY_ORDER } from '@/src/graphql/mutations/order';
 import { useCallStore } from '@/src/store/cart.store';
@@ -27,10 +28,17 @@ const calcTotals = (items: IOrderItem[]) => ({
 const DraftOrderPage = () => {
   const { t } = useTranslation('language');
   const toast = useToast();
-  const { participant } = useCallStore();
+  const participant = useCallStore((s) => s.participant);
+  const config = useCallStore((s) => s.config);
   const { theme } = useThemeStore();
+  const g = useGiftTheme();
+  const giftEnabled = config?.giftOrder === true;
   const orderState = useOrderStore((s) => s.orderState);
   const setOrderState = useOrderStore((s) => s.setOrderState);
+  const giftStickerId = useOrderStore((s) => s.giftStickerId);
+  const giftAnonymous = useOrderStore((s) => s.giftAnonymous);
+  const giftSticker = TABLE_MESSAGE_STICKERS.find((s) => s.id === giftStickerId);
+  const clearGift = useOrderStore((s) => s.clearGift);
   const [confirmVisible, setConfirmVisible] = useState(false);
 
   const showTakeAway = useMemo(() => participant?.services?.includes(TYPE.TAKE_AWAY) ?? false, [participant?.services]);
@@ -54,6 +62,8 @@ const DraftOrderPage = () => {
   const [createOrder, { loading: creating }] = useMutation(CREATE_ORDER, {
     onCompleted(data) {
       const orderId = data.createOrder.id;
+
+      clearGift();
       const hasPayments = (participant?.payments?.length ?? 0) > 0;
       if (hasPayments) {
         const path = participant?.vat ? '/private/vat' : '/private/payment';
@@ -107,15 +117,33 @@ const DraftOrderPage = () => {
   const increase = useCallback((uuid: string) => update(uuid, 1), [update]);
   const decrease = useCallback((uuid: string) => update(uuid, -1), [update]);
 
+  const giftItems = useMemo(
+    () => (giftEnabled ? orderState.items.filter((i) => i.giftToTableId) : []),
+    [orderState.items, giftEnabled],
+  );
+
+  useEffect(() => {
+    if (giftEnabled) return;
+    const state = useOrderStore.getState();
+    if (state.giftTarget || state.orderState.items.some((i) => i.giftToTableId)) clearGift();
+  }, [giftEnabled, orderState.items, clearGift]);
+
   const preparedItems = useMemo(
     () =>
-      orderState.items.map(({ id, quantity, comment, options }) => ({
+      orderState.items.map(({ id, quantity, comment, options, giftToTableId }) => ({
         id,
         quantity,
         comment,
         options: options?.map(({ id, value }) => ({ id, value })) || [],
+        ...(giftEnabled && giftToTableId
+          ? {
+              giftToTableId,
+              giftStickerId: giftStickerId || undefined,
+              giftAnonymous: giftAnonymous || undefined,
+            }
+          : {}),
       })),
-    [orderState.items],
+    [orderState.items, giftEnabled, giftStickerId, giftAnonymous],
   );
 
   const doCreateOrder = useCallback(() => {
@@ -134,7 +162,7 @@ const DraftOrderPage = () => {
         },
       },
     });
-  }, [participant, preparedItems, createOrder, serviceType]);
+  }, [participant, preparedItems, createOrder, serviceType, giftEnabled]);
 
   const onSubmit = useCallback(() => {
     if (isEmpty(orderState.items) || isEmpty(participant)) return;
@@ -164,7 +192,7 @@ const DraftOrderPage = () => {
         reason: '',
       };
       setOrderState((prev) => {
-        const idx = prev.items.findIndex((i) => i.id === variant.id);
+        const idx = prev.items.findIndex((i) => i.id === variant.id && !i.giftToTableId);
         const updated =
           idx >= 0
             ? prev.items.map((i, n) => (n === idx ? { ...i, quantity: i.quantity + 1 } : i))
@@ -178,7 +206,7 @@ const DraftOrderPage = () => {
   const removeFromCart = useCallback(
     (productId: string) => {
       setOrderState((prev) => {
-        const idx = prev.items.findIndex((i) => i.productId === productId);
+        const idx = prev.items.findIndex((i) => i.productId === productId && !i.giftToTableId);
         if (idx < 0) return prev;
         const item = prev.items[idx];
         const updated =
@@ -194,6 +222,7 @@ const DraftOrderPage = () => {
   const crossSells = cross?.getCrossSells?.slice(0, 3) ?? [];
   const totalPrice = `${(orderState.totalAmount || 0).toLocaleString()} ${CURRENCY}`;
   const isDisabled = isEmpty(orderState.items) || isEmpty(participant) || loading;
+  const itemCount = orderState.totalQuantity || 0;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -201,20 +230,53 @@ const DraftOrderPage = () => {
         <Text style={[styles.headerText, { color: theme.text }]}>{t('mainPage.YourOrder')}</Text>
         <TouchableOpacity
           onPress={() => router.back()}
-          style={styles.closeBtn}
+          style={[styles.closeBtn, { backgroundColor: theme.backgroundSecondary }]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Icon source="close" color={theme.primary} size={28} />
+          <Icon source="close" color={theme.textSecondary} size={28} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.body}>
         <View style={styles.leftCol}>
+          {giftItems.length > 0 && (
+            <View style={[styles.giftRibbon, { backgroundColor: g.gold + '14', borderColor: g.gold + '4d' }]}>
+              <View style={[styles.giftRibbonBar, { backgroundColor: g.gold }]} />
+              <Medallion glyph="gift-outline" size={40} solid />
+
+              <View style={styles.giftRibbonText}>
+                <Text style={[styles.giftRibbonTitle, { color: theme.text }]} numberOfLines={1}>
+                  {t('mainPage.gift_banner', {
+                    n: giftItems.length,
+                    table: giftItems[0].giftToTableName,
+                    defaultValue: `${giftItems.length} item(s) → Table ${giftItems[0].giftToTableName}`,
+                  })}
+                </Text>
+                {!!giftSticker && (
+                  <Text style={[styles.giftRibbonMessage, { color: theme.textMuted }]} numberOfLines={1}>
+                    “{t(`mainPage.${giftSticker.labelKey}`)}”
+                  </Text>
+                )}
+              </View>
+
+              <TouchableOpacity
+                onPress={clearGift}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={[styles.giftRibbonCancel, { borderColor: g.gold + '66' }]}
+                activeOpacity={0.7}
+              >
+                <Icon source="close" size={18} color={g.goldText} />
+                <Text style={[styles.giftRibbonCancelText, { color: g.goldText }]}>
+                  {t('mainPage.gift_cancel', 'Cancel gift')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <View style={styles.listWrap}>
             <DraftList items={orderState.items || []} increase={increase} decrease={decrease} />
           </View>
           {crossSells.length > 0 && (
-            <View style={styles.crossSection}>
+            <View style={[styles.crossSection, { borderTopColor: theme.border }]}>
               <Text style={[styles.crossTitle, { color: theme.text }]}>{t('mainPage.recommendedForYou')}</Text>
               <View style={styles.crossRow}>
                 {crossSells.map((p: IMenuProduct) => (
@@ -233,9 +295,10 @@ const DraftOrderPage = () => {
           )}
         </View>
 
-        <View style={[styles.rightCol, { backgroundColor: theme.backgroundSecondary }]}>
+        <View style={[styles.rightCol, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
           {isEmpty(orderState.items) ? (
             <View style={styles.emptyWrap}>
+              <Icon source="cart-outline" size={72} color={theme.border} />
               <Text style={[styles.emptyText, { color: theme.textMuted }]}>{t('mainPage.noItems')}</Text>
             </View>
           ) : (
@@ -244,7 +307,12 @@ const DraftOrderPage = () => {
               {showTakeAway && (
                 <View style={styles.serviceSection}>
                   <Text style={[styles.serviceLabel, { color: theme.textMuted }]}>{t('mainPage.OrderType')}</Text>
-                  <View style={[styles.serviceTrack, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  <View
+                    style={[
+                      styles.serviceTrack,
+                      { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
+                    ]}
+                  >
                     {[TYPE.DINIG, TYPE.TAKE_AWAY].map((type) => {
                       const active = serviceType === type;
                       return (
@@ -270,21 +338,27 @@ const DraftOrderPage = () => {
               )}
               <View style={[styles.totals, { borderTopColor: theme.border }]}>
                 <View style={styles.totalRow}>
-                  <Text style={[styles.totalLabel, { color: theme.text }]}>{t('mainPage.totalItems')}:</Text>
-                  <Text style={[styles.totalValue, { color: theme.primary }]}>{orderState.totalQuantity || 0}</Text>
+                  <Text style={[styles.totalLabel, { color: theme.textMuted }]}>{t('mainPage.totalItems')}</Text>
+                  <Text style={[styles.totalSubValue, { color: theme.text }]}>{itemCount}</Text>
                 </View>
                 <View style={styles.totalRow}>
-                  <Text style={[styles.totalLabel, { color: theme.text }]}>{t('mainPage.Total')}:</Text>
+                  <Text style={[styles.grandLabel, { color: theme.text }]}>{t('mainPage.Total')}</Text>
                   <Text style={[styles.totalValue, { color: theme.primary }]}>{totalPrice}</Text>
                 </View>
               </View>
             </View>
           )}
           <TouchableOpacity
-            style={[styles.submitBtn, { backgroundColor: theme.primary }, isDisabled && styles.disabledBtn]}
+            style={[
+              styles.submitBtn,
+              { backgroundColor: theme.primary },
+              isDisabled && [styles.disabledBtn, { backgroundColor: theme.border }],
+            ]}
             onPress={onSubmit}
             disabled={isDisabled}
+            activeOpacity={0.85}
           >
+            {!loading && !isDisabled && <Icon source="check-circle-outline" size={24} color="#fff" />}
             <Text style={styles.submitBtnText}>{loading ? t('mainPage.loading') : t('mainPage.confirm')}</Text>
           </TouchableOpacity>
         </View>
@@ -293,6 +367,9 @@ const DraftOrderPage = () => {
       <Modal visible={confirmVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalBox, { backgroundColor: theme.card }]}>
+            <View style={[styles.modalIconWrap, { backgroundColor: theme.primary + '1a' }]}>
+              <Icon source="cash-register" size={52} color={theme.primary} />
+            </View>
             <Text style={[styles.modalTitle, { color: theme.text }]}>
               {t('mainPage.confirmOrder') || 'Confirm Order'}
             </Text>
@@ -330,45 +407,48 @@ const DraftOrderPage = () => {
 export default DraftOrderPage;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
-  headerText: { fontWeight: 'bold', fontSize: 18 },
-  closeBtn: { padding: 10, borderRadius: 20 },
-  body: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  headerText: { fontWeight: '800', fontSize: 26 },
+  headerSubtext: { fontSize: 16, fontWeight: '500', marginTop: 2 },
+  closeBtn: { padding: 10, borderRadius: 24 },
+  body: { flex: 1, flexDirection: 'row', paddingHorizontal: 24, paddingTop: 18, paddingBottom: 24, gap: 24 },
   leftCol: { flex: 1, flexDirection: 'column' },
-  listWrap: { flex: 1, padding: 16 },
-  crossSection: { paddingVertical: 16, paddingHorizontal: 16, minHeight: 160 },
-  crossTitle: { fontSize: 16, fontWeight: '700', color: '#000', marginBottom: 12 },
-  crossRow: { flexDirection: 'row', gap: 20 },
-  crossCard: { marginRight: 12, width: 200, marginBottom: 8 },
+  listWrap: { flex: 1 },
+  crossSection: { paddingTop: 18, marginTop: 8, minHeight: 190, borderTopWidth: 1 },
+  crossTitle: { fontSize: 19, fontWeight: '700', marginBottom: 14 },
+  crossRow: { flexDirection: 'row', gap: 22 },
+  crossCard: { marginRight: 12, width: 260, marginBottom: 8 },
   rightCol: {
-    width: 370,
-    backgroundColor: '#f9f9f9',
+    width: '36%',
+    minWidth: 380,
+    maxWidth: 460,
     justifyContent: 'space-between',
     alignItems: 'stretch',
-    paddingHorizontal: 16,
-    paddingVertical: 24,
-    height: 670,
-    marginHorizontal: 30,
-    borderRadius: 20,
+    padding: 24,
+    borderRadius: 22,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  summaryWrap: { flex: 1, maxHeight: '80%' },
-  summaryTitle: { fontSize: 30, fontWeight: 'bold', marginBottom: 16, color: '#000', textAlign: 'center' },
-  serviceSection: { marginBottom: 20 },
-  serviceLabel: { fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 },
+  summaryWrap: { flex: 1 },
+  summaryTitle: { fontSize: 24, fontWeight: '800', marginBottom: 22 },
+  serviceSection: { marginBottom: 24 },
+  serviceLabel: { fontSize: 14, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 10 },
   serviceTrack: {
     flexDirection: 'row',
-    padding: 4,
-    borderRadius: 14,
+    padding: 5,
+    borderRadius: 16,
     borderWidth: 1,
-    gap: 4,
+    gap: 5,
   },
   serviceSegment: {
     flex: 1,
@@ -376,78 +456,88 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: 15,
+    borderRadius: 12,
   },
-  serviceText: { fontSize: 16, fontWeight: '700' },
-  emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { fontSize: 16, color: '#666', textAlign: 'center' },
-  totals: { marginTop: 16, marginBottom: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#e0e0e0' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  totalLabel: { fontSize: 20, fontWeight: 'bold', color: '#000' },
-  totalValue: { fontSize: 20, fontWeight: 'bold', color: defaultColor },
-  submitBtn: {
-    backgroundColor: defaultColor,
-    borderRadius: 8,
-    paddingVertical: 16,
+  serviceText: { fontSize: 18, fontWeight: '700' },
+  giftRibbon: {
+    flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 52,
-    marginTop: 10,
-  },
-  disabledBtn: { backgroundColor: '#cccccc' },
-  submitBtnText: { color: 'white', fontSize: 16, fontWeight: '600' },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalBox: { borderRadius: 16, padding: 32, width: 420, alignItems: 'center' },
-  modalTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 12 },
-  modalMsg: { fontSize: 16, textAlign: 'center', marginBottom: 16 },
-  modalTotal: { fontSize: 28, fontWeight: 'bold', marginBottom: 24 },
-  modalBtns: { flexDirection: 'row', gap: 16 },
-  cancelBtn: {
-    flex: 1,
+    gap: 16,
+    marginBottom: 14,
     paddingVertical: 14,
-    borderRadius: 8,
+    paddingLeft: 20,
+    paddingRight: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#ccc',
-    alignItems: 'center',
+    overflow: 'hidden',
   },
-  cancelText: { fontSize: 16, color: '#555' },
-  confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, backgroundColor: defaultColor, alignItems: 'center' },
-  confirmText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  giftRibbonBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 5 },
+  giftRibbonText: { flex: 1 },
+  giftRibbonTitle: { fontSize: 18, fontWeight: '800' },
+  giftRibbonMessage: { fontSize: 15, fontStyle: 'italic', marginTop: 3 },
+  giftRibbonCancel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+  },
+  giftRibbonCancelText: { fontSize: 15, fontWeight: '700' },
+  emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
+  emptyText: { fontSize: 19, textAlign: 'center' },
+  totals: { marginTop: 'auto', paddingTop: 20, borderTopWidth: 1 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  totalLabel: { fontSize: 17, fontWeight: '600' },
+  totalSubValue: { fontSize: 17, fontWeight: '700' },
+  grandLabel: { fontSize: 21, fontWeight: '800' },
+  totalValue: { fontSize: 28, fontWeight: '800' },
+  submitBtn: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    minHeight: 64,
+    marginTop: 20,
+  },
+  disabledBtn: {},
+  submitBtnText: { color: 'white', fontSize: 20, fontWeight: '700' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalMessage: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 16,
+  modalBox: { borderRadius: 24, padding: 40, width: 500, alignItems: 'center' },
+  modalIconWrap: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
   },
-
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 16,
-  },
+  modalTitle: { fontSize: 26, fontWeight: '800', marginBottom: 10 },
+  modalMessage: { fontSize: 17, textAlign: 'center', marginBottom: 20, lineHeight: 24 },
+  modalTotal: { fontSize: 34, fontWeight: '800', marginBottom: 28 },
+  modalButtons: { flexDirection: 'row', gap: 16, width: '100%' },
   modalCancelButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 17,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
   },
-  modalCancelText: {
-    fontSize: 16,
-  },
+  modalCancelText: { fontSize: 17, fontWeight: '600' },
   modalConfirmButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 17,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  modalConfirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
+  modalConfirmText: { fontSize: 17, fontWeight: '700', color: '#fff' },
 });

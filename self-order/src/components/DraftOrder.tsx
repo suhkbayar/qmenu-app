@@ -24,7 +24,7 @@ const DraftOrder = memo(({ visible, onCloseModal }: Props) => {
   const orderState = useOrderStore((state) => state.orderState);
   const setOrderState = useOrderStore((state) => state.setOrderState);
   const { t } = useTranslation('language');
-  const { participant } = useCallStore();
+  const participant = useCallStore((s) => s.participant);
 
   const [createOrder, { loading }] = useMutation(CREATE_ORDER, {
     onCompleted: async (data) => {

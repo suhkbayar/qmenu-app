@@ -18,6 +18,20 @@ export const ORDER_FIELDS = gql`
     contact
     guests
     comment
+    gifts {
+      id
+      fromTableId
+      fromTableName
+      toTableId
+      stickerId
+      itemIds
+      anonymous
+      respondedAt
+    }
+    table {
+      id
+      name
+    }
     name
     deliveryDate
     totalAmount
@@ -75,6 +89,7 @@ export const ORDER_ITEM_FIELDS = gql`
     image
     productId
     variantName
+    data
     options {
       ...OrderItemOptionFields
     }

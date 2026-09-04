@@ -6,6 +6,7 @@ import jwtDecode from 'jwt-decode';
 
 export type Payload = {
   branch: string;
+  table?: string;
   role: string;
   exp: number;
   features: string[];

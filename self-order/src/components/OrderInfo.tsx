@@ -12,7 +12,7 @@ const OrderInfo = ({ order }: Props) => {
   const taxSum = Math.abs(order.taxAmount + order.vatAmount + order.cityTax).toLocaleString();
 
   return (
-    <View style={{ gap: 4, marginTop: 16 }}>
+    <View style={{ gap: 8, marginTop: 20 }}>
       <View style={styles.row}>
         <Text style={[styles.label, { color: theme.textSecondary }]}>{t('mainPage.Tax')}:</Text>
         <Text style={[styles.value, { color: theme.textSecondary }]}>{taxSum} {CURRENCY}</Text>
@@ -22,8 +22,8 @@ const OrderInfo = ({ order }: Props) => {
         <Text style={[styles.value, { color: theme.textSecondary }]}>{order.discountAmount.toLocaleString()} {CURRENCY}</Text>
       </View>
       <View style={styles.row}>
-        <Text style={[styles.label, { color: theme.textSecondary }]}>{t('mainPage.Total')}:</Text>
-        <Text style={[styles.total, { color: theme.textSecondary }]}>{order.grandTotal.toLocaleString()} {CURRENCY}</Text>
+        <Text style={[styles.label, { color: theme.text }]}>{t('mainPage.Total')}:</Text>
+        <Text style={[styles.total, { color: theme.primary }]}>{order.grandTotal.toLocaleString()} {CURRENCY}</Text>
       </View>
     </View>
   );
@@ -32,8 +32,8 @@ const OrderInfo = ({ order }: Props) => {
 export default OrderInfo;
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '26%', gap: 16 },
-  label: { fontWeight: '700', fontSize: 16, color: '#4B5563' },
-  value: { fontWeight: '500', fontSize: 16, color: '#4B5563' },
-  total: { fontWeight: '700', fontSize: 16, color: '#4B5563' },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '30%', minWidth: 280, gap: 20 },
+  label: { fontWeight: '600', fontSize: 18 },
+  value: { fontWeight: '500', fontSize: 18 },
+  total: { fontWeight: '800', fontSize: 22 },
 });

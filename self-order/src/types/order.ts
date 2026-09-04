@@ -1,5 +1,16 @@
 import { ITransaction } from './transaction';
 
+export interface IGift {
+  id: string;
+  fromTableId?: string;
+  fromTableName?: string;
+  toTableId?: string;
+  stickerId?: string;
+  itemIds?: string[];
+  anonymous?: boolean;
+  respondedAt?: string;
+}
+
 export interface IOrder {
   id?: string;
   number: string;
@@ -14,6 +25,8 @@ export interface IOrder {
   name: string;
   channelType: string;
   memberId: string;
+  gifts?: IGift[];
+  table?: { id: string; name: string };
   items: IOrderItem[];
   charges: IOrderCharge[];
   transactions: ITransaction[];
@@ -133,4 +146,7 @@ export interface IOrderItem {
   createdAt?: Date;
   updatedAt?: Date;
   completedAt?: Date;
+  giftToTableId?: string;
+  giftToTableName?: string;
+  data?: string;
 }

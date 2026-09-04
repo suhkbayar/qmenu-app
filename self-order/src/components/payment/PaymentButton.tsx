@@ -13,11 +13,11 @@ type Props = {
 };
 
 const icons: Record<PaymentType, React.ReactNode> = {
-  QPay: <MaterialCommunityIcons name="qrcode-scan" size={60} color="#fff" />,
-  MCS: <MaterialCommunityIcons name="credit-card-scan" size={60} color="#fff" />,
-  Toki: <Image source={require('@/assets/icon/new_toki.png')} style={{ width: 60, height: 60 }} resizeMode="contain" />,
-  Cash: <MaterialCommunityIcons name="cash-register" size={60} color="#fff" />,
-  MPY: <Image source={require('@/assets/icon/mpay.png')} style={{ width: 120, height: 60 }} resizeMode="contain" />,
+  QPay: <MaterialCommunityIcons name="qrcode-scan" size={72} color="#fff" />,
+  MCS: <MaterialCommunityIcons name="credit-card-scan" size={72} color="#fff" />,
+  Toki: <Image source={require('@/assets/icon/new_toki.png')} style={{ width: 72, height: 72 }} resizeMode="contain" />,
+  Cash: <MaterialCommunityIcons name="cash-register" size={72} color="#fff" />,
+  MPY: <Image source={require('@/assets/icon/mpay.png')} style={{ width: 140, height: 72 }} resizeMode="contain" />,
 };
 
 const PaymentButton = ({ type, id, loading = false, onSelect }: Props) => {
@@ -61,20 +61,19 @@ export default PaymentButton;
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#facc15',
-    borderRadius: 16,
-    paddingVertical: 24,
-    paddingHorizontal: 32,
+    borderRadius: 18,
+    paddingVertical: 28,
+    paddingHorizontal: 36,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,
-    width: 160,
+    width: 190,
   },
   label: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
-    marginTop: 8,
+    marginTop: 10,
     textAlign: 'center',
   },
 });

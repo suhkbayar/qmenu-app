@@ -13,7 +13,7 @@ type Props = {
 
 const TableQrModal = ({ visible, onClose }: Props) => {
   const { t } = useTranslation('language');
-  const { participant } = useCallStore();
+  const participant = useCallStore((s) => s.participant);
   const targetLink = `https://qr.qmenu.mn/qr/${participant?.table?.code}`;
 
   return (

@@ -5,6 +5,8 @@ import { useCallStore } from '@/src/store/cart.store';
 import { useTranslation } from 'react-i18next';
 import { getStorage, setStorage } from '@/src/store/storage';
 import { Image } from './ui/Image';
+import GiftHeaderButton from '@/src/components/GiftHeaderButton';
+import SitTogetherButton from '@/src/components/SitTogetherButton';
 import { IMenuCategory } from '@/src/types';
 import { defaultColor, accentColor } from '@/src/constants/Colors';
 import { useThemeStore } from '@/src/store/theme.store';
@@ -67,10 +69,14 @@ const Header: React.FC<Props> = ({
   activeParentId,
   activeCategoryId,
 }) => {
-  const { participant, setParticipant } = useCallStore();
+  const participant = useCallStore((s) => s.participant);
+  const setParticipant = useCallStore((s) => s.setParticipant);
+  const config = useCallStore((s) => s.config);
+  const giftEnabled = config?.giftOrder === true;
+  const sitEnabled = config?.sitTogether === true;
   const { theme, isDark, toggleTheme } = useThemeStore();
   const [visible, setVisible] = useState(false);
-  const { i18n } = useTranslation('language');
+  const { t, i18n } = useTranslation('language');
   const [loading, setLoading] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(countryByLang['en'] || countryList[0]);
 
@@ -165,61 +171,67 @@ const Header: React.FC<Props> = ({
   const tableName = useMemo(() => participant?.table?.name?.toLocaleUpperCase() || '', [participant?.table?.name]);
 
   return (
-    <View style={[styles.header, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
-      <View style={styles.left}>
-        <Text style={[styles.title, { color: theme.text }]}>{activeCategoryName}</Text>
+    <View style={[styles.wrap, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
+      <View style={styles.header}>
+        <View style={styles.left}>
+          <Text style={[styles.title, { color: theme.text }]}>{activeCategoryName}</Text>
+        </View>
+
+        <View style={styles.right}>
+          {tableName ? (
+            <View style={[styles.headerBtn, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+              <Text style={[styles.tableText, { color: theme.text }]}>{tableName}</Text>
+            </View>
+          ) : null}
+
+          {giftEnabled && <GiftHeaderButton />}
+          {sitEnabled && <SitTogetherButton />}
+
+          <TouchableOpacity
+            onPress={toggleTheme}
+            style={[styles.headerBtn, { borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
+            activeOpacity={0.7}
+          >
+            <Icon source={isDark ? 'weather-sunny' : 'weather-night'} size={28} color={theme.text} />
+          </TouchableOpacity>
+
+          <Menu
+            visible={visible}
+            onDismiss={() => setVisible(false)}
+            contentStyle={[styles.menuContent, { backgroundColor: theme.card }]}
+            anchor={
+              <TouchableOpacity
+                onPress={() => setVisible(true)}
+                style={[styles.headerBtn, { borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
+                activeOpacity={0.7}
+              >
+                <Image source={selectedCountry.path} style={styles.flag} />
+              </TouchableOpacity>
+            }
+          >
+            {availableLanguages.map((country) => (
+              <Menu.Item
+                key={country.i18n}
+                onPress={() => handleLanguageChange(country)}
+                style={styles.menuItem}
+                title={
+                  <View style={styles.menuRow}>
+                    {loading && selectedCountry.i18n === country.i18n ? (
+                      <ActivityIndicator size="small" color={defaultColor} />
+                    ) : (
+                      <>
+                        <Image source={country.path} style={styles.flag} />
+                        <Text style={[styles.countryLabel, { color: theme.text }]}>{country.label}</Text>
+                      </>
+                    )}
+                  </View>
+                }
+              />
+            ))}
+          </Menu>
+        </View>
       </View>
 
-      <View style={styles.right}>
-        {tableName ? (
-          <View style={[styles.headerBtn, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-            <Text style={[styles.tableText, { color: theme.text }]}>{tableName}</Text>
-          </View>
-        ) : null}
-
-        <TouchableOpacity
-          onPress={toggleTheme}
-          style={[styles.headerBtn, { borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
-          activeOpacity={0.7}
-        >
-          <Icon source={isDark ? 'weather-sunny' : 'weather-night'} size={26} color={theme.text} />
-        </TouchableOpacity>
-
-        <Menu
-          visible={visible}
-          onDismiss={() => setVisible(false)}
-          contentStyle={[styles.menuContent, { backgroundColor: theme.card }]}
-          anchor={
-            <TouchableOpacity
-              onPress={() => setVisible(true)}
-              style={[styles.headerBtn, { borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
-              activeOpacity={0.7}
-            >
-              <Image source={selectedCountry.path} style={styles.flag} />
-            </TouchableOpacity>
-          }
-        >
-          {availableLanguages.map((country) => (
-            <Menu.Item
-              key={country.i18n}
-              onPress={() => handleLanguageChange(country)}
-              style={styles.menuItem}
-              title={
-                <View style={styles.menuRow}>
-                  {loading && selectedCountry.i18n === country.i18n ? (
-                    <ActivityIndicator size="small" color={defaultColor} />
-                  ) : (
-                    <>
-                      <Image source={country.path} style={styles.flag} />
-                      <Text style={[styles.countryLabel, { color: theme.text }]}>{country.label}</Text>
-                    </>
-                  )}
-                </View>
-              }
-            />
-          ))}
-        </Menu>
-      </View>
     </View>
   );
 };
@@ -227,38 +239,36 @@ const Header: React.FC<Props> = ({
 export default memo(Header);
 
 const styles = StyleSheet.create({
+  wrap: { borderBottomWidth: 1 },
   header: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    paddingVertical: 18,
+    paddingHorizontal: 22,
   },
   left: { flexDirection: 'row', alignItems: 'center' },
   title: {
-    fontSize: 22,
+    fontSize: 25,
     fontWeight: '800',
     color: accentColor,
     letterSpacing: 0.5,
   },
-  right: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   headerBtn: {
-    height: 54,
-    minWidth: 54,
-    paddingHorizontal: 16,
-    borderRadius: 14,
+    height: 58,
+    minWidth: 58,
+    paddingHorizontal: 18,
+    borderRadius: 16,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  tableText: { fontSize: 18, color: accentColor, fontWeight: '700', letterSpacing: 0.5 },
-  flag: { height: 24, width: 36, borderRadius: 3 },
-  menuContent: { borderRadius: 12, marginTop: 4 },
-  menuItem: { paddingVertical: 4 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  countryLabel: { fontSize: 14, fontWeight: '600', color: accentColor },
+  tableText: { fontSize: 19, color: accentColor, fontWeight: '700', letterSpacing: 0.5 },
+  flag: { height: 26, width: 38, borderRadius: 4 },
+  menuContent: { borderRadius: 14, marginTop: 4 },
+  menuItem: { paddingVertical: 6 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  countryLabel: { fontSize: 16, fontWeight: '600', color: accentColor },
 });

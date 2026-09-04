@@ -13,7 +13,7 @@ import { isCurrentlyOpen } from '@/src/utils';
 import { MenuItemState } from '@/src/constants';
 
 const NUM_COLS = 3;
-const ROW_HEIGHT = 378;
+const ROW_HEIGHT = 412;
 const HEADER_HEIGHT = 60;
 const SUB_HEADER_HEIGHT = 50;
 
@@ -67,7 +67,14 @@ const SectionHeader = memo(({ label, isSubCategory }: { label: string; isSubCate
   const { theme } = useThemeStore();
   return (
     <View style={[styles.sectionHeader, isSubCategory && styles.sectionHeaderSub]}>
-      <Text style={[isSubCategory ? styles.sectionLabelSub : styles.sectionLabel, { color: isSubCategory ? theme.textMuted : theme.text }]}>{label}</Text>
+      <Text
+        style={[
+          isSubCategory ? styles.sectionLabelSub : styles.sectionLabel,
+          { color: isSubCategory ? theme.textMuted : theme.text },
+        ]}
+      >
+        {label}
+      </Text>
     </View>
   );
 });
@@ -179,7 +186,7 @@ const ContainerContent: React.FC<{ participant: IParticipant }> = ({ participant
   const orderItemsMap = useMemo<Record<string, IOrderItem>>(() => {
     const map: Record<string, IOrderItem> = {};
     for (const item of orderItems ?? []) {
-      if (item.productId) map[item.productId] = item;
+      if (item.productId && !item.giftToTableId) map[item.productId] = item;
     }
     return map;
   }, [orderItems]);
@@ -277,12 +284,12 @@ export default memo(ContainerContent);
 
 const styles = StyleSheet.create({
   container: { flexDirection: 'row', flex: 1 },
-  content: { flex: 1, backgroundColor: '#fff' },
+  content: { flex: 1 },
   list: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 100 },
   row: { flexDirection: 'row' },
   cell: { width: `${100 / NUM_COLS}%`, paddingHorizontal: 8, marginBottom: 16 },
   sectionHeader: { height: HEADER_HEIGHT, paddingHorizontal: 8, justifyContent: 'center' },
   sectionHeaderSub: { height: SUB_HEADER_HEIGHT, paddingHorizontal: 16 },
-  sectionLabel: { fontSize: 22, fontWeight: '800', color: '#222' },
-  sectionLabelSub: { fontSize: 17, fontWeight: '700', color: '#666' },
+  sectionLabel: { fontSize: 24, fontWeight: '800' },
+  sectionLabelSub: { fontSize: 19, fontWeight: '700' },
 });

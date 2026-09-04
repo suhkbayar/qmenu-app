@@ -40,21 +40,18 @@ export default memo(function SubcategoryBar({ childrenCats, activeChildId, onSel
 
 const styles = StyleSheet.create({
   wrap: {
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
-  row: { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
+  row: { paddingHorizontal: 18, gap: 10, alignItems: 'center' },
   pill: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
     borderRadius: 999,
-    backgroundColor: '#f3f4f6',
   },
   pillActive: {
     backgroundColor: defaultColor,
   },
-  label: { fontSize: 15, fontWeight: '600', color: '#444' },
+  label: { fontSize: 17, fontWeight: '600' },
   labelActive: { color: '#fff', fontWeight: '700' },
 });

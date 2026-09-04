@@ -14,7 +14,7 @@ type Props = {
 };
 
 const Sidebar = memo(({ categories, activeCategoryId, onSelect }: Props) => {
-  const { participant } = useCallStore();
+  const participant = useCallStore((s) => s.participant);
   const { theme } = useThemeStore();
   const scrollRef = useRef<ScrollView>(null);
   const itemOffsetsRef = useRef<Record<string, number>>({});
@@ -71,10 +71,10 @@ const Sidebar = memo(({ categories, activeCategoryId, onSelect }: Props) => {
 
       {showScrollTop && (
         <TouchableOpacity
-          style={[styles.scrollBtn, { top: 238 }]}
+          style={[styles.scrollBtn, { top: 250 }]}
           onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
         >
-          <Ionicons name="arrow-up-circle" size={30} color={theme.textMuted} />
+          <Ionicons name="arrow-up-circle" size={34} color={theme.textMuted} />
         </TouchableOpacity>
       )}
       {showScrollBottom && (
@@ -82,7 +82,7 @@ const Sidebar = memo(({ categories, activeCategoryId, onSelect }: Props) => {
           style={[styles.scrollBtn, { bottom: 10 }]}
           onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
-          <Ionicons name="arrow-down-circle" size={30} color={theme.textMuted} />
+          <Ionicons name="arrow-down-circle" size={34} color={theme.textMuted} />
         </TouchableOpacity>
       )}
     </View>
@@ -93,33 +93,30 @@ export default Sidebar;
 
 const styles = StyleSheet.create({
   sidebar: {
-    width: 260,
-    backgroundColor: '#f3f4f6',
-
+    width: 280,
     borderBottomRightRadius: 19,
     position: 'relative',
   },
   scroll: { alignItems: 'center', paddingBottom: 60 },
-  scrollBtn: { position: 'absolute', left: '50%', transform: [{ translateX: -15 }], zIndex: 10 },
+  scrollBtn: { position: 'absolute', left: '50%', transform: [{ translateX: -17 }], zIndex: 10 },
   logoContainer: {
     width: '100%',
-    borderRadius: 12,
-    backgroundColor: 'white',
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 22,
     elevation: 4,
   },
-  logo: { width: '100%', height: 220, borderRadius: 10 },
+  logo: { width: '100%', height: 230, borderRadius: 12 },
   item: {
     width: '100%',
-    marginBottom: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 6,
+    marginBottom: 22,
+    paddingVertical: 18,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   activeItem: { backgroundColor: defaultColor, borderTopRightRadius: 12, borderBottomRightRadius: 12 },
-  label: { color: '#333', fontWeight: 'bold', fontSize: 18, textAlign: 'center' },
-  activeLabel: { color: 'white', fontWeight: 'bold', fontSize: 18, textAlign: 'center' },
+  label: { fontWeight: 'bold', fontSize: 20, textAlign: 'center' },
+  activeLabel: { color: 'white', fontWeight: 'bold', fontSize: 20, textAlign: 'center' },
 });

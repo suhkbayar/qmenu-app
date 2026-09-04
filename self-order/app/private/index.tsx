@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Platform, SafeAreaView, StyleSheet } from 'react-native';
 import { useQuery } from '@apollo/client';
 import * as Battery from 'expo-battery';
@@ -18,13 +18,17 @@ import { useCallStore } from '@/src/store/cart.store';
 import { getStorage } from '@/src/store/storage';
 import { useLazyQuery, useMutation, useSubscription } from '@apollo/client';
 
+const MENU_REFETCH_QUIET_MS = 4000;
+const MENU_REFETCH_MAX_WAIT_MS = 15000;
+
 const Private = () => {
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [images, setImages] = useState<{ uri: string }[]>([]);
   const { signOut } = useContext(AuthContext);
-  const { setParticipant, order, load, setTables } = useCallStore();
+  const setParticipant = useCallStore((s) => s.setParticipant);
+  const setTables = useCallStore((s) => s.setTables);
+  const load = useCallStore((s) => s.load);
 
-  // Load participantId from storage once on mount
   useEffect(() => {
     getStorage('participantId').then((id) => {
       if (id) setParticipantId(id);
@@ -44,12 +48,36 @@ const Private = () => {
 
   const branchId = data?.getParticipant?.branch?.id;
 
+  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstPendingAt = useRef<number | null>(null);
+
+  const scheduleMenuRefetch = useCallback(() => {
+    if (!participantId) return;
+
+    const now = Date.now();
+    if (firstPendingAt.current === null) firstPendingAt.current = now;
+
+    const waited = now - firstPendingAt.current;
+    const delay = Math.min(MENU_REFETCH_QUIET_MS, Math.max(0, MENU_REFETCH_MAX_WAIT_MS - waited));
+
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    refetchTimer.current = setTimeout(() => {
+      firstPendingAt.current = null;
+      refetch();
+    }, delay);
+  }, [participantId, refetch]);
+
+  useEffect(
+    () => () => {
+      if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    },
+    [],
+  );
+
   useSubscription(ON_UPDATED_MENU, {
     variables: { branch: branchId },
     skip: !branchId,
-    onData: () => {
-      if (participantId) refetch();
-    },
+    onData: scheduleMenuRefetch,
   });
 
   const [getBanners] = useLazyQuery(GET_BANNERS, { fetchPolicy: 'network-only' });
@@ -59,7 +87,7 @@ const Private = () => {
     if (!data?.getParticipant) return;
     const p = data.getParticipant;
     setParticipant(p);
-    if (p.orderable && !order) load(emptyOrder);
+    if (p.orderable && !useCallStore.getState().order) load(emptyOrder);
     if (p.table) {
       setTables([
         {

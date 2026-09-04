@@ -9,4 +9,6 @@ export interface IConfig {
   navbarBackgroundColor?: string;
   noCheckout?: boolean;
   hidePrice?: boolean;
+  giftOrder?: boolean;
+  sitTogether?: boolean;
 }

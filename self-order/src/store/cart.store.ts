@@ -269,16 +269,18 @@ export const useCallStore = create<ICallStore>(
         get().calculate();
       },
       setParticipant: (participant) => {
-        const mappedConfigs: Record<string, any> = (participant.configs || []).reduce((acc, config) => {
-          const matchedQMenuConfig = qmenuConfigs.find((qconfig) => qconfig.value === config.name);
-          if (matchedQMenuConfig) {
-            acc[matchedQMenuConfig.name] = parseConfig(config.value);
-          }
-          return acc;
-        }, {} as Record<string, any>);
+        const mappedConfigs: Record<string, any> = (participant.configs || []).reduce(
+          (acc, config) => {
+            const matchedQMenuConfig = qmenuConfigs.find((qconfig) => qconfig.value === config.name);
+            if (matchedQMenuConfig) {
+              acc[matchedQMenuConfig.name] = parseConfig(config.value);
+            }
+            return acc;
+          },
+          {} as Record<string, any>,
+        );
 
-        set({ config: { ...mappedConfigs } });
-        set({ participant });
+        set({ config: { ...mappedConfigs }, participant });
       },
     }),
     {

@@ -29,7 +29,8 @@ import { isEmpty } from 'lodash';
 import { useValid } from '@/src/providers/ValidProvider';
 
 const Public = () => {
-  const { tables, deleteTable } = useCallStore();
+  const tables = useCallStore((s) => s.tables);
+  const deleteTable = useCallStore((s) => s.deleteTable);
   const { theme, isDark, toggleTheme } = useThemeStore();
   const [isNew, setIsNew] = useState(true);
   const { setValid } = useValid();

@@ -28,7 +28,7 @@ const Payment = () => {
   const { t } = useTranslation('language');
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const toast = useToast();
-  const { participant } = useCallStore();
+  const participant = useCallStore((s) => s.participant);
   const { theme } = useThemeStore();
   const orderState = useOrderStore((state) => state.orderState);
 
@@ -212,20 +212,12 @@ const Payment = () => {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
         <Text style={[styles.title, { color: theme.textSecondary }]}>{t('mainPage.your_payment')}</Text>
-        <Text style={styles.amount}>
+        <Text style={[styles.amount, { color: theme.primary }]}>
           {order.grandTotal.toLocaleString()} {CURRENCY}
         </Text>
         <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t('mainPage.SelectYourPaymentChannel')}</Text>
 
         <View style={styles.buttons}>
-          {(findPayment(PAYMENT_TYPE.QPay) || findPayment(PAYMENT_TYPE.QPay2)) && (
-            <PaymentButton
-              type="QPay"
-              id={(findPayment(PAYMENT_TYPE.QPay) || findPayment(PAYMENT_TYPE.QPay2))?.id}
-              onSelect={onSelectBank}
-              loading={paying && activeType === 'QPay'}
-            />
-          )}
           {findPayment(PAYMENT_TYPE.MPY) && (
             <PaymentButton
               type="MPY"
@@ -248,6 +240,14 @@ const Payment = () => {
               id={findPayment(PAYMENT_TYPE.Toki)?.id}
               onSelect={onSelectBank}
               loading={paying && activeType === 'Toki'}
+            />
+          )}
+          {(findPayment(PAYMENT_TYPE.QPay) || findPayment(PAYMENT_TYPE.QPay2)) && (
+            <PaymentButton
+              type="QPay"
+              id={(findPayment(PAYMENT_TYPE.QPay) || findPayment(PAYMENT_TYPE.QPay2))?.id}
+              onSelect={onSelectBank}
+              loading={paying && activeType === 'QPay'}
             />
           )}
           {!participant?.advancePayment && <PaymentButton type="Cash" onSelect={onSelectBank} />}
@@ -291,13 +291,13 @@ const Payment = () => {
 export default Payment;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', justifyContent: 'space-between' },
-  content: { alignItems: 'center', paddingTop: 100 },
-  title: { fontSize: 20, fontWeight: '700', color: '#4B5563', marginBottom: 8 },
-  amount: { fontSize: 24, fontWeight: '700', color: '#facc15', marginBottom: 10 },
-  subtitle: { fontSize: 16, color: '#6B7280', marginBottom: 24 },
-  buttons: { flexDirection: 'row', gap: 16 },
+  container: { flex: 1, justifyContent: 'space-between' },
+  content: { alignItems: 'center', paddingTop: 90 },
+  title: { fontSize: 24, fontWeight: '700', marginBottom: 10 },
+  amount: { fontSize: 40, fontWeight: '800', marginBottom: 12 },
+  subtitle: { fontSize: 19, marginBottom: 30 },
+  buttons: { flexDirection: 'row', gap: 20 },
   footer: { flexDirection: 'row', padding: 24 },
-  backBtn: { backgroundColor: '#f3f4f6', paddingVertical: 18, paddingHorizontal: 24, borderRadius: 12 },
-  backBtnText: { color: '#4B5563', fontSize: 16, fontWeight: '600' },
+  backBtn: { paddingVertical: 20, paddingHorizontal: 28, borderRadius: 14 },
+  backBtnText: { fontSize: 18, fontWeight: '600' },
 });

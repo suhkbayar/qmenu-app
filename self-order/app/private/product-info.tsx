@@ -22,6 +22,7 @@ interface Props {
   visible?: boolean;
   onClose?: () => void;
   product?: any;
+  onConfigured?: (item: IOrderItem) => void;
 }
 
 const calculateTotals = (items: IOrderItem[]) => {
@@ -33,11 +34,11 @@ const calculateTotals = (items: IOrderItem[]) => {
   return { totalAmount, grandTotal: totalAmount, totalQuantity };
 };
 
-const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: propProduct }) => {
+const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: propProduct, onConfigured }) => {
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const { t } = useTranslation('language');
-  const { participant } = useCallStore();
+  const participant = useCallStore((s) => s.participant);
   const { theme } = useThemeStore();
   const orderState = useOrderStore((s) => s.orderState);
   const setOrderState = useOrderStore((s) => s.setOrderState);
@@ -223,13 +224,19 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
       return;
     }
 
+    if (onConfigured) {
+      onConfigured(selectedItem);
+      goBack();
+      return;
+    }
+
     setOrderState((prev) => {
       const items = [...prev.items, selectedItem];
       return { items, ...calculateTotals(items), state: 'DRAFT' };
     });
 
     goBack();
-  }, [selectedItem, product, t, setOrderState, goBack]);
+  }, [selectedItem, product, t, setOrderState, goBack, onConfigured]);
 
   const isDisabled = product?.state === MenuItemState.DISABLED;
 
@@ -303,9 +310,21 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
                   <TouchableOpacity
                     key={v.id}
                     onPress={() => onSelect(v)}
-                    style={[styles.chip, { backgroundColor: theme.backgroundSecondary }, selectedItem?.id === v.id && { backgroundColor: theme.primary }]}
+                    style={[
+                      styles.chip,
+                      { backgroundColor: theme.backgroundSecondary },
+                      selectedItem?.id === v.id && { backgroundColor: theme.primary },
+                    ]}
                   >
-                    <Text style={[styles.chipText, { color: theme.text }, selectedItem?.id === v.id && styles.chipTextActive]}>{v.name}</Text>
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: theme.text },
+                        selectedItem?.id === v.id && styles.chipTextActive,
+                      ]}
+                    >
+                      {v.name}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -316,7 +335,9 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
           {currentVariant && !isEmpty(currentVariant.options) && (
             <>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('mainPage.extra')}</Text>
-              <Text style={[styles.sectionDesc, { color: theme.textMuted }, validationError ? styles.errorDesc : undefined]}>
+              <Text
+                style={[styles.sectionDesc, { color: theme.textMuted }, validationError ? styles.errorDesc : undefined]}
+              >
                 {validationError ? 'Шаардлагатай сонголтуудыг сонгоно уу' : t('mainPage.chooseIngredients')}
               </Text>
               <View style={styles.chipRow}>
@@ -328,9 +349,19 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
                     <TouchableOpacity
                       key={opt.id}
                       onPress={() => toggleOption(opt, selectedValue)}
-                      style={[styles.chip, { backgroundColor: theme.backgroundSecondary }, needsValidation ? styles.chipError : isSelected && { backgroundColor: theme.primary }]}
+                      style={[
+                        styles.chip,
+                        { backgroundColor: theme.backgroundSecondary },
+                        needsValidation ? styles.chipError : isSelected && { backgroundColor: theme.primary },
+                      ]}
                     >
-                      <Text style={[styles.chipText, { color: theme.text }, (needsValidation || isSelected) && styles.chipTextActive]}>
+                      <Text
+                        style={[
+                          styles.chipText,
+                          { color: theme.text },
+                          (needsValidation || isSelected) && styles.chipTextActive,
+                        ]}
+                      >
                         {opt.name}
                         {!isEmpty(selectedValue) && `: ${selectedValue}`}
                       </Text>
@@ -349,11 +380,23 @@ const ProductDetails: React.FC<Props> = ({ visible = true, onClose, product: pro
             {!isDisabled && (
               <View style={styles.qtyRow}>
                 <TouchableOpacity onPress={onRemove}>
-                  <FAB animated={false} icon="minus" size="small" style={[styles.fabOutline, { backgroundColor: theme.background }]} color={theme.primary} />
+                  <FAB
+                    animated={false}
+                    icon="minus"
+                    size="small"
+                    style={[styles.fabOutline, { backgroundColor: theme.background }]}
+                    color={theme.primary}
+                  />
                 </TouchableOpacity>
                 <Text style={[styles.qty, { color: theme.text }]}>{selectedItem?.quantity || 0}</Text>
                 <TouchableOpacity onPress={() => currentVariant && onSelect(currentVariant)}>
-                  <FAB animated={false} icon="plus" size="small" style={[styles.fabFill, { backgroundColor: theme.primary }]} color="white" />
+                  <FAB
+                    animated={false}
+                    icon="plus"
+                    size="small"
+                    style={[styles.fabFill, { backgroundColor: theme.primary }]}
+                    color="white"
+                  />
                 </TouchableOpacity>
               </View>
             )}

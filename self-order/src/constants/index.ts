@@ -128,7 +128,7 @@ export enum ChannelType {
   MB = 'MB', //MBank
   MR = 'MR', //Marketplace
   QM = 'QM', //Qmenu
-  TB = 'TB' //Tablet
+  TB = 'TB', //Tablet
 }
 
 export enum LoyaltyState {
@@ -388,6 +388,14 @@ export const qmenuConfigs = [
     name: 'hidePrice',
     value: 'HIDE_PRICE',
   },
+  {
+    name: 'giftOrder',
+    value: 'GIFT_ORDER',
+  },
+  {
+    name: 'sitTogether',
+    value: 'SIT_TOGETHER',
+  },
 ];
 
 export const emptyOrder: ICustomerOrder = {
@@ -399,6 +407,52 @@ export const emptyOrder: ICustomerOrder = {
 };
 
 export const CURRENCY = '₮';
+
+// The gift / sit-together surfaces run on the app's brand orange (defaultColor).
+// `gold` is the fill — rules, buttons, medallions — and always carries `onGold`
+// text. `goldText` is the same accent darkened enough to stay readable when it is
+// the text or icon colour on `surface` / `raised`, where plain #FFC300 is ~1.6:1.
+export const giftPalette = (isDark: boolean) => ({
+  surface: isDark ? '#14141A' : '#FFFFFF',
+  raised: isDark ? '#1D1D25' : '#FFF9E8',
+  gold: '#FFC300',
+  goldBright: isDark ? '#FFD86B' : '#FFD24D',
+  goldDim: isDark ? '#8A6900' : '#D9A600',
+  goldText: isDark ? '#FFC300' : '#8A6500',
+  onGold: isDark ? '#0A0A0D' : '#2A2005',
+  text: isDark ? '#F3EEE4' : '#1A1408',
+  textSoft: isDark ? 'rgba(243,238,228,0.66)' : 'rgba(26,20,8,0.62)',
+  textFaint: isDark ? 'rgba(243,238,228,0.38)' : 'rgba(26,20,8,0.40)',
+  hairline: isDark ? 'rgba(255,195,0,0.30)' : 'rgba(179,134,0,0.28)',
+});
+
+export type GiftPalette = ReturnType<typeof giftPalette>;
+
+export type StickerTone = 'OPENER' | 'REPLY';
+
+export type EmojiAnim = 'beat' | 'shake' | 'pop' | 'float';
+
+export type TableMessageSticker = {
+  id: string;
+  emoji: string;
+  labelKey: string;
+  tone: StickerTone;
+  anim: EmojiAnim;
+};
+
+export const TABLE_MESSAGE_STICKERS: TableMessageSticker[] = [
+  { id: 'ACQUAINT', emoji: '\u{1F60A}', labelKey: 'sticker_acquaint', tone: 'OPENER', anim: 'float' },
+  { id: 'FORYOU', emoji: '\u{1F37E}', labelKey: 'sticker_foryou', tone: 'OPENER', anim: 'pop' },
+  { id: 'SMILE', emoji: '\u{1F609}', labelKey: 'sticker_smile', tone: 'OPENER', anim: 'shake' },
+  { id: 'PARTY', emoji: '\u{1F389}', labelKey: 'sticker_party', tone: 'OPENER', anim: 'pop' },
+  { id: 'BIRTHDAY', emoji: '\u{1F382}', labelKey: 'sticker_birthday', tone: 'OPENER', anim: 'beat' },
+
+  { id: 'THANKS', emoji: '\u{1F970}', labelKey: 'sticker_thanks', tone: 'REPLY', anim: 'beat' },
+  { id: 'LETSMEET', emoji: '\u{1F604}', labelKey: 'sticker_lets_meet', tone: 'REPLY', anim: 'float' },
+];
+
+export const GIFT_EMOJI = '\u{1F381}';
+export const MESSAGE_EMOJI = '\u{1F48C}';
 
 export const validPrefixes = [
   'А',

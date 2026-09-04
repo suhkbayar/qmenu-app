@@ -12,8 +12,8 @@ import { useThemeStore } from '@/src/store/theme.store';
 import ProductDetailsScreen from '@/app/private/product-info';
 import Icon from '@react-native-vector-icons/feather';
 
-const CARD_WIDTH = 220;
-const IMAGE_HEIGHT = 130;
+const CARD_WIDTH = 260;
+const IMAGE_HEIGHT = 150;
 
 type Props = {
   product: IMenuProduct;
@@ -25,7 +25,10 @@ type Props = {
 
 const RecommendedCard = ({ product, orderItem, onAdd, onRemove }: Props) => {
   const { t } = useTranslation('language');
-  const { participant, config, add, remove } = useCallStore();
+  const participant = useCallStore((s) => s.participant);
+  const config = useCallStore((s) => s.config);
+  const add = useCallStore((s) => s.add);
+  const remove = useCallStore((s) => s.remove);
   const { theme } = useThemeStore();
   const [visible, setVisible] = useState(false);
   const [animatedValue] = useState(new Animated.Value(1));
@@ -96,13 +99,13 @@ const RecommendedCard = ({ product, orderItem, onAdd, onRemove }: Props) => {
                 {orderItem ? (
                   <View style={[styles.quantityRow, { backgroundColor: theme.backgroundSecondary }]}>
                     <TouchableOpacity style={[styles.qtyBtn, { backgroundColor: theme.primary }]} onPress={onRemoveItem}>
-                      <Icon name="minus" size={13} color="#fff" />
+                      <Icon name="minus" size={16} color="#fff" />
                     </TouchableOpacity>
                     <Animated.View style={{ transform: [{ scale: animatedValue }] }}>
                       <Text style={[styles.qty, { color: theme.text }]}>{orderItem.quantity}</Text>
                     </Animated.View>
                     <TouchableOpacity style={[styles.qtyBtn, { backgroundColor: theme.primary }]} onPress={() => onSelect(product.productId)}>
-                      <Icon name="plus" size={13} color="#fff" />
+                      <Icon name="plus" size={16} color="#fff" />
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -110,7 +113,7 @@ const RecommendedCard = ({ product, orderItem, onAdd, onRemove }: Props) => {
                     style={[styles.addButton, { backgroundColor: theme.primary }]}
                     onPress={() => (!isConfigurable(product) ? onSelect(product.productId) : setVisible(true))}
                   >
-                    <Icon name="plus" size={16} color="#fff" />
+                    <Icon name="plus" size={20} color="#fff" />
                   </TouchableOpacity>
                 )}
               </View>
@@ -144,47 +147,47 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
     zIndex: 1,
   },
-  ribbonText: { color: '#fff', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  ribbonText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   imageContainer: { width: '100%', height: IMAGE_HEIGHT },
   image: { width: '100%', height: '100%' },
   imageOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   badgeRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingVertical: 6 },
   badge: { backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
-  content: { padding: 12, paddingTop: 10 },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  content: { padding: 14, paddingTop: 12 },
   title: {
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '700',
     color: '#1a1a1a',
-    lineHeight: 20,
-    marginBottom: 8,
-    minHeight: 40,
+    lineHeight: 22,
+    marginBottom: 10,
+    minHeight: 46,
   },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  price: { fontSize: 14, fontWeight: '700', color: defaultColor },
+  price: { fontSize: 17, fontWeight: '700', color: defaultColor },
   action: {},
   quantityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f3f4f6',
-    borderRadius: 20,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    gap: 4,
+    borderRadius: 24,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    gap: 6,
   },
   qtyBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: defaultColor, // overridden inline
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qty: { fontSize: 14, fontWeight: '700', color: '#333', minWidth: 22, textAlign: 'center' },
+  qty: { fontSize: 16, fontWeight: '700', color: '#333', minWidth: 26, textAlign: 'center' },
   addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: defaultColor,
     alignItems: 'center',
     justifyContent: 'center',

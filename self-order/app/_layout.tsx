@@ -21,7 +21,9 @@ import * as SystemUI from 'expo-system-ui';
 import * as Updates from 'expo-updates';
 
 import CustomToast from '@/src/components/ui/CustomToast';
+import TableMessageToast from '@/src/components/ui/TableMessageToast';
 import KioskPinModal from '@/src/components/KioskPinModal';
+import NetworkStatusListener from '@/src/components/NetworkStatusListener';
 import client from '@/src/providers/apolloClient';
 import { AuthProvider } from '@/src/providers/auth';
 import { CartProvider } from '@/src/providers/CartProvider';
@@ -147,9 +149,13 @@ export default function RootLayout() {
                         custom_type: (toast: ToastProps) => (
                           <CustomToast type={toast.type ?? 'default'} message={toast.message} />
                         ),
+                        table_message: (toast: ToastProps) => (
+                          <TableMessageToast id={toast.id} {...toast.data} />
+                        ),
                       }}
                     >
                       <StatusBar hidden />
+                      <NetworkStatusListener />
                       <KioskOverlay />
                       <Stack screenOptions={{ headerShown: false }}>
                         <Stack.Screen name="index" />

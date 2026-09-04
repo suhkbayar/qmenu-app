@@ -23,7 +23,7 @@ const MemoizedPrice = memo(({ variants }: { variants: IMenuVariant[] }) => {
   const max = Math.max(...variants.map((v) => v.salePrice));
   const label =
     min === max ? `${min.toLocaleString()}${CURRENCY}` : `${min.toLocaleString()} - ${max.toLocaleString()}${CURRENCY}`;
-  return <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>{label}</Text>;
+  return <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text }}>{label}</Text>;
 });
 
 const ProductImage = memo(({ source, style }: { source: any; style: object }) => (
@@ -33,7 +33,7 @@ const ProductImage = memo(({ source, style }: { source: any; style: object }) =>
 ));
 
 const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) => {
-  const { participant } = useCallStore();
+  const participant = useCallStore((s) => s.participant);
   const { theme } = useThemeStore();
   const [loading, setLoading] = useState(false);
   const quantity = orderItem?.quantity || 0;
@@ -131,7 +131,7 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) 
       )}
       <TouchableOpacity style={styles.infoButton} onPress={goProductInfo}>
         <View style={styles.infoButtonBg}>
-          <Icon source="eye-outline" size={24} color="#fff" />
+          <Icon source="eye-outline" size={26} color="#fff" />
         </View>
       </TouchableOpacity>
       <View style={styles.info}>
@@ -150,15 +150,14 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) 
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    marginVertical: 7,
-    marginHorizontal: 7,
+    marginVertical: 8,
+    marginHorizontal: 8,
     borderRadius: 12,
     overflow: 'hidden',
     elevation: 4,
     position: 'relative',
-    backgroundColor: '#fff',
   },
-  image: { height: 220, width: '100%' },
+  image: { height: 236, width: '100%' },
   infoButton: { position: 'absolute', top: 8, right: 8 },
   infoButtonBg: {
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -167,30 +166,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
   },
-  info: { paddingHorizontal: 10, paddingVertical: 6, paddingBottom: 0, gap: 4 },
-  name: { fontSize: 18, fontWeight: '700', color: '#333' },
-  description: { fontSize: 14, fontWeight: '600', color: '#77798c' },
+  info: { paddingHorizontal: 12, paddingVertical: 8, paddingBottom: 0, gap: 5 },
+  name: { fontSize: 19, fontWeight: '700', lineHeight: 24 },
+  description: { fontSize: 15, fontWeight: '600', lineHeight: 19 },
   quantityRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   fab: {
     backgroundColor: defaultColor, // overridden inline via theme.primary where needed
-    width: 56,
-    height: 56,
+    width: 60,
+    height: 60,
     borderRadius: 999,
     justifyContent: 'center',
     alignItems: 'center',
   },
   fabOutline: {
     backgroundColor: 'white',
-    width: 56,
-    height: 56,
+    width: 60,
+    height: 60,
     borderRadius: 999,
     borderColor: '#f0f0f0',
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  qty: { fontSize: 20, color: '#555', fontWeight: '700' },
-  controls: { padding: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  qty: { fontSize: 22, fontWeight: '700' },
+  controls: { padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   bonusTag: {
     position: 'absolute',
     top: 10,
@@ -201,7 +200,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     zIndex: 10,
   },
-  bonusText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  bonusText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
 
 export default memo(

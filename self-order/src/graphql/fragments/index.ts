@@ -11,3 +11,4 @@ export * from './notification.action';
 export * from './notification';
 export * from './form';
 export * from './channel.config';
+export * from './tableMessage';
