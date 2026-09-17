@@ -402,7 +402,7 @@
       "PARTIALLY": "Хагас төлсөн"
     },
     "show_sender_location": "Хаанаас ирсэн бэ?",
-    "hide_sender_location": "Байршил нуух",
+    "hide_sender_location": "Хаах",
     "sit_show_location": "Байршил харах",
     "gift_qty_question": "Хэдийг дайлах вэ?",
     "gift_qty_hint": "{{gift}} ширхэг дайлна · {{keep}} ширхэг танд үлдэнэ",

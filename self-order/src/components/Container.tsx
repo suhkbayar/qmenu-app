@@ -23,12 +23,11 @@ type ListRow =
 
 function buildRows(categories: IMenuCategory[]): ListRow[] {
   const rows: ListRow[] = [];
-  let seq = 0;
 
   for (const parent of categories) {
     rows.push({
       type: 'header',
-      key: `h${seq++}`,
+      key: `h-${parent.id}`,
       categoryId: parent.id,
       label: parent.name,
       isSubCategory: false,
@@ -39,7 +38,7 @@ function buildRows(categories: IMenuCategory[]): ListRow[] {
       for (const child of parent.children) {
         rows.push({
           type: 'header',
-          key: `h${seq++}`,
+          key: `h-${parent.id}-${child.id}`,
           categoryId: child.id,
           label: child.name,
           isSubCategory: true,
@@ -48,14 +47,26 @@ function buildRows(categories: IMenuCategory[]): ListRow[] {
         const products = child.products?.filter((p: IMenuProduct) => p.state !== MenuItemState.INACTIVE) ?? [];
         for (let i = 0; i < products.length; i += NUM_COLS) {
           const chunk = products.slice(i, i + NUM_COLS);
-          rows.push({ type: 'row', key: `r${seq++}`, rowKey: `${child.id}-${i}`, items: chunk, height: ROW_HEIGHT });
+          rows.push({
+            type: 'row',
+            key: `r-${parent.id}-${child.id}-${i}`,
+            rowKey: `${child.id}-${i}`,
+            items: chunk,
+            height: ROW_HEIGHT,
+          });
         }
       }
     } else {
       const products = parent.products?.filter((p: IMenuProduct) => p.state !== MenuItemState.INACTIVE) ?? [];
       for (let i = 0; i < products.length; i += NUM_COLS) {
         const chunk = products.slice(i, i + NUM_COLS);
-        rows.push({ type: 'row', key: `r${seq++}`, rowKey: `${parent.id}-${i}`, items: chunk, height: ROW_HEIGHT });
+        rows.push({
+          type: 'row',
+          key: `r-${parent.id}-${i}`,
+          rowKey: `${parent.id}-${i}`,
+          items: chunk,
+          height: ROW_HEIGHT,
+        });
       }
     }
   }

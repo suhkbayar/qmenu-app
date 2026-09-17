@@ -14,7 +14,7 @@ type Props = {
 };
 
 const Sidebar = memo(({ categories, activeCategoryId, onSelect }: Props) => {
-  const participant = useCallStore((s) => s.participant);
+  const logo = useCallStore((s) => s.participant?.branch?.logo);
   const { theme } = useThemeStore();
   const scrollRef = useRef<ScrollView>(null);
   const itemOffsetsRef = useRef<Record<string, number>>({});
@@ -41,7 +41,7 @@ const Sidebar = memo(({ categories, activeCategoryId, onSelect }: Props) => {
     <View style={[styles.sidebar, { backgroundColor: theme.sidebarBackground }]}>
       <View style={{ padding: 10 }}>
         <View style={[styles.logoContainer, { backgroundColor: theme.card }]}>
-          <Image source={{ uri: participant?.branch?.logo }} style={styles.logo} resizeMode="cover" />
+          <Image source={{ uri: logo }} style={styles.logo} resizeMode="cover" />
         </View>
       </View>
 
@@ -60,7 +60,10 @@ const Sidebar = memo(({ categories, activeCategoryId, onSelect }: Props) => {
               onLayout={(e) => {
                 itemOffsetsRef.current[item.id] = e.nativeEvent.layout.y;
               }}
-              style={[styles.item, isActive && { backgroundColor: theme.primary, borderTopRightRadius: 12, borderBottomRightRadius: 12 }]}
+              style={[
+                styles.item,
+                isActive && { backgroundColor: theme.primary, borderTopRightRadius: 12, borderBottomRightRadius: 12 },
+              ]}
               activeOpacity={0.8}
             >
               <Text style={[styles.label, { color: theme.text }, isActive && styles.activeLabel]}>{item.name}</Text>

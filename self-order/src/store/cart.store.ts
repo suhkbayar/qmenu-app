@@ -44,7 +44,7 @@ interface ICallStore {
 }
 
 export const useCallStore = create<ICallStore>(
-  persist(
+  persist<ICallStore>(
     (set, get) => ({
       order: null,
       user: null,
@@ -280,12 +280,25 @@ export const useCallStore = create<ICallStore>(
           {} as Record<string, any>,
         );
 
-        set({ config: { ...mappedConfigs }, participant });
+        const previous = get().config as Record<string, any> | null;
+        const unchanged =
+          previous !== null &&
+          Object.keys(mappedConfigs).length === Object.keys(previous).length &&
+          Object.keys(mappedConfigs).every((key) => previous[key] === mappedConfigs[key]);
+
+        set({ config: unchanged ? (previous as IConfig) : (mappedConfigs as IConfig), participant });
       },
     }),
     {
       name: 'call-storage-array',
       getStorage: () => storage,
+      partialize: (state) => ({
+        tables: state.tables,
+        order: state.order,
+        user: state.user,
+        config: state.config,
+        participant: state.participant ? { ...state.participant, menu: undefined } : null,
+      }),
     },
   ),
 );

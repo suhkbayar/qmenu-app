@@ -1,16 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  ImageSourcePropType,
-  Animated,
-  Easing,
-  Dimensions,
-  PanResponder,
-  GestureResponderEvent,
-  AppState,
-  Keyboard,
-} from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, ImageSourcePropType, Animated, Easing, Dimensions, AppState, Keyboard } from 'react-native';
 
 interface ScreensaverWrapperProps {
   children: React.ReactNode;
@@ -32,26 +21,35 @@ export default function ScreensaverWrapper({
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const translateXAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
 
-  const slideshowInterval = useRef<NodeJS.Timeout | null>(null);
-  const idleTimeout = useRef<NodeJS.Timeout | null>(null);
+  const slideshowInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const idleTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const resetTimer = () => {
+  const imagesRef = useRef(images);
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  const resetTimer = useCallback(() => {
     if (idleTimeout.current) clearTimeout(idleTimeout.current);
-    if (isInactive) {
-      setIsInactive(false);
-      stopSlideshow();
-    }
+    stopSlideshow();
+    setIsInactive(false);
 
     idleTimeout.current = setTimeout(() => {
       setIsInactive(true);
       startSlideshow();
     }, delay);
-  };
+  }, [delay]);
+
+  const resetRef = useRef(resetTimer);
+  useEffect(() => {
+    resetRef.current = resetTimer;
+  }, [resetTimer]);
 
   useEffect(() => {
-    resetTimer();
-    const appStateListener = AppState.addEventListener('change', resetTimer);
-    const keyboardListener = Keyboard.addListener('keyboardDidShow', resetTimer);
+    const reset = () => resetRef.current();
+    reset();
+    const appStateListener = AppState.addEventListener('change', reset);
+    const keyboardListener = Keyboard.addListener('keyboardDidShow', reset);
     return () => {
       if (idleTimeout.current) clearTimeout(idleTimeout.current);
       if (slideshowInterval.current) clearInterval(slideshowInterval.current);
@@ -60,24 +58,13 @@ export default function ScreensaverWrapper({
     };
   }, []);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: () => false,
-      onPanResponderGrant: () => resetTimer(),
-      onPanResponderMove: () => resetTimer(),
-      onPanResponderRelease: () => resetTimer(),
-      onShouldBlockNativeResponder: () => false,
-    }),
-  ).current;
-
   const startSlideshow = () => {
-    if (images.length === 0) return;
+    if (imagesRef.current.length === 0) return;
     setIsImageLoaded(false);
-    if (images.length === 1) return; // stay on single image, no cycling
+    if (imagesRef.current.length === 1) return; // stay on single image, no cycling
     slideshowInterval.current = setInterval(() => {
       setIsImageLoaded(false);
-      setImageIndex((prev) => (prev + 1) % images.length);
+      setImageIndex((prev) => (prev + 1) % imagesRef.current.length);
     }, interval);
   };
 
@@ -111,14 +98,14 @@ export default function ScreensaverWrapper({
     if (isInactive && isImageLoaded) animateImage();
   }, [imageIndex, isImageLoaded, isInactive]);
 
-  const handleTouch = (event: GestureResponderEvent) => resetTimer();
+  const handleTouch = () => resetTimer();
 
-  if (images.length === 0) return <View style={{ flex: 1 }}>{children}</View>;
+  const showScreensaver = isInactive && images.length > 0;
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers} onTouchStart={handleTouch}>
-      <View style={[styles.contentContainer, isInactive && styles.hidden]}>{children}</View>
-      {isInactive && (
+    <View style={[styles.container, showScreensaver && styles.containerActive]} onTouchStart={handleTouch}>
+      <View style={[styles.contentContainer, showScreensaver && styles.hidden]}>{children}</View>
+      {showScreensaver && (
         <View
           style={StyleSheet.absoluteFill}
           onTouchStart={handleTouch}
@@ -143,8 +130,9 @@ export default function ScreensaverWrapper({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'black' },
-  contentContainer: { flex: 1, backgroundColor: 'white' },
+  container: { flex: 1 },
+  containerActive: { backgroundColor: 'black' },
+  contentContainer: { flex: 1 },
   hidden: { opacity: 0 },
   screensaverImage: { width: '100%', height: '100%' },
 });

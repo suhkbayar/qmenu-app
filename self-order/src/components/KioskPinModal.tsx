@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 
+import VersionBadge from '@/src/components/ui/VersionBadge';
+
 type Props = {
   visible: boolean;
   onSubmit: (pin: string) => void;
@@ -10,8 +12,14 @@ type Props = {
 export default function KioskPinModal({ visible, onSubmit, onCancel }: Props) {
   const [pin, setPin] = useState('');
 
-  const handleSubmit = () => { onSubmit(pin); setPin(''); };
-  const handleCancel = () => { setPin(''); onCancel(); };
+  const handleSubmit = () => {
+    onSubmit(pin);
+    setPin('');
+  };
+  const handleCancel = () => {
+    setPin('');
+    onCancel();
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -35,6 +43,8 @@ export default function KioskPinModal({ visible, onSubmit, onCancel }: Props) {
               <Text style={styles.confirmText}>Confirm</Text>
             </Pressable>
           </View>
+
+          <VersionBadge />
         </View>
       </View>
     </Modal>
@@ -45,7 +55,15 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   box: { backgroundColor: '#fff', borderRadius: 12, padding: 24, width: 300, gap: 16 },
   title: { fontSize: 18, fontWeight: '600', textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, fontSize: 16, textAlign: 'center', letterSpacing: 4 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    textAlign: 'center',
+    letterSpacing: 4,
+  },
   buttons: { flexDirection: 'row', gap: 12 },
   cancel: { flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#ccc', alignItems: 'center' },
   cancelText: { color: '#666' },

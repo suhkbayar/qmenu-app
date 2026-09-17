@@ -7,6 +7,7 @@ import { getStorage, setStorage } from '@/src/store/storage';
 import { Image } from './ui/Image';
 import GiftHeaderButton from '@/src/components/GiftHeaderButton';
 import SitTogetherButton from '@/src/components/SitTogetherButton';
+import MbankQuizModal from '@/src/components/modals/MbankQuizModal';
 import { IMenuCategory } from '@/src/types';
 import { defaultColor, accentColor } from '@/src/constants/Colors';
 import { useThemeStore } from '@/src/store/theme.store';
@@ -69,24 +70,24 @@ const Header: React.FC<Props> = ({
   activeParentId,
   activeCategoryId,
 }) => {
-  const participant = useCallStore((s) => s.participant);
   const setParticipant = useCallStore((s) => s.setParticipant);
-  const config = useCallStore((s) => s.config);
-  const giftEnabled = config?.giftOrder === true;
-  const sitEnabled = config?.sitTogether === true;
+  const rawTableName = useCallStore((s) => s.participant?.table?.name);
+  const branchLanguages = useCallStore((s) => s.participant?.branch?.languages);
+  const giftEnabled = useCallStore((s) => s.config?.giftOrder === true);
+  const sitEnabled = useCallStore((s) => s.config?.sitTogether === true);
   const { theme, isDark, toggleTheme } = useThemeStore();
   const [visible, setVisible] = useState(false);
+  const [quizVisible, setQuizVisible] = useState(false);
   const { t, i18n } = useTranslation('language');
   const [loading, setLoading] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(countryByLang['en'] || countryList[0]);
 
   const { data: userData } = useQuery(ME, {
     onCompleted(data) {
-      if (data?.me?.language) {
-        const lang = data.me.language.toLowerCase();
-        i18n.changeLanguage(lang);
-        if (countryByLang[lang]) setSelectedCountry(countryByLang[lang]);
-      }
+      const lang = data?.me?.language?.toLowerCase();
+      if (!lang) return;
+      if (i18n.language !== lang) i18n.changeLanguage(lang);
+      if (countryByLang[lang]) setSelectedCountry(countryByLang[lang]);
     },
   });
 
@@ -112,7 +113,8 @@ const Header: React.FC<Props> = ({
       }
     },
     onCompleted: () => {
-      if (participant?.id) getBranch({ variables: { id: participant.id } });
+      const id = useCallStore.getState().participant?.id;
+      if (id) getBranch({ variables: { id } });
       else setLoading(false);
     },
     onError() {
@@ -121,9 +123,9 @@ const Header: React.FC<Props> = ({
   });
 
   const availableLanguages = useMemo(() => {
-    const langs = participant?.branch?.languages?.map((l: string) => l.toLowerCase()) || [];
+    const langs = branchLanguages?.map((l: string) => l.toLowerCase()) || [];
     return langs.length === 0 ? countryList : countryList.filter((c) => langs.includes(c.i18n.toLowerCase()));
-  }, [participant?.branch?.languages]);
+  }, [branchLanguages]);
 
   useEffect(() => {
     const loadLang = async () => {
@@ -168,7 +170,7 @@ const Header: React.FC<Props> = ({
     return name.toLocaleUpperCase();
   }, [categories, activeIndex, activeParentId, activeCategoryId]);
 
-  const tableName = useMemo(() => participant?.table?.name?.toLocaleUpperCase() || '', [participant?.table?.name]);
+  const tableName = useMemo(() => rawTableName?.toLocaleUpperCase() || '', [rawTableName]);
 
   return (
     <View style={[styles.wrap, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
@@ -186,6 +188,19 @@ const Header: React.FC<Props> = ({
 
           {giftEnabled && <GiftHeaderButton />}
           {sitEnabled && <SitTogetherButton />}
+
+          {/* <TouchableOpacity
+            onPress={() => setQuizVisible(true)}
+            style={[
+              styles.headerBtn,
+              styles.quizBtn,
+              { borderColor: theme.border, backgroundColor: theme.backgroundSecondary },
+            ]}
+            activeOpacity={0.7}
+          >
+            <Image source={require('../../assets/icon/mbank.png')} style={styles.quizIcon} contentFit="contain" />
+            <Text style={[styles.quizLabel, { color: theme.text }]}>Quiz</Text>
+          </TouchableOpacity> */}
 
           <TouchableOpacity
             onPress={toggleTheme}
@@ -232,6 +247,7 @@ const Header: React.FC<Props> = ({
         </View>
       </View>
 
+      {/* <MbankQuizModal visible={quizVisible} onClose={() => setQuizVisible(false)} /> */}
     </View>
   );
 };
@@ -265,6 +281,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  quizBtn: { flexDirection: 'row', gap: 10, paddingLeft: 12, paddingRight: 18 },
+  quizIcon: { height: 34, width: 34 },
+  quizLabel: { fontSize: 18, fontWeight: '700', letterSpacing: 0.4 },
   tableText: { fontSize: 19, color: accentColor, fontWeight: '700', letterSpacing: 0.5 },
   flag: { height: 26, width: 38, borderRadius: 4 },
   menuContent: { borderRadius: 14, marginTop: 4 },

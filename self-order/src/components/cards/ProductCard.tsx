@@ -33,7 +33,7 @@ const ProductImage = memo(({ source, style }: { source: any; style: object }) =>
 ));
 
 const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) => {
-  const participant = useCallStore((s) => s.participant);
+  const orderable = useCallStore((s) => s.participant?.orderable === true);
   const { theme } = useThemeStore();
   const [loading, setLoading] = useState(false);
   const quantity = orderItem?.quantity || 0;
@@ -71,13 +71,19 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) 
   const isDisabled = product.state === MenuItemState.DISABLED;
 
   const renderControls = () => {
-    if (!participant?.orderable) return null;
+    if (!orderable) return null;
 
     if (isDisabled) {
       return (
         <View style={styles.controls}>
           {product.variants && <MemoizedPrice variants={product.variants} />}
-          <FAB animated={false} icon="plus" size="small" style={[styles.fab, { backgroundColor: '#ccc' }]} color="white" />
+          <FAB
+            animated={false}
+            icon="plus"
+            size="small"
+            style={[styles.fab, { backgroundColor: '#ccc' }]}
+            color="white"
+          />
         </View>
       );
     }
@@ -87,7 +93,13 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) 
         <View style={styles.controls}>
           {product.variants && <MemoizedPrice variants={product.variants} />}
           <TouchableOpacity onPress={increase}>
-            <FAB animated={false} icon="plus" size="small" style={[styles.fab, { backgroundColor: theme.primary }]} color="white" />
+            <FAB
+              animated={false}
+              icon="plus"
+              size="small"
+              style={[styles.fab, { backgroundColor: theme.primary }]}
+              color="white"
+            />
           </TouchableOpacity>
         </View>
       );
@@ -109,12 +121,24 @@ const ProductCard: React.FC<Props> = ({ product, orderItem, onQuantityChange }) 
             </TouchableOpacity>
             <Text style={[styles.qty, { color: theme.text }]}>{quantity}</Text>
             <TouchableOpacity activeOpacity={0.7} onPress={increase}>
-              <FAB animated={false} icon="plus" size="small" style={[styles.fab, { backgroundColor: theme.primary }]} color="white" />
+              <FAB
+                animated={false}
+                icon="plus"
+                size="small"
+                style={[styles.fab, { backgroundColor: theme.primary }]}
+                color="white"
+              />
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity activeOpacity={0.7} onPress={increase}>
-            <FAB animated={false} icon="plus" size="small" style={[styles.fab, { backgroundColor: theme.primary }]} color="white" />
+            <FAB
+              animated={false}
+              icon="plus"
+              size="small"
+              style={[styles.fab, { backgroundColor: theme.primary }]}
+              color="white"
+            />
           </TouchableOpacity>
         )}
       </View>

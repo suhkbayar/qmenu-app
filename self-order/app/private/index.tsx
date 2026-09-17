@@ -2,51 +2,76 @@ import React, { useCallback, useContext, useEffect, useRef, useState } from 'rea
 import { Platform, SafeAreaView, StyleSheet } from 'react-native';
 import { useQuery } from '@apollo/client';
 import * as Battery from 'expo-battery';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import Container from '@/src/components/Container';
 import HelpFloatingButton from '@/src/components/HelpFloatingButton';
 import OrderFloatingButton from '@/src/components/OrderFloatingButton';
 import Loader from '@/src/components/ui/Loader';
+import PlanExpired from '@/src/components/ui/PlanExpired';
 import { emptyOrder } from '@/src/constants';
 import { GET_BANNERS, GET_BRANCH } from '@/src/graphql/queries';
 import { ON_UPDATED_MENU } from '@/src/graphql/subscriptions';
 import { UPDATE_BATTERY } from '@/src/graphql/mutations/table';
 import { AuthContext } from '@/src/providers/auth';
 import ScreensaverWrapper from '@/src/providers/ScreensaverWrapper';
+import { useValid } from '@/src/providers/ValidProvider';
 import { useCallStore } from '@/src/store/cart.store';
-import { getStorage } from '@/src/store/storage';
+import { getStorage, removeStorage } from '@/src/store/storage';
 import { useLazyQuery, useMutation, useSubscription } from '@apollo/client';
 
 const MENU_REFETCH_QUIET_MS = 4000;
 const MENU_REFETCH_MAX_WAIT_MS = 15000;
+const COLD_RETRY_MS = 5000;
 
 const Private = () => {
-  const [participantId, setParticipantId] = useState<string | null>(null);
+  const { pid } = useLocalSearchParams<{ pid?: string }>();
+  const [participantId, setParticipantId] = useState<string | null>(pid ?? null);
+  const [planExpired, setPlanExpired] = useState(false);
   const [images, setImages] = useState<{ uri: string }[]>([]);
   const { signOut } = useContext(AuthContext);
+  const { setValid } = useValid();
   const setParticipant = useCallStore((s) => s.setParticipant);
   const setTables = useCallStore((s) => s.setTables);
   const load = useCallStore((s) => s.load);
 
   useEffect(() => {
+    if (participantId) return;
     getStorage('participantId').then((id) => {
       if (id) setParticipantId(id);
     });
-  }, []);
+  }, [participantId]);
 
-  const { data, loading, refetch } = useQuery(GET_BRANCH, {
+  const { data, refetch, error } = useQuery(GET_BRANCH, {
     variables: { id: participantId },
     skip: !participantId,
     fetchPolicy: 'cache-and-network',
     pollInterval: 600000,
-    onError() {
+    onError(error) {
+      if (error.graphQLErrors?.some((e: any) => e.errorType === 'PE0001')) {
+        setPlanExpired(true);
+        return;
+      }
+
+      if (error.networkError) return;
+
       signOut();
-      router.navigate('/');
+      setValid(false);
+      removeStorage('participantId');
+      router.replace('/');
     },
   });
 
   const branchId = data?.getParticipant?.branch?.id;
+  const hasMenu = !!data?.getParticipant;
+
+  useEffect(() => {
+    if (!participantId || hasMenu || !error?.networkError) return;
+    const id = setTimeout(() => {
+      refetch().catch(() => {});
+    }, COLD_RETRY_MS);
+    return () => clearTimeout(id);
+  }, [participantId, hasMenu, error, refetch]);
 
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstPendingAt = useRef<number | null>(null);
@@ -63,7 +88,7 @@ const Private = () => {
     if (refetchTimer.current) clearTimeout(refetchTimer.current);
     refetchTimer.current = setTimeout(() => {
       firstPendingAt.current = null;
-      refetch();
+      refetch().catch(() => {});
     }, delay);
   }, [participantId, refetch]);
 
@@ -85,6 +110,7 @@ const Private = () => {
   // When participant data arrives, sync to store
   useEffect(() => {
     if (!data?.getParticipant) return;
+    setPlanExpired(false);
     const p = data.getParticipant;
     setParticipant(p);
     if (p.orderable && !useCallStore.getState().order) load(emptyOrder);
@@ -134,12 +160,20 @@ const Private = () => {
 
   const participant = data?.getParticipant;
 
-  if (!participantId || (loading && !participant)) return <Loader />;
+  if (planExpired) {
+    return (
+      <SafeAreaView style={styles.fill}>
+        <PlanExpired onRetry={() => refetch()} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!participantId || !participant) return <Loader />;
 
   return (
     <SafeAreaView style={styles.fill}>
       <ScreensaverWrapper images={images} delay={10000} interval={5000}>
-        {participant && <Container participant={participant} />}
+        <Container participant={participant} />
         <OrderFloatingButton />
         <HelpFloatingButton />
       </ScreensaverWrapper>

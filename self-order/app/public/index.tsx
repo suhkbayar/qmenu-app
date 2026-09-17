@@ -3,6 +3,7 @@ import {
   SafeAreaView,
   StyleSheet,
   View,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
@@ -24,6 +25,7 @@ import { FieldValues, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { loginSchema } from '@/src/utils/schemas';
 import FormInput from '@/src/components/forms/FormInput';
+import VersionBadge from '@/src/components/ui/VersionBadge';
 import { useCallStore } from '@/src/store/cart.store';
 import { isEmpty } from 'lodash';
 import { useValid } from '@/src/providers/ValidProvider';
@@ -32,7 +34,9 @@ const Public = () => {
   const tables = useCallStore((s) => s.tables);
   const deleteTable = useCallStore((s) => s.deleteTable);
   const { theme, isDark, toggleTheme } = useThemeStore();
-  const [isNew, setIsNew] = useState(true);
+
+  const [isNew, setIsNew] = useState(() => isEmpty(useCallStore.getState().tables));
+  const [pendingCode, setPendingCode] = useState<string | null>(null);
   const { setValid } = useValid();
 
   const { control, handleSubmit, setError } = useForm<FieldValues>({
@@ -41,13 +45,14 @@ const Public = () => {
   });
 
   const [getCurrentToken, { loading }] = useMutation(CURRENT_TOKEN, {
-    onCompleted: (data) => {
-      setAccessToken(data.getToken.token);
-      setParticipantId(data.getToken.id);
+    onCompleted: async (data) => {
+      await Promise.all([setAccessToken(data.getToken.token), setParticipantId(data.getToken.id)]);
       setValid(true);
-      router.navigate('/');
+
+      router.replace({ pathname: '/private', params: { pid: data.getToken.id } });
     },
     onError(err) {
+      setPendingCode(null);
       setError('code', { type: 'custom', message: err.message });
     },
   });
@@ -69,9 +74,11 @@ const Public = () => {
 
   const goTable = useCallback(
     (table: { code: string }) => {
+      if (pendingCode) return;
+      setPendingCode(table.code);
       getCurrentToken({ variables: { code: table.code, type: 'TB' } });
     },
-    [getCurrentToken],
+    [getCurrentToken, pendingCode],
   );
 
   const handleDeleteTable = useCallback(
@@ -112,6 +119,9 @@ const Public = () => {
             >
               <Icon source={isDark ? 'weather-sunny' : 'weather-night'} size={32} color={theme.text} />
             </TouchableOpacity>
+            <View style={styles.versionBadge} pointerEvents="none">
+              <VersionBadge />
+            </View>
             <View style={styles.container}>
               {isNew ? (
                 <>
@@ -132,6 +142,7 @@ const Public = () => {
                       buttonColor={defaultColor}
                       textColor="#fff"
                       loading={loading}
+                      disabled={loading}
                       onPress={handleSubmit(onSubmit)}
                       style={styles.button}
                     >
@@ -151,12 +162,18 @@ const Public = () => {
                         key={table.code}
                         onPress={() => goTable(table)}
                         onLongPress={() => confirmDeleteTable(table)}
+                        disabled={!!pendingCode}
                         activeOpacity={0.8}
                         style={[styles.tableCard, { backgroundColor: theme.card }]}
                       >
                         <Image source={{ uri: table.branchLogo }} style={styles.tableLogo} />
                         <Text style={[styles.branchName, { color: theme.text }]}>{table.branchName}</Text>
                         <Text style={[styles.tableName, { color: theme.textMuted }]}>{table.tableName}</Text>
+                        {pendingCode === table.code && (
+                          <View style={[styles.cardLoading, { backgroundColor: theme.card }]}>
+                            <ActivityIndicator size="large" color={defaultColor} />
+                          </View>
+                        )}
                       </TouchableOpacity>
                     ))}
                     <TouchableOpacity
@@ -222,10 +239,18 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   tableLogo: { width: '100%', height: 100, borderRadius: 12, marginBottom: 12 },
+  cardLoading: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.92,
+  },
   branchName: { fontWeight: '600', fontSize: 16, textAlign: 'center' },
   tableName: { color: '#888', fontSize: 14, marginTop: 4 },
   addCard: { backgroundColor: defaultColor },
   addIcon: { fontWeight: 'bold', fontSize: 52, color: '#fff' },
   addLabel: { color: '#fff', fontSize: 14, marginTop: 8 },
   themeBtn: { position: 'absolute', top: 20, right: 20, zIndex: 1, padding: 8, borderRadius: 8, borderWidth: 1 },
+  versionBadge: { position: 'absolute', bottom: 12, left: 0, right: 0, zIndex: 1 },
 });

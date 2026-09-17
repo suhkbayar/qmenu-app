@@ -25,16 +25,14 @@ const isSubscription = (operation: Operation) =>
   operation.query.definitions.some((d) => d.kind === 'OperationDefinition' && d.operation === 'subscription');
 
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
-  if (graphQLErrors) {
-    graphQLErrors.forEach((element: any) => {
-      switch (element.errorType) {
-        case 'UnauthorizedException':
-          return forward(operation);
-        case 'CE0004':
-          return forward(operation);
-      }
-    });
+  const retryable = graphQLErrors?.some(
+    (e: any) => e.errorType === 'UnauthorizedException' || e.errorType === 'CE0004',
+  );
+  if (retryable && !operation.getContext().authRetried) {
+    operation.setContext({ authRetried: true });
+    return forward(operation);
   }
+
   if (networkError) {
     if (!isSubscription(operation)) setOffline(true);
     console.log(`[Network error]: ${networkError}`);

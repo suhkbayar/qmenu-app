@@ -1,5 +1,5 @@
 import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Button } from 'react-native';
 import { router } from 'expo-router';
 import { Icon } from 'react-native-paper';
@@ -14,18 +14,21 @@ import { useValid } from '@/src/providers/ValidProvider';
 const CameraScreen = () => {
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
-  const [scanned, setScanned] = useState(false);
+  const scanning = useRef(false);
+  const asked = useRef(false);
   const toast = useToast();
   const { setValid } = useValid();
 
   const [getCurrentToken, { loading }] = useMutation(CURRENT_TOKEN, {
-    onCompleted: (data) => {
-      setAccessToken(data.getToken.token);
-      setParticipantId(data.getToken.id);
+    onCompleted: async (data) => {
+      await Promise.all([setAccessToken(data.getToken.token), setParticipantId(data.getToken.id)]);
       setValid(true);
-      router.navigate('/');
+
+      if (router.canDismiss()) router.dismissAll();
+      router.replace({ pathname: '/private', params: { pid: data.getToken.id } });
     },
     onError(err) {
+      scanning.current = false;
       toast.show(err.message, {
         type: 'warning',
         icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
@@ -43,18 +46,27 @@ const CameraScreen = () => {
 
   const takePicture = useCallback(
     (barcode: { data?: string }) => {
-      if (scanned || !barcode?.data) return;
+      if (scanning.current || !barcode?.data) return;
       const code = barcode.data.split('/').pop();
       if (code) {
-        setScanned(true);
+        scanning.current = true;
         getCurrentToken({ variables: { code, type: 'TB' } });
       }
     },
-    [scanned, getCurrentToken],
+    [getCurrentToken],
   );
 
+  useEffect(() => {
+    if (!permission || permission.granted || asked.current) return;
+    if (permission.status === 'undetermined') {
+      asked.current = true;
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
+
   if (loading) return <Loader />;
-  if (permission && !permission.granted) {
+  if (!permission) return <Loader />;
+  if (!permission.granted) {
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need your permission to show the camera</Text>
