@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "self-order",
+    "name": "qmenu: self order",
     "slug": "self-order",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "scheme": "qmenu-self-order",
@@ -25,7 +25,7 @@
       },
       "package": "com.mn.qmenu.selforder",
       "enableProguardInReleaseBuilds": false,
-      "runtimeVersion": "1.0.0",
+      "runtimeVersion": "1.0.1",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
@@ -56,7 +56,8 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true

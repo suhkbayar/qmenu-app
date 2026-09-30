@@ -40,6 +40,7 @@ export const PAYMENT_TYPE = {
   MBP: 'MBP',
   MCS: 'MCS', //Card Scanner
   MPY: 'MPY',
+  MST: 'MST', //Most Money
 };
 
 export const TYPE = {

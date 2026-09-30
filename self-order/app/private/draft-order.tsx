@@ -18,6 +18,7 @@ import { CREATE_ORDER, GET_PAY_ORDER } from '@/src/graphql/mutations/order';
 import { useCallStore } from '@/src/store/cart.store';
 import { useOrderStore } from '@/src/store/order.store';
 import { IMenuProduct, IOrderItem } from '@/src/types';
+import { findClosedItems } from '@/src/utils';
 
 const calcTotals = (items: IOrderItem[]) => ({
   totalQuantity: items.reduce((s, i) => s + i.quantity, 0),
@@ -166,13 +167,29 @@ const DraftOrderPage = () => {
 
   const onSubmit = useCallback(() => {
     if (isEmpty(orderState.items) || isEmpty(participant)) return;
+
+    const closed = findClosedItems(orderState.items, participant.menu?.categories);
+    if (closed.length) {
+      const closedIds = new Set(closed.map((i) => i.uuid));
+      setOrderState((prev) => {
+        const remaining = prev.items.filter((i) => !closedIds.has(i.uuid));
+        return { ...prev, items: remaining, ...calcTotals(remaining) };
+      });
+      toast.show(t('mainPage.closedItemsRemoved', { items: closed.map((i) => i.name).join(', ') }), {
+        type: 'danger',
+        placement: 'top',
+        duration: 6000,
+      });
+      return;
+    }
+
     const hasPayments = (participant.payments?.length ?? 0) > 0;
     if (!hasPayments && !participant.advancePayment) {
       setConfirmVisible(true);
     } else {
       doCreateOrder();
     }
-  }, [orderState.items, participant, doCreateOrder]);
+  }, [orderState.items, participant, doCreateOrder, setOrderState, toast, t]);
 
   const addToCart = useCallback(
     (variant: { id: string; name?: string; price?: number }, productId: string) => {

@@ -37,7 +37,7 @@ const NetworkStatusListener = () => {
 
         toastId.current = toast.show(t('mainPage.no_internet', 'No internet connection'), {
           type: 'danger',
-          placement: 'top',
+          placement: 'bottom',
           duration: 0,
         });
       }, GRACE_MS);

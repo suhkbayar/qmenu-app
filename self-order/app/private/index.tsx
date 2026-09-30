@@ -1,8 +1,8 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Platform, SafeAreaView, StyleSheet } from 'react-native';
+import { BackHandler, Platform, SafeAreaView, StyleSheet } from 'react-native';
 import { useQuery } from '@apollo/client';
 import * as Battery from 'expo-battery';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import Container from '@/src/components/Container';
 import HelpFloatingButton from '@/src/components/HelpFloatingButton';
@@ -13,7 +13,8 @@ import { emptyOrder } from '@/src/constants';
 import { GET_BANNERS, GET_BRANCH } from '@/src/graphql/queries';
 import { ON_UPDATED_MENU } from '@/src/graphql/subscriptions';
 import { UPDATE_BATTERY } from '@/src/graphql/mutations/table';
-import { AuthContext } from '@/src/providers/auth';
+import { CURRENT_TOKEN } from '@/src/graphql/mutations/token';
+import { AuthContext, getDeviceId, getPayload, onSessionEnd, setSession } from '@/src/providers/auth';
 import ScreensaverWrapper from '@/src/providers/ScreensaverWrapper';
 import { useValid } from '@/src/providers/ValidProvider';
 import { useCallStore } from '@/src/store/cart.store';
@@ -42,6 +43,26 @@ const Private = () => {
     });
   }, [participantId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        router.replace('/public');
+        return true;
+      });
+      return () => sub.remove();
+    }, []),
+  );
+
+  const leave = useCallback(() => {
+    signOut();
+    setValid(false);
+    removeStorage('participantId');
+    if (router.canDismiss()) router.dismissAll();
+    router.replace('/');
+  }, [signOut, setValid]);
+
+  useEffect(() => onSessionEnd(leave), [leave]);
+
   const { data, refetch, error } = useQuery(GET_BRANCH, {
     variables: { id: participantId },
     skip: !participantId,
@@ -55,10 +76,7 @@ const Private = () => {
 
       if (error.networkError) return;
 
-      signOut();
-      setValid(false);
-      removeStorage('participantId');
-      router.replace('/');
+      leave();
     },
   });
 
@@ -142,21 +160,45 @@ const Private = () => {
 
   // Battery reporting
   const [sendBattery] = useMutation(UPDATE_BATTERY);
+  const [getTabletToken] = useMutation(CURRENT_TOKEN);
   const tableId = data?.getParticipant?.table?.id;
+  const tableCode = data?.getParticipant?.table?.code;
 
   useEffect(() => {
     if (Platform.OS === 'web' || !tableId) return;
+    let cancelled = false;
     const push = async () => {
+      const payload = await getPayload();
+      if (!payload || payload.table !== tableId) return;
+
+      if (!payload.device) {
+        if (!tableCode) return;
+        const { data: res } = await getTabletToken({
+          variables: { code: tableCode, type: 'TB', device: await getDeviceId() },
+        });
+        await setSession(res.getToken.token, res.getToken.id);
+      }
+
       const state = await Battery.getPowerStateAsync();
       const percent = Math.round((state?.batteryLevel ?? 0) * 100);
       const charging =
         state?.batteryState === Battery.BatteryState.CHARGING || state?.batteryState === Battery.BatteryState.FULL;
-      sendBattery({ variables: { id: tableId, battery: percent, charging } });
+      await sendBattery({ variables: { id: tableId, battery: percent, charging } });
     };
-    push();
-    const id = setInterval(push, 5 * 60 * 1000);
-    return () => clearInterval(id);
-  }, [tableId]);
+    const run = () =>
+      push().catch((err) => {
+        if (cancelled) return;
+
+        if (!err?.graphQLErrors?.some((e: any) => ['TL0003', 'TL0004'].includes(e.errorType))) return;
+        leave();
+      });
+    run();
+    const id = setInterval(run, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [tableId, tableCode]);
 
   const participant = data?.getParticipant;
 

@@ -7,6 +7,7 @@ import jwtDecode from 'jwt-decode';
 export type Payload = {
   branch: string;
   table?: string;
+  device?: string;
   role: string;
   exp: number;
   features: string[];
@@ -39,6 +40,37 @@ export const getToken = async () => {
 export const setAccessToken = (token: string) => setStorage('token', token);
 
 export const setParticipantId = (id: string) => setStorage('participantId', id);
+
+export const getDeviceId = () => getStorage('deviceId');
+
+export const setSession = async (token: string, participantId: string) => {
+  const { device }: Payload = jwtDecode(token);
+  await Promise.all([
+    setAccessToken(token),
+    setParticipantId(participantId),
+    ...(device ? [setStorage('deviceId', device)] : []),
+  ]);
+};
+
+let sessionEndHandler: (() => void) | null = null;
+let sessionEnded = false;
+
+export const onSessionEnd = (handler: () => void) => {
+  sessionEndHandler = handler;
+  sessionEnded = false;
+  return () => {
+    if (sessionEndHandler === handler) sessionEndHandler = null;
+  };
+};
+
+export const endSession = () => {
+  if (!sessionEndHandler) return false;
+  if (!sessionEnded) {
+    sessionEnded = true;
+    sessionEndHandler();
+  }
+  return true;
+};
 
 export const getPayload = async (): Promise<Payload | null> => {
   const token = await getAccessToken();

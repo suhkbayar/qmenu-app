@@ -6,8 +6,9 @@ import { useTranslation } from 'react-i18next';
 import { getStorage, setStorage } from '@/src/store/storage';
 import { Image } from './ui/Image';
 import GiftHeaderButton from '@/src/components/GiftHeaderButton';
+import NetworkStatusIcon from '@/src/components/NetworkStatusIcon';
 import SitTogetherButton from '@/src/components/SitTogetherButton';
-import MbankQuizModal from '@/src/components/modals/MbankQuizModal';
+import { useQuizStore } from '@/src/store/quiz.store';
 import { IMenuCategory } from '@/src/types';
 import { defaultColor, accentColor } from '@/src/constants/Colors';
 import { useThemeStore } from '@/src/store/theme.store';
@@ -46,6 +47,15 @@ export const countryList: Country[] = [
   { label: 'Uzbek', value: 'UZ', i18n: 'uz', path: require('../../assets/lang/UZ.png') },
 ];
 
+// Temporary: branches that show the Mbank quiz. Add branch IDs here and publish with eas update
+const MBANK_QUIZ_BRANCHES: string[] = [
+  '4b563574-b2eb-45a2-9eee-5b26a4bf334f',
+  'e50fb5e4-92bd-419e-acc1-fc16a755f376',
+  'e2b644ff-a6a3-4db1-8935-14be83618e7c',
+  '23e7fbd9-67a5-4f4f-b296-6019ac93d1f8',
+  '8536b7ec-cd14-44d7-9884-43b9ee5979f9',
+];
+
 const countryByLang = countryList.reduce<Record<string, Country>>((map, c) => {
   map[c.i18n] = c;
   return map;
@@ -75,9 +85,10 @@ const Header: React.FC<Props> = ({
   const branchLanguages = useCallStore((s) => s.participant?.branch?.languages);
   const giftEnabled = useCallStore((s) => s.config?.giftOrder === true);
   const sitEnabled = useCallStore((s) => s.config?.sitTogether === true);
+  const quizEnabled = useCallStore((s) => MBANK_QUIZ_BRANCHES.includes(s.participant?.branch?.id ?? ''));
   const { theme, isDark, toggleTheme } = useThemeStore();
   const [visible, setVisible] = useState(false);
-  const [quizVisible, setQuizVisible] = useState(false);
+  const openQuiz = useQuizStore((s) => s.openQuiz);
   const { t, i18n } = useTranslation('language');
   const [loading, setLoading] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(countryByLang['en'] || countryList[0]);
@@ -189,18 +200,22 @@ const Header: React.FC<Props> = ({
           {giftEnabled && <GiftHeaderButton />}
           {sitEnabled && <SitTogetherButton />}
 
-          {/* <TouchableOpacity
-            onPress={() => setQuizVisible(true)}
-            style={[
-              styles.headerBtn,
-              styles.quizBtn,
-              { borderColor: theme.border, backgroundColor: theme.backgroundSecondary },
-            ]}
-            activeOpacity={0.7}
-          >
-            <Image source={require('../../assets/icon/mbank.png')} style={styles.quizIcon} contentFit="contain" />
-            <Text style={[styles.quizLabel, { color: theme.text }]}>Quiz</Text>
-          </TouchableOpacity> */}
+          {quizEnabled && (
+            <TouchableOpacity
+              onPress={openQuiz}
+              style={[
+                styles.headerBtn,
+                styles.quizBtn,
+                { borderColor: theme.border, backgroundColor: theme.backgroundSecondary },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Image source={require('../../assets/icon/mbank.png')} style={styles.quizBadge} contentFit="contain" />
+              <Text style={[styles.quizWordmark, { color: theme.text }]}>quiz</Text>
+            </TouchableOpacity>
+          )}
+
+          <NetworkStatusIcon style={styles.headerBtn} />
 
           <TouchableOpacity
             onPress={toggleTheme}
@@ -246,8 +261,6 @@ const Header: React.FC<Props> = ({
           </Menu>
         </View>
       </View>
-
-      {/* <MbankQuizModal visible={quizVisible} onClose={() => setQuizVisible(false)} /> */}
     </View>
   );
 };
@@ -281,9 +294,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  quizBtn: { flexDirection: 'row', gap: 10, paddingLeft: 12, paddingRight: 18 },
-  quizIcon: { height: 34, width: 34 },
-  quizLabel: { fontSize: 18, fontWeight: '700', letterSpacing: 0.4 },
+  quizBtn: { flexDirection: 'row', gap: 2, paddingLeft: 12, paddingRight: 16 },
+  quizBadge: { height: 34, width: 34 },
+  quizWordmark: { fontSize: 21, fontWeight: '700', letterSpacing: -0.6, includeFontPadding: false },
   tableText: { fontSize: 19, color: accentColor, fontWeight: '700', letterSpacing: 0.5 },
   flag: { height: 26, width: 38, borderRadius: 4 },
   menuContent: { borderRadius: 14, marginTop: 4 },

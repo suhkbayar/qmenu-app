@@ -16,6 +16,26 @@ const NUM_COLS = 3;
 const ROW_HEIGHT = 412;
 const HEADER_HEIGHT = 60;
 const SUB_HEADER_HEIGHT = 50;
+const MINUTE_MS = 60 * 1000;
+
+const useOpenCategoryKey = (categories?: IMenuCategory[]) => {
+  const compute = useCallback(
+    () =>
+      (categories ?? [])
+        .flatMap((c) => [c, ...(c.children ?? [])])
+        .filter((c) => isCurrentlyOpen(c.timetable))
+        .map((c) => c.id)
+        .join(','),
+    [categories],
+  );
+  const [key, setKey] = useState(compute);
+  useEffect(() => {
+    setKey(compute());
+    const id = setInterval(() => setKey(compute()), MINUTE_MS);
+    return () => clearInterval(id);
+  }, [compute]);
+  return key;
+};
 
 type ListRow =
   | { type: 'header'; key: string; categoryId: string; label: string; isSubCategory: boolean; height: number }
@@ -129,6 +149,8 @@ const ContainerContent: React.FC<{ participant: IParticipant }> = ({ participant
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const jumping = useRef(false);
 
+  const openKey = useOpenCategoryKey(participant?.menu?.categories);
+
   const categories = useMemo<IMenuCategory[]>(() => {
     const cats = participant?.menu?.categories;
     if (!cats?.length) return [];
@@ -138,7 +160,7 @@ const ContainerContent: React.FC<{ participant: IParticipant }> = ({ participant
         ...c,
         children: c.children?.filter((ch: IMenuCategory) => isCurrentlyOpen(ch.timetable)) ?? [],
       }));
-  }, [participant?.menu, i18n.language]);
+  }, [participant?.menu, i18n.language, openKey]);
 
   const rows = useMemo(() => buildRows(categories), [categories]);
 

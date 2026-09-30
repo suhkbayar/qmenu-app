@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import * as Updates from 'expo-updates';
 
+import { checkForUpdate } from '@/src/components/OtaUpdateListener';
 import VersionBadge from '@/src/components/ui/VersionBadge';
 
 type Props = {
@@ -11,13 +13,35 @@ type Props = {
 
 export default function KioskPinModal({ visible, onSubmit, onCancel }: Props) {
   const [pin, setPin] = useState('');
+  const [checked, setChecked] = useState(false);
+  const { isChecking, isDownloading, isUpdatePending, isUpdateAvailable, checkError, downloadError } =
+    Updates.useUpdates();
 
+  const updateStatus = isChecking
+    ? 'Checking…'
+    : isDownloading
+      ? 'Downloading…'
+      : isUpdatePending
+        ? 'Update ready'
+        : downloadError
+          ? `Download failed: ${downloadError.message}`
+          : checkError
+            ? `Check failed: ${checkError.message}`
+            : checked && !isUpdateAvailable
+              ? 'Up to date'
+              : null;
+
+  const handleCheck = () => {
+    checkForUpdate().finally(() => setChecked(true));
+  };
   const handleSubmit = () => {
     onSubmit(pin);
     setPin('');
+    setChecked(false);
   };
   const handleCancel = () => {
     setPin('');
+    setChecked(false);
     onCancel();
   };
 
@@ -44,6 +68,11 @@ export default function KioskPinModal({ visible, onSubmit, onCancel }: Props) {
             </Pressable>
           </View>
 
+          <Pressable onPress={handleCheck} disabled={isChecking || isDownloading}>
+            <Text style={styles.checkText}>Check for update</Text>
+          </Pressable>
+          {updateStatus && <Text style={styles.updateStatus}>{updateStatus}</Text>}
+
           <VersionBadge />
         </View>
       </View>
@@ -69,4 +98,6 @@ const styles = StyleSheet.create({
   cancelText: { color: '#666' },
   confirm: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: '#2563eb', alignItems: 'center' },
   confirmText: { color: '#fff', fontWeight: '600' },
+  checkText: { color: '#2563eb', fontWeight: '600', textAlign: 'center' },
+  updateStatus: { fontSize: 13, color: '#666', textAlign: 'center' },
 });

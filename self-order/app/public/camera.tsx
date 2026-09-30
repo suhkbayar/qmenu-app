@@ -4,9 +4,9 @@ import { View, StyleSheet, TouchableOpacity, Text, Button } from 'react-native';
 import { router } from 'expo-router';
 import { Icon } from 'react-native-paper';
 import Loader from '@/src/components/ui/Loader';
-import { useMutation } from '@apollo/client';
+import { useApolloClient, useMutation } from '@apollo/client';
 import { CURRENT_TOKEN } from '@/src/graphql/mutations/token';
-import { setAccessToken, setParticipantId } from '@/src/providers/auth';
+import { getDeviceId, setSession } from '@/src/providers/auth';
 import { useToast } from 'react-native-toast-notifications';
 import { defaultColor } from '@/src/constants/Colors';
 import { useValid } from '@/src/providers/ValidProvider';
@@ -18,10 +18,13 @@ const CameraScreen = () => {
   const asked = useRef(false);
   const toast = useToast();
   const { setValid } = useValid();
+  const apolloClient = useApolloClient();
 
   const [getCurrentToken, { loading }] = useMutation(CURRENT_TOKEN, {
     onCompleted: async (data) => {
-      await Promise.all([setAccessToken(data.getToken.token), setParticipantId(data.getToken.id)]);
+      await setSession(data.getToken.token, data.getToken.id);
+
+      await apolloClient.clearStore();
       setValid(true);
 
       if (router.canDismiss()) router.dismissAll();
@@ -45,12 +48,12 @@ const CameraScreen = () => {
   }, []);
 
   const takePicture = useCallback(
-    (barcode: { data?: string }) => {
+    async (barcode: { data?: string }) => {
       if (scanning.current || !barcode?.data) return;
       const code = barcode.data.split('/').pop();
       if (code) {
         scanning.current = true;
-        getCurrentToken({ variables: { code, type: 'TB' } });
+        getCurrentToken({ variables: { code, type: 'TB', device: await getDeviceId() } });
       }
     },
     [getCurrentToken],

@@ -17,15 +17,16 @@ import { Button, Icon, TextInput } from 'react-native-paper';
 import { Image } from '@/src/components/ui/Image';
 import { defaultColor } from '@/src/constants/Colors';
 import { useThemeStore } from '@/src/store/theme.store';
-import { useMutation } from '@apollo/client';
+import { useApolloClient, useMutation } from '@apollo/client';
 import { CURRENT_TOKEN } from '@/src/graphql/mutations/token';
-import { setAccessToken, setParticipantId } from '@/src/providers/auth';
+import { getDeviceId, setSession } from '@/src/providers/auth';
 import { router } from 'expo-router';
 import { FieldValues, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { loginSchema } from '@/src/utils/schemas';
 import FormInput from '@/src/components/forms/FormInput';
 import VersionBadge from '@/src/components/ui/VersionBadge';
+import NetworkStatusIcon from '@/src/components/NetworkStatusIcon';
 import { useCallStore } from '@/src/store/cart.store';
 import { isEmpty } from 'lodash';
 import { useValid } from '@/src/providers/ValidProvider';
@@ -38,6 +39,7 @@ const Public = () => {
   const [isNew, setIsNew] = useState(() => isEmpty(useCallStore.getState().tables));
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const { setValid } = useValid();
+  const apolloClient = useApolloClient();
 
   const { control, handleSubmit, setError } = useForm<FieldValues>({
     resolver: yupResolver(loginSchema as any),
@@ -46,7 +48,9 @@ const Public = () => {
 
   const [getCurrentToken, { loading }] = useMutation(CURRENT_TOKEN, {
     onCompleted: async (data) => {
-      await Promise.all([setAccessToken(data.getToken.token), setParticipantId(data.getToken.id)]);
+      await setSession(data.getToken.token, data.getToken.id);
+      // A new table: drop the previous table's cached participant, menu and banners
+      await apolloClient.clearStore();
       setValid(true);
 
       router.replace({ pathname: '/private', params: { pid: data.getToken.id } });
@@ -66,17 +70,17 @@ const Public = () => {
   }, []);
 
   const onSubmit = useCallback(
-    (data: FieldValues) => {
-      getCurrentToken({ variables: { code: data.code, type: 'TB' } });
+    async (data: FieldValues) => {
+      getCurrentToken({ variables: { code: data.code, type: 'TB', device: await getDeviceId() } });
     },
     [getCurrentToken],
   );
 
   const goTable = useCallback(
-    (table: { code: string }) => {
+    async (table: { code: string }) => {
       if (pendingCode) return;
       setPendingCode(table.code);
-      getCurrentToken({ variables: { code: table.code, type: 'TB' } });
+      getCurrentToken({ variables: { code: table.code, type: 'TB', device: await getDeviceId() } });
     },
     [getCurrentToken, pendingCode],
   );
@@ -119,6 +123,7 @@ const Public = () => {
             >
               <Icon source={isDark ? 'weather-sunny' : 'weather-night'} size={32} color={theme.text} />
             </TouchableOpacity>
+            <NetworkStatusIcon style={[styles.networkBtn, { backgroundColor: theme.card }]} iconSize={32} />
             <View style={styles.versionBadge} pointerEvents="none">
               <VersionBadge />
             </View>
@@ -252,5 +257,6 @@ const styles = StyleSheet.create({
   addIcon: { fontWeight: 'bold', fontSize: 52, color: '#fff' },
   addLabel: { color: '#fff', fontSize: 14, marginTop: 8 },
   themeBtn: { position: 'absolute', top: 20, right: 20, zIndex: 1, padding: 8, borderRadius: 8, borderWidth: 1 },
+  networkBtn: { position: 'absolute', top: 20, right: 82, zIndex: 1, padding: 8, borderRadius: 8 },
   versionBadge: { position: 'absolute', bottom: 12, left: 0, right: 0, zIndex: 1 },
 });

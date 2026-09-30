@@ -1711,6 +1711,11 @@
     prompts "^2.4.2"
     semver "^7.5.2"
 
+"@react-native-community/netinfo@11.4.1":
+  version "11.4.1"
+  resolved "https://registry.yarnpkg.com/@react-native-community/netinfo/-/netinfo-11.4.1.tgz#a3c247aceab35f75dd0aa4bfa85d2be5a4508688"
+  integrity sha512-B0BYAkghz3Q2V09BF88RA601XursIEA111tnc2JOaN7axJWmNefmfjZqw/KdSxKZp7CZUuPpjBmz/WCR9uaHYg==
+
 "@react-native-vector-icons/common@^12.3.0":
   version "12.3.0"
   resolved "https://registry.yarnpkg.com/@react-native-vector-icons/common/-/common-12.3.0.tgz#8a3cb778fd197e971da0fa69a35fa4fc8b030f1a"
@@ -4009,6 +4014,11 @@ expo-updates@~0.28.15:
     glob "^10.4.2"
     ignore "^5.3.1"
     resolve-from "^5.0.0"
+
+expo-video@~2.2.2:
+  version "2.2.3"
+  resolved "https://registry.yarnpkg.com/expo-video/-/expo-video-2.2.3.tgz#38a543a8fcd3751e938d5286ce66ceffff1998bd"
+  integrity sha512-3e58J0ZOfXAz10NBsSbCGykAazi41tLOu/1QNglDPmK1yeA0t2tpLuZk59PZNy/t4ZVSn/cRDCZxG+gfQpx2yg==
 
 expo-web-browser@~14.2.0:
   version "14.2.0"

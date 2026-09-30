@@ -17,7 +17,7 @@ import expo.modules.ReactActivityDelegateWrapper
 class MainActivity : ReactActivity() {
   override fun onResume() {
     super.onResume()
-    if (KioskModule.kioskExited) return
+    // Kiosk comes back on whenever the app returns to the screen, e.g. staff press Home after using Settings
     val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     if (dpm.isDeviceOwnerApp(packageName)) {
       startLockTask()

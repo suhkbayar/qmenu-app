@@ -13,7 +13,7 @@ class QMenuDeviceAdminReceiver : DeviceAdminReceiver() {
     override fun onDisabled(context: Context, intent: Intent) {}
 
     override fun onProfileProvisioningComplete(context: Context, intent: Intent) {
-        // Called after QR code enrollment completes — auto-start kiosk mode
+        // Called after QR code enrollment completes — ProvisioningSuccessActivity then opens the app
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         val adminComponent = ComponentName(context, QMenuDeviceAdminReceiver::class.java)
 
@@ -26,10 +26,7 @@ class QMenuDeviceAdminReceiver : DeviceAdminReceiver() {
             )
         )
 
-        // Launch MainActivity — it will call startLockTask() on resume
-        val launchIntent = Intent(context, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(launchIntent)
+        // Become the home screen before setup finishes, so there's no launcher chooser
+        KioskModule.setBootIntoApp(context)
     }
 }

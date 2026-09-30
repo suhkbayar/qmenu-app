@@ -18,12 +18,13 @@ import { Camera } from 'expo-camera';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as SystemUI from 'expo-system-ui';
-import * as Updates from 'expo-updates';
 
 import CustomToast from '@/src/components/ui/CustomToast';
 import TableMessageToast from '@/src/components/ui/TableMessageToast';
 import KioskPinModal from '@/src/components/KioskPinModal';
+import MbankQuizModal from '@/src/components/modals/MbankQuizModal';
 import NetworkStatusListener from '@/src/components/NetworkStatusListener';
+import OtaUpdateListener from '@/src/components/OtaUpdateListener';
 import client from '@/src/providers/apolloClient';
 import { AuthProvider } from '@/src/providers/auth';
 import { CartProvider } from '@/src/providers/CartProvider';
@@ -80,14 +81,10 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { i18n } = useTranslation();
 
-  const [loaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    'Inter-Regular': { uri: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2' },
-    'Inter-Medium': { uri: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuI6fAZ9hiJ-Ek-_EeA.woff2' },
-    'Inter-SemiBold': { uri: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYAZ9hiJ-Ek-_EeA.woff2' },
-    'Inter-Bold': { uri: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYAZ9hiJ-Ek-_EeA.woff2' },
-    'Inter-ExtraBold': { uri: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuDyYAZ9hiJ-Ek-_EeA.woff2' },
   });
+  const loaded = fontsLoaded || !!fontError;
 
   useEffect(() => {
     if (!loaded) return;
@@ -119,18 +116,6 @@ export default function RootLayout() {
         .then(() => NavigationBar.setVisibilityAsync('hidden'))
         .catch(() => {});
     }
-
-    // OTA updates
-    if (!__DEV__) {
-      Updates.checkForUpdateAsync()
-        .then(async (update) => {
-          if (update.isAvailable) {
-            await Updates.fetchUpdateAsync();
-            await Updates.reloadAsync();
-          }
-        })
-        .catch(() => {});
-    }
   }, [loaded]);
 
   if (!loaded) return null;
@@ -149,19 +134,19 @@ export default function RootLayout() {
                         custom_type: (toast: ToastProps) => (
                           <CustomToast type={toast.type ?? 'default'} message={toast.message} />
                         ),
-                        table_message: (toast: ToastProps) => (
-                          <TableMessageToast id={toast.id} {...toast.data} />
-                        ),
+                        table_message: (toast: ToastProps) => <TableMessageToast id={toast.id} {...toast.data} />,
                       }}
                     >
                       <StatusBar hidden />
                       <NetworkStatusListener />
+                      <OtaUpdateListener />
                       <KioskOverlay />
                       <Stack screenOptions={{ headerShown: false }}>
                         <Stack.Screen name="index" />
                         <Stack.Screen name="public" />
                         <Stack.Screen name="private" />
                       </Stack>
+                      <MbankQuizModal />
                     </ToastProvider>
                   </CartProvider>
                 </DrawerProvider>

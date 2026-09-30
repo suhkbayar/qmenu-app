@@ -1,8 +1,9 @@
-import { ApolloClient, ApolloLink, createHttpLink, InMemoryCache, Operation } from '@apollo/client';
+import { ApolloClient, ApolloLink, createHttpLink, InMemoryCache, Observable, Operation } from '@apollo/client';
 import { onError } from '@apollo/client/link/error';
+import { setContext } from '@apollo/client/link/context';
 import { AuthOptions, AUTH_TYPE, createAuthLink } from 'aws-appsync-auth-link';
 import { createSubscriptionHandshakeLink } from 'aws-appsync-subscription-link';
-import { getToken } from './auth';
+import { endSession, getToken, isValidToken } from './auth';
 import { RetryLink } from '@apollo/client/link/retry';
 import { DEFAULT_TOKEN } from '@/src/constants/token';
 import { setOffline } from '@/src/utils/network';
@@ -24,7 +25,13 @@ const authLink = createAuthLink({ url, region, auth });
 const isSubscription = (operation: Operation) =>
   operation.query.definitions.some((d) => d.kind === 'OperationDefinition' && d.operation === 'subscription');
 
+const sessionLink = setContext(async () => ({ sessionExpired: !(await isValidToken()) }));
+
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+  if (operation.getContext().sessionExpired && graphQLErrors?.some((e: any) => e.errorType === 'CE0003')) {
+    if (endSession()) return new Observable(() => {});
+  }
+
   const retryable = graphQLErrors?.some(
     (e: any) => e.errorType === 'UnauthorizedException' || e.errorType === 'CE0004',
   );
@@ -60,6 +67,7 @@ const retryLink = new RetryLink({
 const link = ApolloLink.from([
   networkStatusLink,
   ApolloLink.split((operation) => !isSubscription(operation), retryLink),
+  sessionLink,
   authLink,
   errorLink,
   subscriptionLink,

@@ -1,5 +1,5 @@
 import { TableState } from '@/src/constants';
-import { IMenuProduct, IOrderItem } from '@/src/types';
+import { IMenuCategory, IMenuProduct, IOrderItem } from '@/src/types';
 import { isEmpty } from 'lodash';
 import { Dimensions } from 'react-native';
 import moment from 'moment';
@@ -57,10 +57,10 @@ export function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     var r = Math.random() * 16;
     if (d > 0) {
-      r = (d + r) % 16 | 0;
+      r = ((d + r) % 16) | 0;
       d = Math.floor(d / 16);
     } else {
-      r = (d2 + r) % 16 | 0;
+      r = ((d2 + r) % 16) | 0;
       d2 = Math.floor(d2 / 16);
     }
     return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
@@ -97,4 +97,20 @@ export const isCurrentlyOpen = (timetable?: any): boolean => {
   let closeTime = moment(`${todayStr} ${close}`, 'YYYY-MM-DD HH:mm');
   if (closeTime.isBefore(openTime)) closeTime.add(1, 'day');
   return now.isBetween(openTime, closeTime);
+};
+
+export const findClosedItems = (items: IOrderItem[], categories: IMenuCategory[] = []): IOrderItem[] => {
+  const known = new Set<string>();
+  const open = new Set<string>();
+  const walk = (category: IMenuCategory, parentOpen: boolean) => {
+    const isOpen = parentOpen && isCurrentlyOpen(category.timetable);
+    for (const product of category.products ?? []) {
+      known.add(product.productId);
+      if (isOpen) open.add(product.productId);
+    }
+    for (const child of category.children ?? []) walk(child, isOpen);
+  };
+  categories.forEach((category) => walk(category, true));
+
+  return items.filter((item) => !!item.productId && known.has(item.productId) && !open.has(item.productId));
 };

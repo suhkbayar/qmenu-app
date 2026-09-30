@@ -242,6 +242,14 @@ const Payment = () => {
               loading={paying && activeType === 'Toki'}
             />
           )}
+          {findPayment(PAYMENT_TYPE.MST) && (
+            <PaymentButton
+              type="MST"
+              id={findPayment(PAYMENT_TYPE.MST)?.id}
+              onSelect={onSelectBank}
+              loading={paying && activeType === 'MST'}
+            />
+          )}
           {(findPayment(PAYMENT_TYPE.QPay) || findPayment(PAYMENT_TYPE.QPay2)) && (
             <PaymentButton
               type="QPay"

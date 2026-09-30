@@ -61,7 +61,7 @@ const GiftHeaderButton = () => {
       )}
 
       <TouchableOpacity
-        style={[styles.button, { backgroundColor: g.raised, borderColor: g.hairline }]}
+        style={[styles.button, { backgroundColor: g.isDark ? g.raised : g.surface, borderColor: g.hairline }]}
         onPress={open}
         activeOpacity={0.8}
       >

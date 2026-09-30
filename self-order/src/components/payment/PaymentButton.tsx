@@ -3,7 +3,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { TouchableOpacity, StyleSheet, Text, ActivityIndicator, Image } from 'react-native';
 
-type PaymentType = 'QPay' | 'MCS' | 'Toki' | 'Cash' | 'MPY';
+type PaymentType = 'QPay' | 'MCS' | 'Toki' | 'Cash' | 'MPY' | 'MST';
 
 type Props = {
   type: PaymentType;
@@ -18,6 +18,7 @@ const icons: Record<PaymentType, React.ReactNode> = {
   Toki: <Image source={require('@/assets/icon/new_toki.png')} style={{ width: 72, height: 72 }} resizeMode="contain" />,
   Cash: <MaterialCommunityIcons name="cash-register" size={72} color="#fff" />,
   MPY: <Image source={require('@/assets/icon/mpay.png')} style={{ width: 140, height: 72 }} resizeMode="contain" />,
+  MST: <MaterialCommunityIcons name="qrcode-scan" size={72} color="#fff" />,
 };
 
 const PaymentButton = ({ type, id, loading = false, onSelect }: Props) => {
@@ -30,6 +31,7 @@ const PaymentButton = ({ type, id, loading = false, onSelect }: Props) => {
     Toki: 'Toki',
     Cash: t('mainPage.PayAtTheBoxOffice'),
     MPY: 'М Банк',
+    MST: 'QR Pay',
   };
 
   const bgColors: Record<PaymentType, string> = {
@@ -38,6 +40,7 @@ const PaymentButton = ({ type, id, loading = false, onSelect }: Props) => {
     Toki: theme.primary,
     Cash: theme.primary,
     MPY: '#1dc9a7',
+    MST: theme.primary,
   };
 
   const handlePress = () => {
