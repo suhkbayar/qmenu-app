@@ -1,421 +1,311 @@
-import { useCallStore } from '@/cache/cart.store';
-import Loader from '@/components/Loader';
-import PayCashierModal from '@/components/Modal/PayCashierModal';
-import PaymentModal from '@/components/Modal/PendingTransaction';
-import OrderInfo from '@/components/OrderInfo';
-import CashForm from '@/components/PaymentForms/cash';
-import QpayForm from '@/components/PaymentForms/qpay';
-import { CURRENCY, emptyOrder, PAYMENT_TYPE } from '@/constants';
-import { defaultColor } from '@/constants/Colors';
-import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/graphql/mutation/order';
-import { GET_ORDER, GET_ORDERS } from '@/graphql/query';
-import { ON_UPDATED_ORDER } from '@/graphql/subscription';
-import { getPayload } from '@/providers/auth';
-import { useDraw } from '@/providers/drawerProvider';
-import { useOrder } from '@/providers/OrderProvider';
-import { IOrder, ITransaction } from '@/types';
-import { useMutation, useQuery, useSubscription } from '@apollo/client';
-import { useLocalSearchParams, router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon } from 'react-native-paper';
+import { useLocalSearchParams, router } from 'expo-router';
+import { useMutation, useQuery, useSubscription } from '@apollo/client';
+import { useTranslation } from 'react-i18next';
 import { useToast } from 'react-native-toast-notifications';
+
+import Loader from '@/src/components/ui/Loader';
+import OrderInfo from '@/src/components/OrderInfo';
+import PaymentButton from '@/src/components/payment/PaymentButton';
+import PayCashierModal from '@/src/components/modals/PayCashierModal';
+import PendingTransactionModal from '@/src/components/modals/PendingTransactionModal';
+import McsPaymentModal from '@/src/components/modals/McsPaymentModal';
+import { CURRENCY, PAYMENT_TYPE } from '@/src/constants';
+import { defaultColor } from '@/src/constants/Colors';
+import { useThemeStore } from '@/src/store/theme.store';
+import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/src/graphql/mutations/order';
+import { GET_ORDER } from '@/src/graphql/queries';
+import { ON_UPDATED_ORDER } from '@/src/graphql/subscriptions';
+import { getPayload } from '@/src/providers/auth';
+import { useCallStore } from '@/src/store/cart.store';
+import { useOrderStore } from '@/src/store/order.store';
+import { IOrder, ITransaction } from '@/src/types';
+import { launchCardScanner } from '@/src/utils/cardScanner';
 
 const Payment = () => {
   const { t } = useTranslation('language');
-  const { orderId } = useLocalSearchParams();
-  const [order, setOrder] = useState<IOrder>();
+  const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const toast = useToast();
-  const { orderState, setOrderState } = useOrder();
-  const { setDrawerVisible } = useDraw();
+  const participant = useCallStore((s) => s.participant);
+  const { theme } = useThemeStore();
+  const orderState = useOrderStore((state) => state.orderState);
+
+  const [order, setOrder] = useState<IOrder>();
   const [transaction, setTransaction] = useState<ITransaction>();
-  const [visiblePending, setVisiblePending] = useState(false);
-  const { participant } = useCallStore();
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [activeType, setActiveType] = useState<string | null>(null);
   const [visibleCash, setVisibleCash] = useState(false);
+  const [visiblePending, setVisiblePending] = useState(false);
+  const [visibleMcs, setVisibleMcs] = useState(false);
 
   useEffect(() => {
-    const fetchPayload = async () => {
-      const payload = await getPayload();
-      setCustomerId(payload?.sub ?? null);
-    };
-
-    fetchPayload();
+    getPayload().then((p) => setCustomerId(p?.sub ?? null));
   }, []);
 
-  useSubscription(ON_UPDATED_ORDER, {
-    variables: { customer: customerId },
-    skip: !customerId,
-    onData: ({ client, data }) => {
-      console.log('📡 Subscription Data:', data);
-
-      const updatedData = data?.data?.onUpdatedOrder;
-      if (!updatedData) return;
-
-      const { event, order: subscriptionOrder } = updatedData;
-
-      try {
-        // 1️⃣ Update GET_ORDERS (list)
-        const cacheList = client.readQuery<{ getOrders: IOrder[] }>({
-          query: GET_ORDERS,
-        });
-
-        if (cacheList?.getOrders) {
-          let updatedOrders = [...cacheList.getOrders];
-          const index = updatedOrders.findIndex((order) => order.id === subscriptionOrder.id);
-          const exists = index !== -1;
-
-          switch (event) {
-            case 'CREATED':
-              if (!exists) {
-                updatedOrders.push(subscriptionOrder);
-              }
-              break;
-
-            case 'UPDATED':
-              if (exists) {
-                updatedOrders[index] = subscriptionOrder;
-              } else {
-                updatedOrders.push(subscriptionOrder);
-              }
-              break;
-
-            case 'DELETE':
-              updatedOrders = updatedOrders.filter((order) => order.id !== subscriptionOrder.id);
-              break;
-          }
-
-          client.writeQuery({
-            query: GET_ORDERS,
-            data: { getOrders: updatedOrders },
-          });
-        }
-
-        // 2️⃣ Update GET_ORDER (single)
-        if (event === 'UPDATED' || event === 'CREATED') {
-          client.writeQuery({
-            query: GET_ORDER,
-            variables: { id: subscriptionOrder.id },
-            data: { getOrder: subscriptionOrder },
-          });
-        } else if (event === 'DELETE') {
-          // Optionally clear GET_ORDER if needed
-          client.writeQuery({
-            query: GET_ORDER,
-            variables: { id: subscriptionOrder.id },
-            data: { getOrder: null },
-          });
-        }
-        if (subscriptionOrder.id === orderId) {
-          setVisiblePending(false);
-          router.push({
-            pathname: '/private/payment-success',
-            params: { orderId: orderId },
-          });
-        }
-
-        console.log('✅ Cache updated for both getOrders and getOrder');
-      } catch (err) {
-        console.error('❌ Cache update failed:', err);
-      }
+  const showWarning = useCallback(
+    (msg: string) => {
+      toast.show(msg, {
+        type: 'warning',
+        icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
+        placement: 'top',
+        warningColor: defaultColor,
+        duration: 4000,
+        animationType: 'slide-in',
+      });
     },
-    onError: (err) => {
-      console.error('❌ Subscription error:', err.message);
-    },
-  });
+    [toast],
+  );
+
+  const goSuccess = useCallback(() => {
+    router.push({ pathname: '/private/payment-success', params: { orderId } });
+  }, [orderId]);
+
+  const vatType = participant?.vat ? orderState.vatType : 0;
+  const baseInput = { order: orderId, register: orderState.register, vatType };
 
   const { loading } = useQuery(GET_ORDER, {
     variables: { id: orderId },
     skip: !orderId,
+    fetchPolicy: 'no-cache',
     onCompleted: (data) => {
       setOrder(data.getOrder);
+      if (data.getOrder.paymentState === 'PAID') goSuccess();
+    },
+  });
 
-      if (data?.getOrder.paymentState === 'PAID') {
+  useSubscription(ON_UPDATED_ORDER, {
+    variables: { customer: customerId },
+    skip: !customerId,
+    onData: ({ data }) => {
+      const updated = data?.data?.onUpdatedOrder?.order;
+      if (updated?.id === orderId && updated.paymentState === 'PAID') {
         setVisiblePending(false);
-        router.push({
-          pathname: '/private/payment-success',
-          params: { orderId: orderId },
-        });
+        setVisibleMcs(false);
+        goSuccess();
       }
-    },
-  });
-
-  const [payOrderByCash, { loading: cashing }] = useMutation(GET_PAY_ORDER, {
-    onCompleted: (data) => {
-      if (data && data?.payOrder) {
-        setVisibleCash(false);
-        router.push({
-          pathname: '/private/payment-success',
-          params: { orderId: orderId },
-        });
-      }
-
-      setVisiblePending(true);
-    },
-    onError(err) {
-      toast.show(err.message, {
-        type: 'warning',
-        icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
-        placement: 'top',
-        warningColor: defaultColor,
-        duration: 4000,
-        animationType: 'slide-in',
-      });
-    },
-  });
-
-  const [payOrderByPayment, { loading: paying }] = useMutation(GET_PAY_ORDER, {
-    onCompleted: (data) => {
-      if (data && data?.payOrder) {
-        setTransaction(data.payOrder.transaction);
-      }
-      setVisiblePending(true);
-    },
-    onError(err) {
-      toast.show(err.message, {
-        type: 'warning',
-        icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
-        placement: 'top',
-        warningColor: defaultColor,
-        duration: 4000,
-        animationType: 'slide-in',
-      });
     },
   });
 
   const [validateTransaction, { loading: validating }] = useMutation(VALIDATE_TRANSACTION, {
     onCompleted(data) {
-      if (data.validateTransaction.paymentState === 'PAID') {
+      const updated = data.validateTransaction;
+      if (updated.paymentState === 'PAID') {
+        setVisibleMcs(false);
         setVisiblePending(false);
-        router.push({
-          pathname: '/private/payment-success',
-          params: { orderId: orderId },
+        goSuccess();
+      } else {
+        const failed = updated.transactions?.find((tx: ITransaction) => tx.id === transaction?.id);
+        setVisibleMcs(false);
+        showWarning(failed?.comment || t('mainPage.NotPaidDescription'));
+      }
+    },
+    onError(err) {
+      setVisibleMcs(false);
+      toast.show(err.message, { type: 'danger', placement: 'center', duration: 4000, animationType: 'slide-in' });
+    },
+  });
+
+  const [payOrder, { loading: paying }] = useMutation(GET_PAY_ORDER, {
+    onCompleted(data) {
+      if (!data?.payOrder) return;
+      const tx: ITransaction = data.payOrder.transaction;
+      setTransaction(tx);
+      setActiveType(null);
+      if (tx?.type === PAYMENT_TYPE.MCS) {
+        setVisibleMcs(true);
+      } else {
+        setVisiblePending(true);
+      }
+    },
+    onError(err) {
+      setActiveType(null);
+      console.log('payOrder error:', JSON.stringify(err, null, 2));
+      console.log('graphQLErrors:', err.graphQLErrors);
+      console.log('networkError:', err.networkError);
+      showWarning(err.message);
+    },
+  });
+
+  const [payCash, { loading: cashing }] = useMutation(GET_PAY_ORDER, {
+    onCompleted(data) {
+      if (data?.payOrder) {
+        setVisibleCash(false);
+        goSuccess();
+      }
+    },
+    onError(err) {
+      console.log(err.graphQLErrors);
+      showWarning(err.message);
+    },
+  });
+
+  useEffect(() => {
+    if (!visibleMcs || !transaction || !order) return;
+    let cancelled = false;
+
+    const runScanner = async () => {
+      try {
+        const result = await launchCardScanner(order.totalAmount.toString());
+        if (cancelled) return;
+        const mcsData = JSON.stringify({
+          timestamp: new Date().toISOString(),
+          response: { payment_status: result.payment_status, response_body: result.response_body || {} },
         });
-      } else if (data.validateTransaction.paymentState !== 'PAID') {
-        toast.show(t('mainPage.NotPaidDescription'), {
-          type: 'warning',
-          icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
-          placement: 'top',
-          warningColor: defaultColor,
+        validateTransaction({ variables: { id: transaction.id, data: mcsData } });
+      } catch (err: any) {
+        if (cancelled) return;
+        if (err.message === 'CANCELLED') {
+          setVisibleMcs(false);
+          showWarning(t('mainPage.PaymentCancelled') || 'Payment was cancelled');
+          return;
+        }
+        const errorData = JSON.stringify({
+          timestamp: new Date().toISOString(),
+          response: { payment_status: false, response_body: { message: err.message || 'Error' } },
+        });
+        validateTransaction({ variables: { id: transaction.id, data: errorData } });
+        setVisibleMcs(false);
+        toast.show(err.message || t('mainPage.CardScannerError'), {
+          type: 'danger',
+          placement: 'center',
           duration: 4000,
           animationType: 'slide-in',
         });
       }
-    },
-    onError(err) {
-      toast.show(err.message, {
-        type: 'danger',
-        placement: 'center',
-        duration: 4000,
-        animationType: 'slide-in',
-      });
-    },
-  });
-
-  const onSubmit = async (paymentId: string) => {
-    if (!order) return;
-
-    let input = {
-      confirm: false,
-      order: order.id,
-      payment: paymentId,
-      register: orderState.register,
-      vatType: participant?.vat ? orderState.vatType : 0,
     };
 
-    payOrderByPayment({
-      variables: {
-        input: { ...input },
-      },
-    });
-  };
-
-  const onCash = async () => {
-    if (!order) return;
-
-    let input = {
-      confirm: true,
-      order: order.id,
-      payment: '',
-      register: orderState.register,
-      vatType: participant?.vat ? orderState.vatType : 0,
+    runScanner();
+    return () => {
+      cancelled = true;
     };
+  }, [visibleMcs, transaction, order]);
 
-    payOrderByCash({
-      variables: {
-        input: { ...input },
-      },
-    });
-  };
+  const onSelectBank = useCallback(
+    (type: string, id?: string) => {
+      if (type === 'Cash') {
+        setVisibleCash(true);
+        return;
+      }
+      if (!id) return;
+      setActiveType(type);
+      payOrder({ variables: { input: { ...baseInput, confirm: false, payment: id } } });
+    },
+    [baseInput, payOrder],
+  );
 
-  const onSelectBank = (type?: any, id?: string) => {
-    if (type === 'Cash') {
-      setVisibleCash(true);
-      return;
-    }
+  const onCash = useCallback(() => {
+    payCash({ variables: { input: { ...baseInput, confirm: true, payment: '' } } });
+  }, [baseInput, payCash]);
 
-    if (id) {
-      onSubmit(id);
-    }
-  };
-
-  const onRefetch = async (transactionId: string) => {
-    try {
-      await validateTransaction({ variables: { id: transactionId } });
-    } catch (error) {
-      toast.show(t('mainPage.NotPaidDescription'), {
-        type: 'warning',
-        icon: <Icon source="alert-circle-outline" size={30} color="#fff" />,
-        placement: 'top',
-        warningColor: defaultColor,
-        duration: 4000,
-        animationType: 'slide-in',
-      });
-    }
-  };
+  const onRefetch = useCallback(
+    (txId: string) => {
+      validateTransaction({ variables: { id: txId } }).catch(() => showWarning(t('mainPage.NotPaidDescription')));
+    },
+    [validateTransaction, showWarning, t],
+  );
+  const findPayment = (type: string) => participant?.payments.find((p) => p.type === type);
 
   if (loading || !order) return <Loader />;
-
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
-        <Text style={styles.title}>{t('mainPage.your_payment')}</Text>
-        <Text style={styles.amount}>
-          {order.totalAmount.toLocaleString()} {CURRENCY}
+        <Text style={[styles.title, { color: theme.textSecondary }]}>{t('mainPage.your_payment')}</Text>
+        <Text style={[styles.amount, { color: theme.primary }]}>
+          {order.grandTotal.toLocaleString()} {CURRENCY}
         </Text>
-        <Text style={styles.subtitle}>{t('mainPage.SelectYourPaymentChannel')}</Text>
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: 16,
-          }}
-        >
-          <QpayForm
-            id={
-              participant?.payments.find(
-                (payment) => payment.type === PAYMENT_TYPE.QPay || payment.type === PAYMENT_TYPE.QPay2,
-              )?.id
-            }
-            onSelect={onSelectBank}
-            loading={paying}
-          />
-          {!participant?.advancePayment && <CashForm onSelect={onSelectBank} />}
+        <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t('mainPage.SelectYourPaymentChannel')}</Text>
+
+        <View style={styles.buttons}>
+          {findPayment(PAYMENT_TYPE.MPY) && (
+            <PaymentButton
+              type="MPY"
+              id={findPayment(PAYMENT_TYPE.MPY)?.id}
+              onSelect={onSelectBank}
+              loading={paying && activeType === 'MPY'}
+            />
+          )}
+          {findPayment(PAYMENT_TYPE.MCS) && (
+            <PaymentButton
+              type="MCS"
+              id={findPayment(PAYMENT_TYPE.MCS)?.id}
+              onSelect={onSelectBank}
+              loading={paying && activeType === 'MCS'}
+            />
+          )}
+          {findPayment(PAYMENT_TYPE.Toki) && (
+            <PaymentButton
+              type="Toki"
+              id={findPayment(PAYMENT_TYPE.Toki)?.id}
+              onSelect={onSelectBank}
+              loading={paying && activeType === 'Toki'}
+            />
+          )}
+          {findPayment(PAYMENT_TYPE.MST) && (
+            <PaymentButton
+              type="MST"
+              id={findPayment(PAYMENT_TYPE.MST)?.id}
+              onSelect={onSelectBank}
+              loading={paying && activeType === 'MST'}
+            />
+          )}
+          {(findPayment(PAYMENT_TYPE.QPay) || findPayment(PAYMENT_TYPE.QPay2)) && (
+            <PaymentButton
+              type="QPay"
+              id={(findPayment(PAYMENT_TYPE.QPay) || findPayment(PAYMENT_TYPE.QPay2))?.id}
+              onSelect={onSelectBank}
+              loading={paying && activeType === 'QPay'}
+            />
+          )}
+          {!participant?.advancePayment && <PaymentButton type="Cash" onSelect={onSelectBank} />}
         </View>
-        {order && <OrderInfo order={order} />}
+
+        <OrderInfo order={order} />
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.footerButton} onPress={() => router.back()}>
-          <Text style={styles.footerButtonText}>{t('mainPage.GoBack')}</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity
-          style={styles.footerButton}
-          onPress={() => {
-            router.push('/');
-            setOrderState(emptyOrder);
-            setDrawerVisible(false);
-          }}
+          style={[styles.backBtn, { backgroundColor: theme.backgroundSecondary }]}
+          onPress={() => router.back()}
         >
-          <Text style={styles.footerButtonText}>{t('mainPage.NewOrder')}</Text>
+          <Text style={[styles.backBtnText, { color: theme.textSecondary }]}>{t('mainPage.GoBack')}</Text>
         </TouchableOpacity>
       </View>
 
-      {transaction && (
-        <PaymentModal
-          loading={validating}
-          visible={visiblePending}
-          onClose={() => {
-            setVisiblePending(false);
-          }}
-          transaction={transaction}
-          refetch={(transactionId) => {
-            onRefetch(transactionId);
-          }}
-        />
-      )}
-
+      <PendingTransactionModal
+        visible={visiblePending}
+        loading={validating}
+        transaction={transaction as ITransaction}
+        onClose={() => setVisiblePending(false)}
+        refetch={onRefetch}
+      />
+      <McsPaymentModal
+        visible={visibleMcs}
+        loading={validating}
+        transaction={transaction as ITransaction}
+        onClose={() => setVisibleMcs(false)}
+      />
       <PayCashierModal
         visible={visibleCash}
         loading={cashing}
-        onClose={() => {
-          setVisibleCash(false);
-        }}
-        onConfirm={() => onCash()}
+        onClose={() => setVisibleCash(false)}
+        onConfirm={onCash}
       />
     </View>
   );
 };
 
 export default Payment;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    justifyContent: 'space-between',
-  },
-  content: {
-    alignItems: 'center',
-    paddingTop: 100,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#4B5563',
-    marginBottom: 8,
-  },
-
-  summary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '20%',
-    gap: 16,
-  },
-
-  amount: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#facc15',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 24,
-  },
-  paymentButton: {
-    backgroundColor: '#facc15',
-    borderRadius: 16,
-    paddingVertical: 24,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    elevation: 2,
-    width: 160,
-  },
-  paymentText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 24,
-  },
-  footerButton: {
-    backgroundColor: '#f3f4f6', // light gray
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-  },
-  footerButtonText: {
-    color: '#4B5563',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  container: { flex: 1, justifyContent: 'space-between' },
+  content: { alignItems: 'center', paddingTop: 90 },
+  title: { fontSize: 24, fontWeight: '700', marginBottom: 10 },
+  amount: { fontSize: 40, fontWeight: '800', marginBottom: 12 },
+  subtitle: { fontSize: 19, marginBottom: 30 },
+  buttons: { flexDirection: 'row', gap: 20 },
+  footer: { flexDirection: 'row', padding: 24 },
+  backBtn: { paddingVertical: 20, paddingHorizontal: 28, borderRadius: 14 },
+  backBtnText: { fontSize: 18, fontWeight: '600' },
 });

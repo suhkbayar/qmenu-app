@@ -1,142 +1,155 @@
 import 'react-native-get-random-values';
-import '../utils/i18n';
+import '@/src/utils/i18n';
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
-import { PaperProvider } from 'react-native-paper';
+import { useEffect } from 'react';
+import { Platform, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { PaperProvider, MD3LightTheme } from 'react-native-paper';
 import 'react-native-reanimated';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { ApolloProvider } from '@apollo/client';
-import client from '@/providers/client';
-import { AuthProvider } from '@/providers/auth';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import * as SystemUI from 'expo-system-ui';
 import { ToastProvider } from 'react-native-toast-notifications';
-import { ToastProps } from 'react-native-toast-notifications/lib/typescript/toast';
-import CustomToast from '@/components/CustomToast';
-import * as NavigationBar from 'expo-navigation-bar';
-import { CartProvider } from '@/context/CartContext';
-import * as ScreenOrientation from 'expo-screen-orientation';
-import SubscriptionProvider from '@/providers/subscription';
+import type { ToastProps } from 'react-native-toast-notifications/lib/typescript/toast';
 import { Camera } from 'expo-camera';
-import { ValidProvider } from '@/context/ValidContext';
-import { getStorage } from '@/cache';
-import { useTranslation } from 'react-i18next';
-import { OrderProvider } from '@/providers/OrderProvider';
-import { LogBox, Platform } from 'react-native';
-import { DrawerProvider } from '@/providers/drawerProvider';
+import * as NavigationBar from 'expo-navigation-bar';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import * as SystemUI from 'expo-system-ui';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
+import CustomToast from '@/src/components/ui/CustomToast';
+import TableMessageToast from '@/src/components/ui/TableMessageToast';
+import KioskPinModal from '@/src/components/KioskPinModal';
+import MbankQuizModal from '@/src/components/modals/MbankQuizModal';
+import NetworkStatusListener from '@/src/components/NetworkStatusListener';
+import OtaUpdateListener from '@/src/components/OtaUpdateListener';
+import client from '@/src/providers/apolloClient';
+import { AuthProvider } from '@/src/providers/auth';
+import { CartProvider } from '@/src/providers/CartProvider';
+import { DrawerProvider } from '@/src/providers/DrawerProvider';
+import { ValidProvider } from '@/src/providers/ValidProvider';
+import { useColorScheme } from '@/src/hooks/useColorScheme';
+import { useKioskExit } from '@/src/hooks/useKioskExit';
+import { KioskModule } from '@/src/modules/KioskModule';
+import { getStorage } from '@/src/store/storage';
+import { useTranslation } from 'react-i18next';
+
 SplashScreen.preventAutoHideAsync();
+
+// Apply Inter font globally to all RN Text and TextInput
+(Text as any).defaultProps = { ...(Text as any).defaultProps, style: { fontFamily: 'Inter-Regular' } };
+(TextInput as any).defaultProps = { ...(TextInput as any).defaultProps, style: { fontFamily: 'Inter-Regular' } };
+
+const paperTheme = {
+  ...MD3LightTheme,
+  fonts: {
+    ...MD3LightTheme.fonts,
+    default: { ...MD3LightTheme.fonts.default, fontFamily: 'Inter-Regular' },
+    bodySmall: { ...MD3LightTheme.fonts.bodySmall, fontFamily: 'Inter-Regular' },
+    bodyMedium: { ...MD3LightTheme.fonts.bodyMedium, fontFamily: 'Inter-Regular' },
+    bodyLarge: { ...MD3LightTheme.fonts.bodyLarge, fontFamily: 'Inter-Regular' },
+    labelSmall: { ...MD3LightTheme.fonts.labelSmall, fontFamily: 'Inter-Medium' },
+    labelMedium: { ...MD3LightTheme.fonts.labelMedium, fontFamily: 'Inter-Medium' },
+    labelLarge: { ...MD3LightTheme.fonts.labelLarge, fontFamily: 'Inter-SemiBold' },
+    titleSmall: { ...MD3LightTheme.fonts.titleSmall, fontFamily: 'Inter-SemiBold' },
+    titleMedium: { ...MD3LightTheme.fonts.titleMedium, fontFamily: 'Inter-Bold' },
+    titleLarge: { ...MD3LightTheme.fonts.titleLarge, fontFamily: 'Inter-Bold' },
+    headlineSmall: { ...MD3LightTheme.fonts.headlineSmall, fontFamily: 'Inter-Bold' },
+    headlineMedium: { ...MD3LightTheme.fonts.headlineMedium, fontFamily: 'Inter-ExtraBold' },
+    headlineLarge: { ...MD3LightTheme.fonts.headlineLarge, fontFamily: 'Inter-ExtraBold' },
+  },
+};
+
+const CustomDefaultTheme = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, background: 'rgb(255, 255, 255)' },
+};
+
+function KioskOverlay() {
+  const { handleSecretTap, pinVisible, handlePinSubmit, handlePinCancel } = useKioskExit();
+  return (
+    <>
+      <Pressable onPress={handleSecretTap} style={styles.hiddenTap} />
+      <KioskPinModal visible={pinVisible} onSubmit={handlePinSubmit} onCancel={handlePinCancel} />
+    </>
+  );
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const { i18n } = useTranslation();
 
-  const [loaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-
-  LogBox.ignoreLogs([
-    'Warning: bound renderChildren: Support for defaultProps will be removed from function components in a future major release.',
-  ]);
+  const loaded = fontsLoaded || !!fontError;
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    if (!loaded) return;
+    SplashScreen.hideAsync();
+
+    // Load stored language
+    getStorage('language').then((lang) => {
+      if (lang) i18n.changeLanguage(lang.toLowerCase());
+    });
+
+    // Camera permission
+    Camera.requestCameraPermissionsAsync();
+
+    // Lock landscape
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+
+    // Transparent system UI
+    SystemUI.setBackgroundColorAsync('transparent');
+
+    // Kiosk mode
+    if (Platform.OS === 'android') {
+      KioskModule.startKiosk().catch(() => {});
+    }
+
+    // Hide Android nav bar
+    if (Platform.OS === 'android') {
+      NavigationBar.setBackgroundColorAsync('#FF000000')
+        .then(() => NavigationBar.setButtonStyleAsync('light'))
+        .then(() => NavigationBar.setVisibilityAsync('hidden'))
+        .catch(() => {});
     }
   }, [loaded]);
 
-  useEffect(() => {
-    const requestPermission = async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      if (status === 'granted') {
-        setHasPermission(status === 'granted');
-      }
-    };
-    requestPermission();
-  }, []);
-
-  useEffect(() => {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-    NavigationBar.setVisibilityAsync('hidden'); // hides the soft nav bar
-  }, []);
-
-  useEffect(() => {
-    const hideNavigationBar = async () => {
-      if (Platform.OS === 'android') {
-        try {
-          await NavigationBar.setBackgroundColorAsync('#FF000000');
-          await NavigationBar.setButtonStyleAsync('light');
-          await NavigationBar.setVisibilityAsync('hidden');
-        } catch (e) {
-          console.warn('Navigation bar hide failed:', e);
-        }
-      }
-    };
-    hideNavigationBar();
-  }, []);
-
-  useEffect(() => {
-    const fetchLanguage = async () => {
-      const cachedLanguage = await getStorage('language');
-      if (cachedLanguage) {
-        i18n.changeLanguage(cachedLanguage.toLowerCase());
-      }
-    };
-
-    fetchLanguage();
-  }, []);
-
-  useEffect(() => {
-    SystemUI.setBackgroundColorAsync('transparent'); // optional
-  }, []);
-
-  if (!loaded) {
-    return null;
-  }
-
-  const CustomDefaultTheme = {
-    ...DefaultTheme, // Extend DefaultTheme
-    colors: {
-      ...DefaultTheme.colors, // Spread existing colors
-      background: 'rgb(255, 255, 255)',
-    },
-  };
+  if (!loaded) return null;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : CustomDefaultTheme}>
       <ApolloProvider client={client}>
         <AuthProvider>
           <SafeAreaProvider>
-            <PaperProvider>
+            <PaperProvider theme={paperTheme}>
               <ValidProvider>
-                <OrderProvider>
-                  <DrawerProvider>
-                    <CartProvider>
-                      <SubscriptionProvider>
-                        <ToastProvider
-                          renderType={{
-                            custom_type: (toast: ToastProps) => (
-                              <CustomToast type={toast.type ?? 'default'} message={toast.message} />
-                            ),
-                          }}
-                        >
-                          <StatusBar hidden />
-                          <Stack screenOptions={{ headerShown: false }}>
-                            <Stack.Screen name="index" />
-                            <Stack.Screen name="public" />
-                            <Stack.Screen name="private" />
-                          </Stack>
-                        </ToastProvider>
-                      </SubscriptionProvider>
-                    </CartProvider>
-                  </DrawerProvider>
-                </OrderProvider>
+                <DrawerProvider>
+                  <CartProvider>
+                    <ToastProvider
+                      renderType={{
+                        custom_type: (toast: ToastProps) => (
+                          <CustomToast type={toast.type ?? 'default'} message={toast.message} />
+                        ),
+                        table_message: (toast: ToastProps) => <TableMessageToast id={toast.id} {...toast.data} />,
+                      }}
+                    >
+                      <StatusBar hidden />
+                      <NetworkStatusListener />
+                      <OtaUpdateListener />
+                      <KioskOverlay />
+                      <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="index" />
+                        <Stack.Screen name="public" />
+                        <Stack.Screen name="private" />
+                      </Stack>
+                      <MbankQuizModal />
+                    </ToastProvider>
+                  </CartProvider>
+                </DrawerProvider>
               </ValidProvider>
             </PaperProvider>
           </SafeAreaProvider>
@@ -145,3 +158,15 @@ export default function RootLayout() {
     </ThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  hiddenTap: {
+    position: 'absolute',
+    top: 0,
+    left: '50%',
+    transform: [{ translateX: -30 }],
+    width: 60,
+    height: 60,
+    zIndex: 999,
+  },
+});

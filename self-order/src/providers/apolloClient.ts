@@ -1,0 +1,96 @@
+import { ApolloClient, ApolloLink, createHttpLink, InMemoryCache, Observable, Operation } from '@apollo/client';
+import { onError } from '@apollo/client/link/error';
+import { setContext } from '@apollo/client/link/context';
+import { AuthOptions, AUTH_TYPE, createAuthLink } from 'aws-appsync-auth-link';
+import { createSubscriptionHandshakeLink } from 'aws-appsync-subscription-link';
+import { endSession, getToken, isValidToken } from './auth';
+import { RetryLink } from '@apollo/client/link/retry';
+import { DEFAULT_TOKEN } from '@/src/constants/token';
+import { setOffline } from '@/src/utils/network';
+
+const url = 'https://graph.qmenu.mn/graphql';
+const region = 'ap-east-1';
+
+const auth: AuthOptions = {
+  type: AUTH_TYPE.AWS_LAMBDA,
+  token: async () => {
+    const token = await getToken();
+    return token || DEFAULT_TOKEN;
+  },
+};
+
+const httpLink = createHttpLink({ uri: url });
+const authLink = createAuthLink({ url, region, auth });
+
+const isSubscription = (operation: Operation) =>
+  operation.query.definitions.some((d) => d.kind === 'OperationDefinition' && d.operation === 'subscription');
+
+const sessionLink = setContext(async () => ({ sessionExpired: !(await isValidToken()) }));
+
+const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+  if (operation.getContext().sessionExpired && graphQLErrors?.some((e: any) => e.errorType === 'CE0003')) {
+    if (endSession()) return new Observable(() => {});
+  }
+
+  const retryable = graphQLErrors?.some(
+    (e: any) => e.errorType === 'UnauthorizedException' || e.errorType === 'CE0004',
+  );
+  if (retryable && !operation.getContext().authRetried) {
+    operation.setContext({ authRetried: true });
+    return forward(operation);
+  }
+
+  if (networkError) {
+    if (!isSubscription(operation)) setOffline(true);
+    console.log(`[Network error]: ${networkError}`);
+  }
+});
+
+const subscriptionLink = createSubscriptionHandshakeLink({ url, region, auth }, httpLink);
+
+const networkStatusLink = new ApolloLink((operation, forward) =>
+  forward(operation).map((result) => {
+    setOffline(false);
+    return result;
+  }),
+);
+
+const retryLink = new RetryLink({
+  delay: { initial: 1000, max: 8000, jitter: true },
+  attempts: {
+    max: 5,
+
+    retryIf: (error) => !!error.networkError,
+  },
+});
+
+const link = ApolloLink.from([
+  networkStatusLink,
+  ApolloLink.split((operation) => !isSubscription(operation), retryLink),
+  sessionLink,
+  authLink,
+  errorLink,
+  subscriptionLink,
+]);
+
+const client = new ApolloClient({
+  link,
+  cache: new InMemoryCache({
+    typePolicies: {
+      Query: {
+        fields: {
+          getBranch: {
+            merge(_existing, incoming) {
+              return incoming;
+            },
+          },
+        },
+      },
+      Branch: { keyFields: ['id'] },
+      Participant: { keyFields: ['id'] },
+      Product: { keyFields: ['productId'] },
+    },
+  }),
+});
+
+export default client;

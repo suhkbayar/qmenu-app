@@ -1,26 +1,31 @@
 import { Stack } from 'expo-router';
-import { useEffect } from 'react';
-import { Platform } from 'react-native';
-import * as NavigationBar from 'expo-navigation-bar';
+import TableMessageListener from '@/src/components/TableMessageListener';
+import TableMessageComposer from '@/src/components/TableMessageComposer';
+import SitRequestModal from '@/src/components/modals/SitRequestModal';
+import { useCallStore } from '@/src/store/cart.store';
+
 export default function PrivateLayout() {
-  useEffect(() => {
-    const hideNavigationBar = async () => {
-      if (Platform.OS === 'android') {
-        try {
-          await NavigationBar.setBackgroundColorAsync('#FF000000');
-          await NavigationBar.setButtonStyleAsync('light');
-          await NavigationBar.setVisibilityAsync('hidden');
-        } catch (e) {
-          console.warn('Navigation bar hide failed:', e);
-        }
-      }
-    };
-    hideNavigationBar();
-  }, []);
+  const giftEnabled = useCallStore((s) => s.config?.giftOrder === true);
+  const sitEnabled = useCallStore((s) => s.config?.sitTogether === true);
+
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="order" />
-      <Stack.Screen name="index" />
-    </Stack>
+    <>
+      {(giftEnabled || sitEnabled) && (
+        <>
+          <TableMessageListener />
+          <TableMessageComposer />
+          <SitRequestModal />
+        </>
+      )}
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="draft-order" />
+        <Stack.Screen name="payment" />
+        <Stack.Screen name="payment-success" />
+        <Stack.Screen name="vat" />
+        <Stack.Screen name="product-info" />
+        <Stack.Screen name="history" />
+      </Stack>
+    </>
   );
 }

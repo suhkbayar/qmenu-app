@@ -1,20 +1,9 @@
 import { Redirect } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { isValidToken } from '@/providers/auth';
 import { ActivityIndicator, SafeAreaView } from 'react-native';
-import { useValid } from '@/context/ValidContext';
+import { useValid } from '@/src/providers/ValidProvider';
 
 export default function RootPage() {
   const { valid } = useValid();
-
-  // useEffect(() => {
-  //   const checkToken = async () => {
-  //     const valid = await isValidToken();
-  //     setIsValid(valid);
-  //   };
-
-  //   checkToken();
-  // }, []);
 
   if (valid === null) {
     return (
@@ -24,9 +13,5 @@ export default function RootPage() {
     );
   }
 
-  if (valid) {
-    return <Redirect href="/private" />;
-  } else {
-    return <Redirect href="/public" />;
-  }
+  return <Redirect href={valid ? '/private' : '/public'} />;
 }

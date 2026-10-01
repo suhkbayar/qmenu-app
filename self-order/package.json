@@ -4,12 +4,17 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "build:android": "eas build --platform android",
+    "build:android:dev": "eas build --platform android --profile development",
+    "build:android:preview": "eas build --platform android --profile preview",
+    "update:prod": "eas update --branch production",
+    "update:preview": "eas update --branch preview",
+    "update:kiosk": "eas update --branch kiosk"
   },
   "jest": {
     "preset": "jest-expo"
@@ -19,6 +24,7 @@
     "@expo/vector-icons": "^14.0.2",
     "@hookform/resolvers": "^5.0.1",
     "@react-native-async-storage/async-storage": "^2.1.2",
+    "@react-native-community/netinfo": "11.4.1",
     "@react-native-vector-icons/feather": "^12.0.1",
     "@react-navigation/native": "^7.1.12",
     "@react-navigation/native-stack": "^7.3.17",
@@ -30,9 +36,11 @@
     "expo-blur": "~14.1.5",
     "expo-camera": "~16.1.8",
     "expo-constants": "~17.1.6",
+    "expo-dev-client": "~5.2.4",
     "expo-font": "~13.3.1",
     "expo-haptics": "~14.1.4",
     "expo-image": "~2.3.0",
+    "expo-intent-launcher": "^13.0.7",
     "expo-linking": "~7.1.5",
     "expo-navigation-bar": "~4.2.6",
     "expo-router": "~5.1.0",
@@ -42,6 +50,7 @@
     "expo-symbols": "~0.4.5",
     "expo-system-ui": "~5.0.9",
     "expo-updates": "~0.28.15",
+    "expo-video": "~2.2.2",
     "expo-web-browser": "~14.2.0",
     "graphql": "^16.10.0",
     "i18next": "^24.2.3",
@@ -70,6 +79,9 @@
     "react-native-webview": "13.13.5",
     "yup": "^1.6.1",
     "zustand": "^3.4.1"
+  },
+  "resolutions": {
+    "use-latest-callback": "^0.2.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

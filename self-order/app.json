@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "self-order",
+    "name": "qmenu: self order",
     "slug": "self-order",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "scheme": "qmenu-self-order",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mn.qmenu.selforder",
@@ -24,7 +24,14 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.mn.qmenu.selforder",
-      "runtimeVersion": "1.0.0"
+      "enableProguardInReleaseBuilds": false,
+      "runtimeVersion": "1.0.1",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -49,7 +56,8 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true
@@ -59,15 +67,14 @@
         "origin": false
       },
       "eas": {
-        "projectId": "1a851a81-ff4a-437b-9509-daa6c6ed91e0",
-        "buildId": "c457594d-54da-45fa-84f4-abfa3ced70b1"
+        "projectId": "e305709f-4a6a-4b04-94fa-be9ab9358121"
       }
     },
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/1a851a81-ff4a-437b-9509-daa6c6ed91e0"
+      "url": "https://u.expo.dev/e305709f-4a6a-4b04-94fa-be9ab9358121"
     }
   }
 }

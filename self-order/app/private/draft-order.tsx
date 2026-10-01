@@ -1,114 +1,158 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
-import { SafeAreaView, StyleSheet, TouchableOpacity, View, ScrollView } from 'react-native';
-import { Text, Icon } from 'react-native-paper';
-import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
-import { useCallStore } from '@/cache/cart.store';
-import { useOrder } from '@/providers/OrderProvider';
-import { IOrder, IOrderItem } from '@/types';
-import { isEmpty } from 'lodash';
-import { CURRENCY, TYPE } from '@/constants';
-import { defaultColor } from '@/constants/Colors';
-import DraftList from '@/components/Card/DraftCard';
-import RecommendedCard from '@/components/Card/RecommendedCard';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Icon, Text } from 'react-native-paper';
+import { router } from 'expo-router';
 import { useLazyQuery, useMutation } from '@apollo/client';
-import { CREATE_ORDER } from '@/graphql/mutation/order';
-import { GET_ORDERS } from '@/graphql/query';
-import { GET_CROSS_SELLS } from '@/graphql/query/product';
+import { useTranslation } from 'react-i18next';
+import { useToast } from 'react-native-toast-notifications';
+import { isEmpty } from 'lodash';
+
+import DraftList from '@/src/components/cards/DraftCard';
+import RecommendedCard from '@/src/components/cards/RecommendedCard';
+import { CURRENCY, TABLE_MESSAGE_STICKERS, TYPE } from '@/src/constants';
+import Medallion from '@/src/components/ui/Medallion';
+import { useThemeStore } from '@/src/store/theme.store';
+import { useGiftTheme } from '@/src/hooks/useGiftTheme';
+import { GET_CROSS_SELLS } from '@/src/graphql/queries/product';
+import { CREATE_ORDER, GET_PAY_ORDER } from '@/src/graphql/mutations/order';
+import { useCallStore } from '@/src/store/cart.store';
+import { useOrderStore } from '@/src/store/order.store';
+import { IMenuProduct, IOrderItem } from '@/src/types';
+import { findClosedItems } from '@/src/utils';
+
+const calcTotals = (items: IOrderItem[]) => ({
+  totalQuantity: items.reduce((s, i) => s + i.quantity, 0),
+  totalAmount: items.reduce((s, i) => s + i.quantity * i.price, 0),
+  grandTotal: items.reduce((s, i) => s + i.quantity * i.price, 0),
+});
 
 const DraftOrderPage = () => {
-  const { orderState, setOrderState } = useOrder();
-  const { participant, order } = useCallStore();
   const { t } = useTranslation('language');
-  const router = useRouter();
+  const toast = useToast();
+  const participant = useCallStore((s) => s.participant);
+  const config = useCallStore((s) => s.config);
+  const { theme } = useThemeStore();
+  const g = useGiftTheme();
+  const giftEnabled = config?.giftOrder === true;
+  const orderState = useOrderStore((s) => s.orderState);
+  const setOrderState = useOrderStore((s) => s.setOrderState);
+  const giftStickerId = useOrderStore((s) => s.giftStickerId);
+  const giftAnonymous = useOrderStore((s) => s.giftAnonymous);
+  const giftSticker = TABLE_MESSAGE_STICKERS.find((s) => s.id === giftStickerId);
+  const clearGift = useOrderStore((s) => s.clearGift);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+
+  const showTakeAway = useMemo(() => participant?.services?.includes(TYPE.TAKE_AWAY) ?? false, [participant?.services]);
+  const [serviceType, setServiceType] = useState<string>(TYPE.DINIG);
 
   const [getCrossSells, { data: cross }] = useLazyQuery(GET_CROSS_SELLS);
-  const [createOrder, { loading }] = useMutation(CREATE_ORDER, {
-    update(cache, { data: { createOrder } }) {
-      const existing = cache.readQuery<{ getOrders: IOrder[] }>({ query: GET_ORDERS });
-      if (existing?.getOrders) {
-        cache.writeQuery({
-          query: GET_ORDERS,
-          data: { getOrders: [...existing.getOrders, createOrder] },
-        });
+
+  const [payCash, { loading: cashing }] = useMutation(GET_PAY_ORDER, {
+    onCompleted(data) {
+      if (data?.payOrder) {
+        setConfirmVisible(false);
+        router.push({ pathname: '/private/payment-success', params: { orderId: data.payOrder.order.id } });
       }
     },
-    onCompleted: async (data) => {
-      const path = participant?.vat ? '/private/vat' : '/private/payment';
-      router.push({ pathname: path, params: { orderId: data.createOrder.id } });
+    onError(err) {
+      setConfirmVisible(false);
+      toast.show(err.message, { type: 'danger', placement: 'top', duration: 4000 });
     },
   });
 
-  useEffect(() => {
-    if (!isEmpty(orderState.items) && participant?.menu?.id) {
-      const productIds = orderState.items.map((item) => item.productId).filter(Boolean);
-      if (productIds.length > 0) {
-        getCrossSells({ variables: { menuId: participant.menu.id, ids: productIds } });
+  const [createOrder, { loading: creating }] = useMutation(CREATE_ORDER, {
+    onCompleted(data) {
+      const orderId = data.createOrder.id;
+
+      clearGift();
+      const hasPayments = (participant?.payments?.length ?? 0) > 0;
+      if (hasPayments) {
+        const path = participant?.vat ? '/private/vat' : '/private/payment';
+        router.push({ pathname: path, params: { orderId } });
+      } else {
+        payCash({
+          variables: {
+            input: { order: orderId, confirm: true, payment: '', vatType: participant?.vat ? orderState.vatType : 0 },
+          },
+        });
       }
-    }
-  }, [orderState.items, participant?.menu?.id, getCrossSells]);
-
-  const calculateTotals = useCallback((items: IOrderItem[]) => {
-    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-    const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
-    return { totalAmount, grandTotal: totalAmount, totalQuantity };
-  }, []);
-
-  const increase = useCallback(
-    (uuid: string) => {
-      setOrderState((prev) => {
-        const updatedItems = prev.items.map((item) =>
-          item.uuid === uuid ? { ...item, quantity: item.quantity + 1 } : item,
-        );
-        const totals = calculateTotals(updatedItems);
-        return { ...prev, items: updatedItems, ...totals };
+    },
+    onError(err) {
+      setConfirmVisible(false);
+      toast.show(err.message || t('mainPage.orderCreationFailed'), {
+        type: 'danger',
+        placement: 'top',
+        duration: 4000,
       });
     },
-    [setOrderState, calculateTotals],
+  });
+
+  const loading = creating || cashing;
+
+  useEffect(() => {
+    if (isEmpty(orderState.items) || !participant?.menu?.id) return;
+    const ids = orderState.items.map((i) => i.productId).filter(Boolean);
+    if (ids.length > 0) getCrossSells({ variables: { menuId: participant.menu.id, ids } });
+  }, [orderState.items, participant?.menu?.id]);
+
+  const update = useCallback(
+    (uuid: string, delta: 1 | -1) => {
+      setOrderState((prev) => {
+        const updated = prev.items
+          .map((i) =>
+            i.uuid !== uuid
+              ? i
+              : delta === 1
+                ? { ...i, quantity: i.quantity + 1 }
+                : i.quantity > 1
+                  ? { ...i, quantity: i.quantity - 1 }
+                  : null,
+          )
+          .filter((i): i is IOrderItem => i !== null);
+        return { ...prev, items: updated, ...calcTotals(updated) };
+      });
+    },
+    [setOrderState],
   );
 
-  const decrease = useCallback(
-    (uuid: string) => {
-      setOrderState((prev) => {
-        const updatedItems = prev.items
-          .map((item) => {
-            if (item.uuid === uuid) {
-              if (item.quantity > 1) {
-                return { ...item, quantity: item.quantity - 1 };
-              } else {
-                return null;
-              }
+  const increase = useCallback((uuid: string) => update(uuid, 1), [update]);
+  const decrease = useCallback((uuid: string) => update(uuid, -1), [update]);
+
+  const giftItems = useMemo(
+    () => (giftEnabled ? orderState.items.filter((i) => i.giftToTableId) : []),
+    [orderState.items, giftEnabled],
+  );
+
+  useEffect(() => {
+    if (giftEnabled) return;
+    const state = useOrderStore.getState();
+    if (state.giftTarget || state.orderState.items.some((i) => i.giftToTableId)) clearGift();
+  }, [giftEnabled, orderState.items, clearGift]);
+
+  const preparedItems = useMemo(
+    () =>
+      orderState.items.map(({ id, quantity, comment, options, giftToTableId }) => ({
+        id,
+        quantity,
+        comment,
+        options: options?.map(({ id, value }) => ({ id, value })) || [],
+        ...(giftEnabled && giftToTableId
+          ? {
+              giftToTableId,
+              giftStickerId: giftStickerId || undefined,
+              giftAnonymous: giftAnonymous || undefined,
             }
-            return item;
-          })
-          .filter((item): item is IOrderItem => item !== null);
-
-        const totals = calculateTotals(updatedItems);
-        return { ...prev, items: updatedItems, ...totals };
-      });
-    },
-    [setOrderState, calculateTotals],
+          : {}),
+      })),
+    [orderState.items, giftEnabled, giftStickerId, giftAnonymous],
   );
 
-  const preparedItems = useMemo(() => {
-    return orderState.items.map((item) => ({
-      id: item.id,
-      quantity: item.quantity,
-      comment: item.comment,
-      options: item.options?.map((opt) => ({ id: opt.id, value: opt.value })) || [],
-    }));
-  }, [orderState.items]);
-
-  const onSubmit = useCallback(() => {
-    if (isEmpty(orderState.items) || isEmpty(participant)) {
-      return;
-    }
-
+  const doCreateOrder = useCallback(() => {
     createOrder({
       variables: {
         participant: participant?.id,
         input: {
-          type: TYPE.DINIG,
+          type: serviceType,
           deliveryDate: '',
           contact: '',
           address: '',
@@ -119,368 +163,398 @@ const DraftOrderPage = () => {
         },
       },
     });
-  }, [orderState.items, participant, preparedItems, createOrder]);
+  }, [participant, preparedItems, createOrder, serviceType, giftEnabled]);
 
-  const formattedPrice = useMemo(() => {
-    return `${(orderState.totalAmount || 0).toLocaleString()} ${CURRENCY}`;
-  }, [orderState.totalAmount]);
+  const onSubmit = useCallback(() => {
+    if (isEmpty(orderState.items) || isEmpty(participant)) return;
+
+    const closed = findClosedItems(orderState.items, participant.menu?.categories);
+    if (closed.length) {
+      const closedIds = new Set(closed.map((i) => i.uuid));
+      setOrderState((prev) => {
+        const remaining = prev.items.filter((i) => !closedIds.has(i.uuid));
+        return { ...prev, items: remaining, ...calcTotals(remaining) };
+      });
+      toast.show(t('mainPage.closedItemsRemoved', { items: closed.map((i) => i.name).join(', ') }), {
+        type: 'danger',
+        placement: 'top',
+        duration: 6000,
+      });
+      return;
+    }
+
+    const hasPayments = (participant.payments?.length ?? 0) > 0;
+    if (!hasPayments && !participant.advancePayment) {
+      setConfirmVisible(true);
+    } else {
+      doCreateOrder();
+    }
+  }, [orderState.items, participant, doCreateOrder, setOrderState, toast, t]);
 
   const addToCart = useCallback(
-    (variant: any, productId: string) => {
+    (variant: { id: string; name?: string; price?: number }, productId: string) => {
+      const cp = cross?.getCrossSells?.find((p: { productId: string }) => p.productId === productId);
       const newItem: IOrderItem = {
         id: variant.id,
         uuid: `${variant.id}-${Date.now()}`,
-        productId: productId,
-        name: variant.name || cross?.getCrossSells?.find((p: any) => p.productId === productId)?.name || '',
+        productId,
+        name: variant.name || cp?.name || '',
         price: variant.price || 0,
         quantity: 1,
         comment: '',
         options: [],
         discount: 0,
         state: '',
-        image: cross?.getCrossSells?.find((p: any) => p.productId === productId)?.image,
+        image: cp?.image,
         reason: '',
       };
-
       setOrderState((prev) => {
-        const existingItemIndex = prev.items.findIndex((item) => item.id === variant.id);
-        let updatedItems;
-
-        if (existingItemIndex >= 0) {
-          updatedItems = prev.items.map((item, index) =>
-            index === existingItemIndex ? { ...item, quantity: item.quantity + 1 } : item,
-          );
-        } else {
-          updatedItems = [...prev.items, newItem];
-        }
-
-        const totals = calculateTotals(updatedItems);
-        return { ...prev, items: updatedItems, ...totals };
+        const idx = prev.items.findIndex((i) => i.id === variant.id && !i.giftToTableId);
+        const updated =
+          idx >= 0
+            ? prev.items.map((i, n) => (n === idx ? { ...i, quantity: i.quantity + 1 } : i))
+            : [...prev.items, newItem];
+        return { ...prev, items: updated, ...calcTotals(updated) };
       });
     },
-    [setOrderState, calculateTotals, cross?.getCrossSells],
+    [setOrderState, cross?.getCrossSells],
   );
 
   const removeFromCart = useCallback(
     (productId: string) => {
       setOrderState((prev) => {
-        const existingItemIndex = prev.items.findIndex((item) => item.productId === productId);
-        let updatedItems;
-
-        if (existingItemIndex >= 0) {
-          const existingItem = prev.items[existingItemIndex];
-          if (existingItem.quantity > 1) {
-            updatedItems = prev.items.map((item, index) =>
-              index === existingItemIndex ? { ...item, quantity: item.quantity - 1 } : item,
-            );
-          } else {
-            updatedItems = prev.items.filter((_, index) => index !== existingItemIndex);
-          }
-        } else {
-          updatedItems = prev.items;
-        }
-
-        const totals = calculateTotals(updatedItems);
-        return { ...prev, items: updatedItems, ...totals };
+        const idx = prev.items.findIndex((i) => i.productId === productId && !i.giftToTableId);
+        if (idx < 0) return prev;
+        const item = prev.items[idx];
+        const updated =
+          item.quantity > 1
+            ? prev.items.map((i, n) => (n === idx ? { ...i, quantity: i.quantity - 1 } : i))
+            : prev.items.filter((_, n) => n !== idx);
+        return { ...prev, items: updated, ...calcTotals(updated) };
       });
     },
-    [setOrderState, calculateTotals],
+    [setOrderState],
   );
 
-  const renderRecommendations = useCallback(() => {
-    if (isEmpty(cross?.getCrossSells)) return null;
-
-    const limited = cross.getCrossSells.slice(0, 3);
-    return (
-      <View style={styles.crossSellSection}>
-        <Text style={styles.crossSellTitle}>{t('mainPage.recommendedForYou')}</Text>
-        <View style={styles.recommendationsContainer}>
-          {limited.map((product: any) => (
-            <View key={product.id} style={styles.recommendationCard}>
-              <RecommendedCard
-                isFullWidth={false}
-                product={product}
-                orderItem={orderState.items?.find((item) => item.productId === product.id)}
-                onAdd={addToCart}
-                onRemove={removeFromCart}
-              />
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  }, [cross?.getCrossSells, t, orderState.items, addToCart, removeFromCart]);
-
-  const renderOrderSummary = () => {
-    if (isEmpty(orderState.items)) {
-      return (
-        <View style={styles.emptyOrderContainer}>
-          <Text style={styles.emptyOrderText}>{t('mainPage.noItems') || 'No items in order'}</Text>
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.orderSummaryContainer}>
-        <Text style={styles.orderSummaryTitle}>{t('mainPage.OrderSummary') || 'Order Summary'}</Text>
-        <View style={styles.totalContainer}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>{t('mainPage.totalItems') || 'Total Items'}:</Text>
-            <Text style={styles.totalValue}>{orderState.totalQuantity || 0}</Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>{t('mainPage.Total') || 'Total Amount'}:</Text>
-            <Text style={styles.totalValue}>{formattedPrice}</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            (isEmpty(orderState.items) || isEmpty(participant) || loading) && styles.disabledButton,
-          ]}
-          onPress={onSubmit}
-          disabled={isEmpty(orderState.items) || isEmpty(participant) || loading}
-          hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-        >
-          <Text style={styles.submitButtonText}>
-            {loading ? t('mainPage.loading') || 'Loading...' : t('mainPage.Order')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
+  const crossSells = cross?.getCrossSells?.slice(0, 3) ?? [];
+  const totalPrice = `${(orderState.totalAmount || 0).toLocaleString()} ${CURRENCY}`;
+  const isDisabled = isEmpty(orderState.items) || isEmpty(participant) || loading;
+  const itemCount = orderState.totalQuantity || 0;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>{t('mainPage.YourOrder')}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <Text style={[styles.headerText, { color: theme.text }]}>{t('mainPage.YourOrder')}</Text>
         <TouchableOpacity
           onPress={() => router.back()}
-          style={styles.closeButton}
+          style={[styles.closeBtn, { backgroundColor: theme.backgroundSecondary }]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Icon source="close" color={defaultColor} size={28} />
+          <Icon source="close" color={theme.textSecondary} size={28} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.mainContent}>
-        <View style={styles.leftColumn}>
-          <View style={styles.productListContainer}>
+      <View style={styles.body}>
+        <View style={styles.leftCol}>
+          {giftItems.length > 0 && (
+            <View style={[styles.giftRibbon, { backgroundColor: g.gold + '14', borderColor: g.gold + '4d' }]}>
+              <View style={[styles.giftRibbonBar, { backgroundColor: g.gold }]} />
+              <Medallion glyph="gift-outline" size={40} solid />
+
+              <View style={styles.giftRibbonText}>
+                <Text style={[styles.giftRibbonTitle, { color: theme.text }]} numberOfLines={1}>
+                  {t('mainPage.gift_banner', {
+                    n: giftItems.length,
+                    table: giftItems[0].giftToTableName,
+                    defaultValue: `${giftItems.length} item(s) → Table ${giftItems[0].giftToTableName}`,
+                  })}
+                </Text>
+                {!!giftSticker && (
+                  <Text style={[styles.giftRibbonMessage, { color: theme.textMuted }]} numberOfLines={1}>
+                    “{t(`mainPage.${giftSticker.labelKey}`)}”
+                  </Text>
+                )}
+              </View>
+
+              <TouchableOpacity
+                onPress={clearGift}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={[styles.giftRibbonCancel, { borderColor: g.gold + '66' }]}
+                activeOpacity={0.7}
+              >
+                <Icon source="close" size={18} color={g.goldText} />
+                <Text style={[styles.giftRibbonCancelText, { color: g.goldText }]}>
+                  {t('mainPage.gift_cancel', 'Cancel gift')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <View style={styles.listWrap}>
             <DraftList items={orderState.items || []} increase={increase} decrease={decrease} />
           </View>
-
-          {renderRecommendations()}
+          {crossSells.length > 0 && (
+            <View style={[styles.crossSection, { borderTopColor: theme.border }]}>
+              <Text style={[styles.crossTitle, { color: theme.text }]}>{t('mainPage.recommendedForYou')}</Text>
+              <View style={styles.crossRow}>
+                {crossSells.map((p: IMenuProduct) => (
+                  <View key={p.id} style={styles.crossCard}>
+                    <RecommendedCard
+                      isFullWidth={false}
+                      product={p}
+                      orderItem={orderState.items?.find((i) => i.productId === p.productId)}
+                      onAdd={addToCart}
+                      onRemove={removeFromCart}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
 
-        <View style={styles.rightColumn}>{renderOrderSummary()}</View>
+        <View style={[styles.rightCol, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          {isEmpty(orderState.items) ? (
+            <View style={styles.emptyWrap}>
+              <Icon source="cart-outline" size={72} color={theme.border} />
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>{t('mainPage.noItems')}</Text>
+            </View>
+          ) : (
+            <View style={styles.summaryWrap}>
+              <Text style={[styles.summaryTitle, { color: theme.text }]}>{t('mainPage.OrderSummary')}</Text>
+              {showTakeAway && (
+                <View style={styles.serviceSection}>
+                  <Text style={[styles.serviceLabel, { color: theme.textMuted }]}>{t('mainPage.OrderType')}</Text>
+                  <View
+                    style={[
+                      styles.serviceTrack,
+                      { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
+                    ]}
+                  >
+                    {[TYPE.DINIG, TYPE.TAKE_AWAY].map((type) => {
+                      const active = serviceType === type;
+                      return (
+                        <TouchableOpacity
+                          key={type}
+                          style={[styles.serviceSegment, active && { backgroundColor: theme.primary }]}
+                          onPress={() => setServiceType(type)}
+                          activeOpacity={0.9}
+                        >
+                          <Icon
+                            source={type === TYPE.TAKE_AWAY ? 'bag-personal-outline' : 'silverware-fork-knife'}
+                            size={22}
+                            color={active ? '#fff' : theme.textMuted}
+                          />
+                          <Text style={[styles.serviceText, { color: active ? '#fff' : theme.textMuted }]}>
+                            {t(`mainPage.${type}`)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+              <View style={[styles.totals, { borderTopColor: theme.border }]}>
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalLabel, { color: theme.textMuted }]}>{t('mainPage.totalItems')}</Text>
+                  <Text style={[styles.totalSubValue, { color: theme.text }]}>{itemCount}</Text>
+                </View>
+                <View style={styles.totalRow}>
+                  <Text style={[styles.grandLabel, { color: theme.text }]}>{t('mainPage.Total')}</Text>
+                  <Text style={[styles.totalValue, { color: theme.primary }]}>{totalPrice}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+          <TouchableOpacity
+            style={[
+              styles.submitBtn,
+              { backgroundColor: theme.primary },
+              isDisabled && [styles.disabledBtn, { backgroundColor: theme.border }],
+            ]}
+            onPress={onSubmit}
+            disabled={isDisabled}
+            activeOpacity={0.85}
+          >
+            {!loading && !isDisabled && <Icon source="check-circle-outline" size={24} color="#fff" />}
+            <Text style={styles.submitBtnText}>{loading ? t('mainPage.loading') : t('mainPage.confirm')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      <Modal visible={confirmVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { backgroundColor: theme.card }]}>
+            <View style={[styles.modalIconWrap, { backgroundColor: theme.primary + '1a' }]}>
+              <Icon source="cash-register" size={52} color={theme.primary} />
+            </View>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              {t('mainPage.confirmOrder') || 'Confirm Order'}
+            </Text>
+            <Text style={[styles.modalMessage, { color: theme.textMuted }]}>
+              {t('mainPage.cashierPayMessage') || 'Your order will be placed. Please pay at the cashier.'}
+            </Text>
+            <Text style={[styles.modalTotal, { color: theme.primary }]}>{totalPrice}</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalCancelButton, { borderColor: theme.border }]}
+                onPress={() => setConfirmVisible(false)}
+                disabled={loading}
+              >
+                <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>
+                  {t('mainPage.cancel') || 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmButton, { backgroundColor: theme.primary }]}
+                onPress={doCreateOrder}
+                disabled={loading}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {loading ? t('mainPage.loading') || 'Loading...' : t('mainPage.confirm')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
 
+export default DraftOrderPage;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
-  headerText: {
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
-  closeButton: {
-    padding: 10,
-    borderRadius: 20,
-  },
-  mainContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  leftColumn: {
-    flex: 1,
-
-    flexDirection: 'column',
-  },
-  productListContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  productScrollView: {
-    flex: 1,
-  },
-  rightColumn: {
-    width: 370,
-    backgroundColor: '#f9f9f9',
-    justifyContent: 'flex-start',
+  headerText: { fontWeight: '800', fontSize: 26 },
+  headerSubtext: { fontSize: 16, fontWeight: '500', marginTop: 2 },
+  closeBtn: { padding: 10, borderRadius: 24 },
+  body: { flex: 1, flexDirection: 'row', paddingHorizontal: 24, paddingTop: 18, paddingBottom: 24, gap: 24 },
+  leftCol: { flex: 1, flexDirection: 'column' },
+  listWrap: { flex: 1 },
+  crossSection: { paddingTop: 18, marginTop: 8, minHeight: 190, borderTopWidth: 1 },
+  crossTitle: { fontSize: 19, fontWeight: '700', marginBottom: 14 },
+  crossRow: { flexDirection: 'row', gap: 22 },
+  crossCard: { marginRight: 12, width: 260, marginBottom: 8 },
+  rightCol: {
+    width: '36%',
+    minWidth: 380,
+    maxWidth: 460,
+    justifyContent: 'space-between',
     alignItems: 'stretch',
-    paddingHorizontal: 16,
-    paddingVertical: 24,
-    height: 670,
-    marginRight: 30,
-    marginLeft: 30,
-    borderRadius: 20,
+    padding: 24,
+    borderRadius: 22,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  orderSummaryContainer: {
-    flex: 1,
-    maxHeight: '80%',
-    justifyContent: 'flex-start',
-    width: '100%',
-  },
-  orderSummaryScroll: {
-    flex: 1,
-    maxHeight: 400,
-  },
-  orderSummaryTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#000',
-    textAlign: 'center',
-  },
-  emptyOrderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyOrderText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  orderSummaryItem: {
-    backgroundColor: '#fff',
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  orderItemHeader: {
+  summaryWrap: { flex: 1 },
+  summaryTitle: { fontSize: 24, fontWeight: '800', marginBottom: 22 },
+  serviceSection: { marginBottom: 24 },
+  serviceLabel: { fontSize: 14, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 10 },
+  serviceTrack: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  orderItemName: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#000',
-    marginRight: 8,
-  },
-  orderItemPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: defaultColor,
-  },
-  quantityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 8,
-  },
-  quantityButton: {
-    width: 32,
-    height: 32,
+    padding: 5,
     borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    gap: 5,
+  },
+  serviceSegment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 15,
+    borderRadius: 12,
+  },
+  serviceText: { fontSize: 18, fontWeight: '700' },
+  giftRibbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 14,
+    paddingVertical: 14,
+    paddingLeft: 20,
+    paddingRight: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  giftRibbonBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 5 },
+  giftRibbonText: { flex: 1 },
+  giftRibbonTitle: { fontSize: 18, fontWeight: '800' },
+  giftRibbonMessage: { fontSize: 15, fontStyle: 'italic', marginTop: 3 },
+  giftRibbonCancel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+  },
+  giftRibbonCancelText: { fontSize: 15, fontWeight: '700' },
+  emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
+  emptyText: { fontSize: 19, textAlign: 'center' },
+  totals: { marginTop: 'auto', paddingTop: 20, borderTopWidth: 1 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  totalLabel: { fontSize: 17, fontWeight: '600' },
+  totalSubValue: { fontSize: 17, fontWeight: '700' },
+  grandLabel: { fontSize: 21, fontWeight: '800' },
+  totalValue: { fontSize: 28, fontWeight: '800' },
+  submitBtn: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    minHeight: 64,
+    marginTop: 20,
+  },
+  disabledBtn: {},
+  submitBtnText: { color: 'white', fontSize: 20, fontWeight: '700' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 8,
   },
-  quantityText: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    minWidth: 30,
-    textAlign: 'center',
-  },
-  unitPrice: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  totalContainer: {
-    marginTop: 16,
+  modalBox: { borderRadius: 24, padding: 40, width: 500, alignItems: 'center' },
+  modalIconWrap: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
   },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  modalTitle: { fontSize: 26, fontWeight: '800', marginBottom: 10 },
+  modalMessage: { fontSize: 17, textAlign: 'center', marginBottom: 20, lineHeight: 24 },
+  modalTotal: { fontSize: 34, fontWeight: '800', marginBottom: 28 },
+  modalButtons: { flexDirection: 'row', gap: 16, width: '100%' },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 17,
+    borderRadius: 12,
+    borderWidth: 1,
     alignItems: 'center',
-    marginBottom: 8,
   },
-  totalLabel: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  totalValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: defaultColor,
-  },
-  submitButton: {
-    backgroundColor: defaultColor,
-    borderRadius: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+  modalCancelText: { fontSize: 17, fontWeight: '600' },
+  modalConfirmButton: {
+    flex: 1,
+    paddingVertical: 17,
+    borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-    marginTop: 10,
   },
-  disabledButton: {
-    backgroundColor: '#cccccc',
-    borderColor: '#cccccc',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  submitButtonPrice: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  crossSellSection: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-
-    minHeight: 160,
-  },
-  crossSellTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 12,
-  },
-  recommendationsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  recommendationCard: {
-    marginRight: 12,
-    width: 200,
-    marginBottom: 8,
-  },
+  modalConfirmText: { fontSize: 17, fontWeight: '700', color: '#fff' },
 });
-
-export default DraftOrderPage;
