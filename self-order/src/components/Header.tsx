@@ -47,15 +47,6 @@ export const countryList: Country[] = [
   { label: 'Uzbek', value: 'UZ', i18n: 'uz', path: require('../../assets/lang/UZ.png') },
 ];
 
-// Temporary: branches that show the Mbank quiz. Add branch IDs here and publish with eas update
-const MBANK_QUIZ_BRANCHES: string[] = [
-  '4b563574-b2eb-45a2-9eee-5b26a4bf334f',
-  'e50fb5e4-92bd-419e-acc1-fc16a755f376',
-  'e2b644ff-a6a3-4db1-8935-14be83618e7c',
-  '23e7fbd9-67a5-4f4f-b296-6019ac93d1f8',
-  '8536b7ec-cd14-44d7-9884-43b9ee5979f9',
-];
-
 const countryByLang = countryList.reduce<Record<string, Country>>((map, c) => {
   map[c.i18n] = c;
   return map;
@@ -85,7 +76,6 @@ const Header: React.FC<Props> = ({
   const branchLanguages = useCallStore((s) => s.participant?.branch?.languages);
   const giftEnabled = useCallStore((s) => s.config?.giftOrder === true);
   const sitEnabled = useCallStore((s) => s.config?.sitTogether === true);
-  const quizEnabled = useCallStore((s) => MBANK_QUIZ_BRANCHES.includes(s.participant?.branch?.id ?? ''));
   const { theme, isDark, toggleTheme } = useThemeStore();
   const [visible, setVisible] = useState(false);
   const openQuiz = useQuizStore((s) => s.openQuiz);
@@ -200,20 +190,19 @@ const Header: React.FC<Props> = ({
           {giftEnabled && <GiftHeaderButton />}
           {sitEnabled && <SitTogetherButton />}
 
-          {quizEnabled && (
-            <TouchableOpacity
-              onPress={openQuiz}
-              style={[
-                styles.headerBtn,
-                styles.quizBtn,
-                { borderColor: theme.border, backgroundColor: theme.backgroundSecondary },
-              ]}
-              activeOpacity={0.7}
-            >
-              <Image source={require('../../assets/icon/mbank.png')} style={styles.quizBadge} contentFit="contain" />
-              <Text style={[styles.quizWordmark, { color: theme.text }]}>quiz</Text>
-            </TouchableOpacity>
-          )}
+          {/* The Mbank quiz, for every branch */}
+          <TouchableOpacity
+            onPress={openQuiz}
+            style={[
+              styles.headerBtn,
+              styles.quizBtn,
+              { borderColor: theme.border, backgroundColor: theme.backgroundSecondary },
+            ]}
+            activeOpacity={0.7}
+          >
+            <Image source={require('../../assets/icon/mbank.png')} style={styles.quizBadge} contentFit="contain" />
+            <Text style={[styles.quizWordmark, { color: theme.text }]}>quiz</Text>
+          </TouchableOpacity>
 
           <NetworkStatusIcon style={styles.headerBtn} />
 

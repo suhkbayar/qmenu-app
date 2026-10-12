@@ -2,7 +2,9 @@ import React, { useCallback, useContext, useEffect, useRef, useState } from 'rea
 import { BackHandler, Platform, SafeAreaView, StyleSheet } from 'react-native';
 import { useQuery } from '@apollo/client';
 import * as Battery from 'expo-battery';
+import Constants from 'expo-constants';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import * as Updates from 'expo-updates';
 
 import Container from '@/src/components/Container';
 import HelpFloatingButton from '@/src/components/HelpFloatingButton';
@@ -24,6 +26,15 @@ import { useLazyQuery, useMutation, useSubscription } from '@apollo/client';
 const MENU_REFETCH_QUIET_MS = 4000;
 const MENU_REFETCH_MAX_WAIT_MS = 15000;
 const COLD_RETRY_MS = 5000;
+
+// Sent with each battery report, so the admin can see which tablets still run 1.0.x, e.g. "1.0.1 OTA
+// a1b2c3d4". The runtime is the installed APK's, so 1.0.0 and 1.0.1 tell apart even on the same update.
+const appVersion = () => {
+  const version = Updates.runtimeVersion ?? Constants.expoConfig?.version ?? '?';
+  if (!Updates.isEnabled) return `${version} updates off`;
+  if (Updates.isEmbeddedLaunch) return `${version} embedded`;
+  return `${version} OTA ${Updates.updateId?.replace(/-/g, '').slice(0, 8) ?? '?'}`;
+};
 
 const Private = () => {
   const { pid } = useLocalSearchParams<{ pid?: string }>();
@@ -183,7 +194,7 @@ const Private = () => {
       const percent = Math.round((state?.batteryLevel ?? 0) * 100);
       const charging =
         state?.batteryState === Battery.BatteryState.CHARGING || state?.batteryState === Battery.BatteryState.FULL;
-      await sendBattery({ variables: { id: tableId, battery: percent, charging } });
+      await sendBattery({ variables: { id: tableId, battery: percent, charging, appVersion: appVersion() } });
     };
     const run = () =>
       push().catch((err) => {
