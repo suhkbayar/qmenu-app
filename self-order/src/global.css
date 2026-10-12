@@ -1,0 +1,114 @@
+/* The app's theme: the only place colours and fonts are defined. */
+@import 'tailwindcss';
+@import 'uniwind';
+@import 'heroui-native/styles';
+
+/* Let Tailwind see the classes HeroUI's components use */
+@source '../node_modules/heroui-native/lib';
+
+@theme {
+  /* Onest (strong Cyrillic): embedded by expo-font in app.json, and loaded at startup in app/_layout.tsx
+     so builds made before the switch get it through an OTA update. These are its font names. */
+  --font-normal: 'Onest_400Regular';
+  --font-medium: 'Onest_500Medium';
+  --font-semibold: 'Onest_600SemiBold';
+  --font-bold: 'Onest_700Bold';
+
+  /* Text sizes, a step larger than Tailwind's (read at arm's length on a table). HeroUI's buttons,
+     tabs and dialogs use the same scale. */
+  --text-xs: 13px;
+  --text-sm: 15px;
+  --text-base: 17px;
+  --text-lg: 19px;
+  --text-xl: 22px;
+  --text-2xl: 26px;
+  --text-3xl: 32px;
+}
+
+/* The app's own colours, set per theme below. Static so code can read them (icon colours). */
+@theme inline static {
+  /* Order and request states: text on its own soft background */
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-pending: var(--pending);
+  --color-pending-soft: var(--pending-soft);
+  /* A selected option or tile: the brand yellow, softened (its border is accent) */
+  --color-accent-tint: var(--accent-tint);
+  /* Gift (the logo red) and Sit together (teal): the fill of their icon tiles and picked tables, a
+     shade for text and icons on cards, and a soft background */
+  --color-gift: var(--gift);
+  --color-gift-text: var(--gift-text);
+  --color-gift-soft: var(--gift-soft);
+  --color-sit: var(--sit);
+  --color-sit-text: var(--sit-text);
+  --color-sit-soft: var(--sit-soft);
+}
+
+/* Same structure as heroui-native/styles (:root inside the theme layer), so these override its defaults. */
+@layer theme {
+  :root {
+    @variant light {
+      /* QMenu yellow, with dark text on it so labels stay readable */
+      --accent: #ffc300;
+      --accent-foreground: #15171a;
+
+      /* Warm neutrals: page, cards, secondary surfaces (steppers, close buttons), photo placeholders */
+      --background: #f5f3ee;
+      --foreground: #16181c;
+      --surface: #ffffff;
+      --surface-secondary: #f1eee7;
+      --surface-tertiary: #ece8e1;
+      --overlay: #ffffff;
+      --muted: #646a73;
+      --default: #f1eee7;
+      --default-foreground: #16181c;
+      --border: #e6e2da;
+      --separator: #d9d5cd;
+      --segment: #ffffff;
+
+      --positive: #1d6b43;
+      --positive-soft: #e3f3ea;
+      --pending: #6b4e00;
+      --pending-soft: #fff1c7;
+      --accent-tint: #fff6d6;
+      --gift: #eb1833;
+      --gift-text: #c8102e;
+      --gift-soft: #fde8eb;
+      --sit: #12a386;
+      --sit-text: #0f7a64;
+      --sit-soft: #e2f3ef;
+    }
+
+    /* The same warm neutrals, dark. Soft backgrounds go deep and their text light, so text stays readable. */
+    @variant dark {
+      --accent: #ffc300;
+      --accent-foreground: #15171a;
+
+      --background: #121110;
+      --foreground: #f3f1ec;
+      --surface: #1c1b19;
+      --surface-secondary: #272522;
+      --surface-tertiary: #302d29;
+      --overlay: #1c1b19;
+      --muted: #a29d94;
+      --default: #272522;
+      --default-foreground: #f3f1ec;
+      --border: #2f2c28;
+      --separator: #46423c;
+      --segment: #3a3732;
+      --field-background: #272522;
+
+      --positive: #6fd39d;
+      --positive-soft: #173426;
+      --pending: #f2c14e;
+      --pending-soft: #3a2f10;
+      --accent-tint: #3a3214;
+      --gift: #eb1833;
+      --gift-text: #ff7b8b;
+      --gift-soft: #3a1a1f;
+      --sit: #12a386;
+      --sit-text: #4cd3b3;
+      --sit-soft: #12332c;
+    }
+  }
+}

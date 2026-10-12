@@ -1,0 +1,27 @@
+{
+  "mainPage": {
+    "citizen": "公民",
+    "NotPaidDescription": "您的账单尚未付清",
+    "enter_registration_number": "请输入注册号",
+    "validation": {
+      "mandatoryOptions": "请选择必需的选项：{{options}}"
+    },
+    "Total": "总共",
+    "AmountPaid": "该付的钱",
+    "Order": "命令",
+    "YourOrder": "你的订单",
+    "GoBack": "后退",
+    "Dining": "用餐",
+    "TakeAway": "带走",
+    "OrganizationalRegisters": "组织登记",
+    "Individual": "个人",
+    "Institution": "组织",
+    "add": "添加",
+    "Variants": "选项",
+    "Required": "必填",
+    "extra": "附加项",
+    "call_waiter": "叫服务员",
+    "request_bill": "结账",
+    "table_clean": "请求清理桌子"
+  }
+}

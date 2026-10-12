@@ -1,0 +1,27 @@
+{
+  "mainPage": {
+    "NotPaidDescription": "請求書が支払われていません",
+    "citizen": "市民",
+    "enter_registration_number": "登録番号を入力してください",
+    "validation": {
+      "mandatoryOptions": "必須オプションを選択してください：{{options}}"
+    },
+    "Total": "合計",
+    "AmountPaid": "支払う金額",
+    "Order": "注文",
+    "YourOrder": "ご注文",
+    "GoBack": "戻る",
+    "Dining": "ダイニング",
+    "TakeAway": "取り除く",
+    "OrganizationalRegisters": "組織登録簿",
+    "Individual": "個人",
+    "Institution": "組織",
+    "add": "追加",
+    "Variants": "オプション",
+    "Required": "必須",
+    "extra": "追加",
+    "call_waiter": "ウェイターを呼ぶ",
+    "request_bill": "お会計をお願いします",
+    "table_clean": "テーブルの清掃を依頼する"
+  }
+}

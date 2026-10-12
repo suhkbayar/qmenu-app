@@ -6,7 +6,7 @@ import { createSubscriptionHandshakeLink } from 'aws-appsync-subscription-link';
 import { endSession, getToken, isValidToken } from './auth';
 import { RetryLink } from '@apollo/client/link/retry';
 import { DEFAULT_TOKEN } from '@/src/constants/token';
-import { setOffline } from '@/src/utils/network';
+import { setOffline } from '@/src/lib/network';
 
 const url = 'https://graph.qmenu.mn/graphql';
 const region = 'ap-east-1';
@@ -92,5 +92,8 @@ const client = new ApolloClient({
     },
   }),
 });
+
+const CACHE_CLEANUP_MS = 60 * 60 * 1000;
+setInterval(() => client.cache.gc(), CACHE_CLEANUP_MS);
 
 export default client;

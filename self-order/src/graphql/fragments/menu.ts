@@ -42,42 +42,6 @@ export const MENU_PRODUCT_FIELDS = gql`
   }
 `;
 
-export const PRODUCT_FIELDS = gql`
-  fragment ProductFields on Product {
-    createdAt
-    id
-    image
-    adultsOnly
-    description
-    images
-    keywords
-    kitchen
-    name
-    price
-    specification
-    type
-    updatedAt
-    upload
-    uploads
-    withNote
-  }
-`;
-
-export const VARIANT_FIELDS = gql`
-  fragment VariantFields on Variant {
-    active
-    barCode
-    code
-    createdAt
-    id
-    name
-    price
-    unitType
-    unitValue
-    updatedAt
-  }
-`;
-
 export const MENU_VARIANT_FIELDS = gql`
   fragment MenuVariantFields on MenuVariant {
     id

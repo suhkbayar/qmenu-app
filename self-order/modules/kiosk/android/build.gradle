@@ -1,0 +1,15 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.mn.qmenu.selforder'
+version = '1.0.0'
+
+android {
+  namespace "com.mn.qmenu.selforder.kiosk"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}

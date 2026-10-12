@@ -1,0 +1,27 @@
+{
+  "mainPage": {
+    "NotPaidDescription": "Votre facture n'a pas été payée.",
+    "enter_registration_number": "Entrez le numéro d'enregistrement",
+    "citizen": "Citoyen",
+    "validation": {
+      "mandatoryOptions": "Veuillez sélectionner les options requises : {{options}}"
+    },
+    "Total": "Total",
+    "AmountPaid": "Montant à payer",
+    "Order": "Ordre",
+    "YourOrder": "Votre commande",
+    "GoBack": "Retour",
+    "Dining": "À manger",
+    "TakeAway": "Emporter",
+    "OrganizationalRegisters": "Registres organisationnels",
+    "Individual": "Un individu",
+    "Institution": "Organisme",
+    "add": "Ajouter",
+    "Variants": "Choix",
+    "Required": "Obligatoire",
+    "extra": "Supplément",
+    "call_waiter": "Appeler le serveur",
+    "request_bill": "Demander l'addition",
+    "table_clean": "Demander le nettoyage de la table"
+  }
+}

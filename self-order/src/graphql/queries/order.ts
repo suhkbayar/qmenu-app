@@ -1,5 +1,5 @@
 import { gql } from '@apollo/client';
-import { CUSTOMER_FIELDS, ORDER_ITEM_OPTION_FIELDS, TABLE_FIELDS, TRANSACTION_FIELDS } from '../fragments';
+import { ORDER_ITEM_OPTION_FIELDS, TABLE_FIELDS, TRANSACTION_FIELDS } from '../fragments';
 
 export const ORDER_FIELDS = gql`
   fragment OrderFields on Order {
@@ -140,21 +140,6 @@ export const DISCOUNTS_FIELDS = gql`
   }
 `;
 
-export const ORDER_VATS_FIELD = gql`
-  fragment VatsFields on Vat {
-    amount
-    citytax
-    buyer
-    createdAt
-    date
-    id
-    state
-    register
-    type
-    updatedAt
-  }
-`;
-
 export const CHARGES_FIELDS = gql`
   fragment ChargesFields on OrderCharge {
     calculation
@@ -168,31 +153,6 @@ export const CHARGES_FIELDS = gql`
     value
     updatedAt
   }
-`;
-
-export const GET_ORDER_REVIEWS = gql`
-  query getOrderReviewsByLimit($offset: Int, $limit: Int) {
-    getOrderReviewsByLimit(offset: $offset, limit: $limit) {
-      id
-      createdAt
-      updatedAt
-      type
-
-      liked
-      comment
-      additional
-      pictures
-      uploads
-      order {
-        ...OrderFields
-      }
-      customer {
-        ...CustomerFields
-      }
-    }
-  }
-  ${CUSTOMER_FIELDS}
-  ${ORDER_FIELDS}
 `;
 
 export const GET_ORDER = gql`
@@ -259,72 +219,4 @@ export const GET_TABLET_ORDERS = gql`
   ${ORDER_ITEM_FIELDS}
   ${TRANSACTION_FIELDS}
   ${ORDER_LOYALTY_FIELDS}
-`;
-
-export const GET_ORDERS = gql`
-  {
-    getOrders {
-      ...OrderFields
-      table {
-        ...TableFields
-      }
-      items {
-        ...OrderItemFields
-      }
-      transactions {
-        ...TransactionFields
-      }
-      discounts {
-        ...DiscountsFields
-      }
-      charges {
-        ...ChargesFields
-      }
-    }
-  }
-  ${TABLE_FIELDS}
-  ${ORDER_FIELDS}
-  ${DISCOUNTS_FIELDS}
-  ${CHARGES_FIELDS}
-  ${ORDER_ITEM_FIELDS}
-  ${TRANSACTION_FIELDS}
-`;
-
-export const CHECK_TABLE = gql`
-  query checkTable($code: String!) {
-    checkTable(code: $code) {
-      ...OrderFields
-      table {
-        ...TableFields
-      }
-      items {
-        ...OrderItemFields
-      }
-      transactions {
-        ...TransactionFields
-      }
-      discounts {
-        ...DiscountsFields
-      }
-      charges {
-        ...ChargesFields
-      }
-    }
-  }
-  ${TABLE_FIELDS}
-  ${ORDER_FIELDS}
-  ${DISCOUNTS_FIELDS}
-  ${CHARGES_FIELDS}
-  ${ORDER_ITEM_FIELDS}
-  ${TRANSACTION_FIELDS}
-`;
-
-export const ORDER_TABLE_FIELDS = gql`
-  fragment OrderTableFields on OrderTable {
-    id
-    tableId
-    orderId
-    name
-    guests
-  }
 `;

@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useMemo, useEffect } from 'react';
 import { isValidToken } from '@/src/providers/auth';
-import { getStorage } from '@/src/store/storage';
+import { getStorage } from '@/src/lib/storage';
 
 interface ValidContextType {
   valid: boolean | null;

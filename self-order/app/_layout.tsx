@@ -1,172 +1,128 @@
 import 'react-native-get-random-values';
-import '@/src/utils/i18n';
+import '@/src/i18n';
+import '@/src/global.css';
 
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
+import { ApolloProvider } from '@apollo/client';
+// One import per weight, so only these four go into the bundle (the package has nine)
+import { Onest_400Regular } from '@expo-google-fonts/onest/400Regular';
+import { Onest_500Medium } from '@expo-google-fonts/onest/500Medium';
+import { Onest_600SemiBold } from '@expo-google-fonts/onest/600SemiBold';
+import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
+import { Camera } from 'expo-camera';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import { Platform, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import { PaperProvider, MD3LightTheme } from 'react-native-paper';
-import 'react-native-reanimated';
-import { ApolloProvider } from '@apollo/client';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { ToastProvider } from 'react-native-toast-notifications';
-import type { ToastProps } from 'react-native-toast-notifications/lib/typescript/toast';
-import { Camera } from 'expo-camera';
-import * as NavigationBar from 'expo-navigation-bar';
+import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-
-import CustomToast from '@/src/components/ui/CustomToast';
-import TableMessageToast from '@/src/components/ui/TableMessageToast';
-import KioskPinModal from '@/src/components/KioskPinModal';
-import MbankQuizModal from '@/src/components/modals/MbankQuizModal';
-import NetworkStatusListener from '@/src/components/NetworkStatusListener';
-import OtaUpdateListener from '@/src/components/OtaUpdateListener';
+import { HeroUINativeProvider, useThemeColor } from 'heroui-native';
+import { useTranslation } from 'react-i18next';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Uniwind } from 'uniwind';
+import { Kiosk } from '@/modules/kiosk';
+import { markActivity } from '@/src/features/kiosk/activity';
+import { AdminExit } from '@/src/features/kiosk/AdminExit';
+import { EXTRA_ALLOWED_APPS } from '@/src/features/kiosk/allowedApps';
+import { AppUpdater } from '@/src/features/kiosk/AppUpdater';
+import { HiddenNavigationBar } from '@/src/features/kiosk/HiddenNavigationBar';
+import { NightlyRestart } from '@/src/features/kiosk/NightlyRestart';
+import { OfflineNotice } from '@/src/features/kiosk/OfflineNotice';
+import { UpdatePrompt } from '@/src/features/kiosk/UpdatePrompt';
+import { QuizOverlay } from '@/src/features/quiz/QuizOverlay';
 import client from '@/src/providers/apolloClient';
 import { AuthProvider } from '@/src/providers/auth';
-import { CartProvider } from '@/src/providers/CartProvider';
-import { DrawerProvider } from '@/src/providers/DrawerProvider';
-import { ValidProvider } from '@/src/providers/ValidProvider';
-import { useColorScheme } from '@/src/hooks/useColorScheme';
-import { useKioskExit } from '@/src/hooks/useKioskExit';
-import { KioskModule } from '@/src/modules/KioskModule';
-import { getStorage } from '@/src/store/storage';
-import { useTranslation } from 'react-i18next';
+import { getStorage } from '@/src/lib/storage';
+import { ValidProvider, useValid } from '@/src/providers/ValidProvider';
+import { LoadingScreen } from '@/src/ui/LoadingScreen';
+import { useThemeStore } from '@/src/ui/themeStore';
 
 SplashScreen.preventAutoHideAsync();
 
-// Apply Inter font globally to all RN Text and TextInput
-(Text as any).defaultProps = { ...(Text as any).defaultProps, style: { fontFamily: 'Inter-Regular' } };
-(TextInput as any).defaultProps = { ...(TextInput as any).defaultProps, style: { fontFamily: 'Inter-Regular' } };
-
-const paperTheme = {
-  ...MD3LightTheme,
-  fonts: {
-    ...MD3LightTheme.fonts,
-    default: { ...MD3LightTheme.fonts.default, fontFamily: 'Inter-Regular' },
-    bodySmall: { ...MD3LightTheme.fonts.bodySmall, fontFamily: 'Inter-Regular' },
-    bodyMedium: { ...MD3LightTheme.fonts.bodyMedium, fontFamily: 'Inter-Regular' },
-    bodyLarge: { ...MD3LightTheme.fonts.bodyLarge, fontFamily: 'Inter-Regular' },
-    labelSmall: { ...MD3LightTheme.fonts.labelSmall, fontFamily: 'Inter-Medium' },
-    labelMedium: { ...MD3LightTheme.fonts.labelMedium, fontFamily: 'Inter-Medium' },
-    labelLarge: { ...MD3LightTheme.fonts.labelLarge, fontFamily: 'Inter-SemiBold' },
-    titleSmall: { ...MD3LightTheme.fonts.titleSmall, fontFamily: 'Inter-SemiBold' },
-    titleMedium: { ...MD3LightTheme.fonts.titleMedium, fontFamily: 'Inter-Bold' },
-    titleLarge: { ...MD3LightTheme.fonts.titleLarge, fontFamily: 'Inter-Bold' },
-    headlineSmall: { ...MD3LightTheme.fonts.headlineSmall, fontFamily: 'Inter-Bold' },
-    headlineMedium: { ...MD3LightTheme.fonts.headlineMedium, fontFamily: 'Inter-ExtraBold' },
-    headlineLarge: { ...MD3LightTheme.fonts.headlineLarge, fontFamily: 'Inter-ExtraBold' },
-  },
+/** True once the saved light/dark choice has been read, so the first frame is drawn in the right theme. */
+const useThemeLoaded = () => {
+  const [loaded, setLoaded] = useState(useThemeStore.persist.hasHydrated);
+  useEffect(() => {
+    if (useThemeStore.persist.hasHydrated()) setLoaded(true);
+    return useThemeStore.persist.onFinishHydration(() => setLoaded(true));
+  }, []);
+  return loaded;
 };
-
-const CustomDefaultTheme = {
-  ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, background: 'rgb(255, 255, 255)' },
-};
-
-function KioskOverlay() {
-  const { handleSecretTap, pinVisible, handlePinSubmit, handlePinCancel } = useKioskExit();
-  return (
-    <>
-      <Pressable onPress={handleSecretTap} style={styles.hiddenTap} />
-      <KioskPinModal visible={pinVisible} onSubmit={handlePinSubmit} onCancel={handlePinCancel} />
-    </>
-  );
-}
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const { i18n } = useTranslation();
-
-  const [fontsLoaded, fontError] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-  const loaded = fontsLoaded || !!fontError;
+  const isDark = useThemeStore((s) => s.isDark);
+  const themeLoaded = useThemeLoaded();
+  // Builds from 2.0.5 on embed Onest too; loading it here also covers older builds via OTA.
+  // A font that fails to load falls back to the system font rather than blocking the app.
+  const [fontsLoaded, fontError] = useFonts({ Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold });
+  const ready = themeLoaded && (fontsLoaded || !!fontError);
 
   useEffect(() => {
-    if (!loaded) return;
-    SplashScreen.hideAsync();
+    Uniwind.setTheme(isDark ? 'dark' : 'light');
+  }, [isDark]);
 
-    // Load stored language
+  useEffect(() => {
+    if (!ready) return;
+    SplashScreen.hideAsync();
     getStorage('language').then((lang) => {
       if (lang) i18n.changeLanguage(lang.toLowerCase());
     });
-
-    // Camera permission
     Camera.requestCameraPermissionsAsync();
-
-    // Lock landscape
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-
-    // Transparent system UI
     SystemUI.setBackgroundColorAsync('transparent');
+    if (Platform.OS === 'android') Kiosk.start(EXTRA_ALLOWED_APPS).catch(() => {});
+  }, [ready]);
 
-    // Kiosk mode
-    if (Platform.OS === 'android') {
-      KioskModule.startKiosk().catch(() => {});
-    }
-
-    // Hide Android nav bar
-    if (Platform.OS === 'android') {
-      NavigationBar.setBackgroundColorAsync('#FF000000')
-        .then(() => NavigationBar.setButtonStyleAsync('light'))
-        .then(() => NavigationBar.setVisibilityAsync('hidden'))
-        .catch(() => {});
-    }
-  }, [loaded]);
-
-  if (!loaded) return null;
+  if (!ready) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : CustomDefaultTheme}>
+    // Every touch, dialogs included, keeps the screensaver away
+    <GestureHandlerRootView style={{ flex: 1 }} onTouchStart={markActivity}>
       <ApolloProvider client={client}>
         <AuthProvider>
           <SafeAreaProvider>
-            <PaperProvider theme={paperTheme}>
+            <HeroUINativeProvider>
               <ValidProvider>
-                <DrawerProvider>
-                  <CartProvider>
-                    <ToastProvider
-                      renderType={{
-                        custom_type: (toast: ToastProps) => (
-                          <CustomToast type={toast.type ?? 'default'} message={toast.message} />
-                        ),
-                        table_message: (toast: ToastProps) => <TableMessageToast id={toast.id} {...toast.data} />,
-                      }}
-                    >
-                      <StatusBar hidden />
-                      <NetworkStatusListener />
-                      <OtaUpdateListener />
-                      <KioskOverlay />
-                      <Stack screenOptions={{ headerShown: false }}>
-                        <Stack.Screen name="index" />
-                        <Stack.Screen name="public" />
-                        <Stack.Screen name="private" />
-                      </Stack>
-                      <MbankQuizModal />
-                    </ToastProvider>
-                  </CartProvider>
-                </DrawerProvider>
+                <NavigationTheme isDark={isDark}>
+                  <StatusBar hidden />
+                  <HiddenNavigationBar />
+                  <Routes />
+                  <QuizOverlay />
+                  <OfflineNotice />
+                  <UpdatePrompt />
+                  <AppUpdater />
+                  <NightlyRestart />
+                  <AdminExit />
+                </NavigationTheme>
               </ValidProvider>
-            </PaperProvider>
+            </HeroUINativeProvider>
           </SafeAreaProvider>
         </AuthProvider>
       </ApolloProvider>
-    </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 
-const styles = StyleSheet.create({
-  hiddenTap: {
-    position: 'absolute',
-    top: 0,
-    left: '50%',
-    transform: [{ translateX: -30 }],
-    width: 60,
-    height: 60,
-    zIndex: 999,
-  },
-});
+/**
+ * (menu): the guests' screens, at / and /history. setup: staff link the tablet to a table, at /setup.
+ * The menu's layout sends a tablet without a table session to setup; until that's known, a loader.
+ */
+const Routes = () => {
+  const { valid } = useValid();
+  if (valid === null) return <LoadingScreen />;
+  return <Stack screenOptions={{ headerShown: false }} />;
+};
+
+/** Screen transitions show the navigator's background; match it to the app theme. */
+const NavigationTheme = ({ isDark, children }: { isDark: boolean; children: ReactNode }) => {
+  const background = useThemeColor('background');
+  const theme = useMemo(() => {
+    const base = isDark ? DarkTheme : DefaultTheme;
+    return { ...base, colors: { ...base.colors, background } };
+  }, [isDark, background]);
+  return <ThemeProvider value={theme}>{children}</ThemeProvider>;
+};

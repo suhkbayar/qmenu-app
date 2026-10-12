@@ -1,0 +1,27 @@
+{
+  "mainPage": {
+    "NotPaidDescription": "Sizning hisobingiz to'lanmagan",
+    "citizen": "Fuqarolik",
+    "enter_registration_number": "Ro‘yxatga olish raqamini kiriting",
+    "validation": {
+      "mandatoryOptions": "Majburiy variantlarni tanlang: {{options}}"
+    },
+    "Total": "Jami",
+    "AmountPaid": "To'lanishi kerak bo'lgan miqdor",
+    "Order": "Buyurtma",
+    "YourOrder": "Sizning buyurtmangiz",
+    "GoBack": "Orqaga",
+    "Dining": "ovqatlanish",
+    "TakeAway": "Olib ketish",
+    "OrganizationalRegisters": "Tashkiliy registrlar",
+    "Individual": "Shaxs",
+    "Institution": "Tashkilot",
+    "add": "Qo'shish",
+    "Variants": "Tanlovlar",
+    "Required": "Majburiy",
+    "extra": "Qo‘shimcha",
+    "call_waiter": "Ofitsiantni chaqirish",
+    "request_bill": "Hisobni so‘rash",
+    "table_clean": "Stolni tozalashni so'rash"
+  }
+}

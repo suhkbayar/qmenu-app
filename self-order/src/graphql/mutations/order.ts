@@ -6,7 +6,6 @@ import {
   ORDER_FIELDS,
   ORDER_ITEM_FIELDS,
   ORDER_LOYALTY_FIELDS,
-  ORDER_TABLE_FIELDS,
 } from '../queries';
 
 export const CREATE_ORDER = gql`
@@ -48,34 +47,18 @@ export const CREATE_ORDER = gql`
   ${ORDER_LOYALTY_FIELDS}
 `;
 
-export const PAY_ORDER_WITH_SUB_PAYMENTS = gql`
-  mutation payOrderWithSubPayments($input: TransactionInput!, $inputs: [TransactionInput!]) {
-    payOrderWithSubPayments(input: $input, inputs: $inputs) {
-      order {
-        ...OrderFields
-        table {
-          ...TableFields
-        }
-        items {
-          ...OrderItemFields
-        }
-        transactions {
-          ...TransactionFields
-        }
-        loyalties {
-          ...OrderLoyaltyFields
-        }
-      }
-      transaction {
-        ...TransactionFields
+/** A new round of items onto the table's open order; the kitchen gets just the new items. */
+export const ADD_ORDER_ITEMS = gql`
+  mutation addOrderItems($participant: ID!, $id: ID!, $items: [OrderItemInput!]!) {
+    addOrderItems(participant: $participant, id: $id, items: $items) {
+      ...OrderFields
+      items {
+        ...OrderItemFields
       }
     }
   }
   ${ORDER_FIELDS}
-  ${TABLE_FIELDS}
   ${ORDER_ITEM_FIELDS}
-  ${ORDER_LOYALTY_FIELDS}
-  ${TRANSACTION_FIELDS}
 `;
 
 export const GET_PAY_ORDER = gql`
@@ -131,71 +114,4 @@ export const VALIDATE_TRANSACTION = gql`
   ${ORDER_ITEM_FIELDS}
   ${TRANSACTION_FIELDS}
   ${ORDER_LOYALTY_FIELDS}
-`;
-
-export const CORRECTION_TRANSACTION = gql`
-  mutation returnTransaction($id: ID!, $reason: String) {
-    returnTransaction(id: $id, reason: $reason) {
-      order {
-        ...OrderFields
-        table {
-          ...TableFields
-        }
-        items {
-          ...OrderItemFields
-        }
-        transactions {
-          ...TransactionFields
-        }
-        loyalties {
-          ...OrderLoyaltyFields
-        }
-      }
-      transaction {
-        ...TransactionFields
-      }
-    }
-  }
-  ${ORDER_FIELDS}
-  ${TABLE_FIELDS}
-  ${ORDER_ITEM_FIELDS}
-  ${TRANSACTION_FIELDS}
-  ${ORDER_LOYALTY_FIELDS}
-`;
-
-export const START_ORDER = gql`
-  mutation startOrder($id: ID!) {
-    startOrder(id: $id) {
-      ...OrderFields
-      table {
-        ...TableFields
-      }
-      items {
-        ...OrderItemFields
-      }
-      transactions {
-        ...TransactionFields
-      }
-      discounts {
-        ...DiscountsFields
-      }
-      charges {
-        ...ChargesFields
-      }
-      loyalties {
-        ...OrderLoyaltyFields
-      }
-      tables {
-        ...OrderTableFields
-      }
-    }
-  }
-  ${TABLE_FIELDS}
-  ${ORDER_FIELDS}
-  ${DISCOUNTS_FIELDS}
-  ${CHARGES_FIELDS}
-  ${ORDER_ITEM_FIELDS}
-  ${TRANSACTION_FIELDS}
-  ${ORDER_LOYALTY_FIELDS}
-  ${ORDER_TABLE_FIELDS}
 `;

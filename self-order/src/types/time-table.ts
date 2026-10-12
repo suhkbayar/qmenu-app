@@ -21,23 +21,3 @@ export interface ITimeTable {
   wedClose: string;
   wedOpen: string;
 }
-
-export interface IOpenOrClose {
-  key: string;
-  name: string;
-  count: number;
-  field: string;
-}
-
-export interface IFilterRestaurantTypes {
-  key: string;
-  field: string;
-  count: number;
-}
-
-export interface IFilterDeliveryType {
-  key: string;
-  name: string;
-  field: string;
-  count: number;
-}

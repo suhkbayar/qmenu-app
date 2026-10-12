@@ -1,6 +1,5 @@
-import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
-import { getStorage, removeStorage, setStorage } from '@/src/store/storage';
-import { isEmpty } from 'lodash';
+import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import { getStorage, removeStorage, setStorage } from '@/src/lib/storage';
 import { DEFAULT_TOKEN } from '@/src/constants/token';
 import jwtDecode from 'jwt-decode';
 
@@ -21,7 +20,7 @@ const getAccessToken = async () => {
 
 export const isValidToken = async () => {
   const token = await getAccessToken();
-  if (isEmpty(token)) return false;
+  if (!token) return false;
   try {
     const { exp }: Payload = jwtDecode(token as string);
     if (exp * 1000 < new Date().getTime()) return false;

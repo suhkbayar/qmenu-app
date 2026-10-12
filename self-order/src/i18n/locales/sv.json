@@ -1,0 +1,27 @@
+{
+  "mainPage": {
+    "NotPaidDescription": "Din räkning har inte blivit betald.",
+    "citizen": "Medborgare",
+    "enter_registration_number": "Ange registreringsnummer",
+    "validation": {
+      "mandatoryOptions": "Vänligen välj obligatoriska alternativ: {{options}}"
+    },
+    "Total": "Total",
+    "AmountPaid": "Summa att betala",
+    "Order": "Ordning",
+    "YourOrder": "Du beställer",
+    "GoBack": "Tillbaka",
+    "Dining": "Matsal",
+    "TakeAway": "Hämtmat",
+    "OrganizationalRegisters": "Organisationsregister",
+    "Individual": "En individ",
+    "Institution": "Organisation",
+    "add": "Lägg till",
+    "Variants": "alternativ",
+    "Required": "Obligatoriskt,",
+    "extra": "Extra",
+    "call_waiter": "Kalla på servitör",
+    "request_bill": "Be om notan",
+    "table_clean": "Be om bordsrengöring"
+  }
+}

@@ -1,0 +1,76 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <!-- Self-updates (AppInstaller) -->
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
+  <!-- Android 11+ package visibility: the admin exit finds the stock launcher, and
+       DeviceOwner.setAllowedApps finds apps with icons, Settings, Camera and Files -->
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.MAIN"/>
+      <category android:name="android.intent.category.HOME"/>
+    </intent>
+    <intent>
+      <action android:name="android.intent.action.MAIN"/>
+      <category android:name="android.intent.category.LAUNCHER"/>
+    </intent>
+    <intent>
+      <action android:name="android.settings.SETTINGS"/>
+    </intent>
+    <intent>
+      <action android:name="android.media.action.STILL_IMAGE_CAMERA"/>
+    </intent>
+    <intent>
+      <action android:name="android.intent.action.OPEN_DOCUMENT"/>
+      <data android:mimeType="*/*"/>
+    </intent>
+  </queries>
+
+  <application>
+    <!-- Device-owner component. Its class name must never change (see QMenuDeviceAdminReceiver.kt). -->
+    <receiver
+      android:name="com.mn.qmenu.selforder.QMenuDeviceAdminReceiver"
+      android:label="QMenu Kiosk Admin"
+      android:permission="android.permission.BIND_DEVICE_ADMIN"
+      android:exported="true">
+      <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin_receiver"/>
+      <intent-filter>
+        <action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/>
+        <action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE"/>
+      </intent-filter>
+    </receiver>
+
+    <receiver android:name="com.mn.qmenu.selforder.kiosk.RelaunchReceiver" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+      </intent-filter>
+    </receiver>
+
+    <!-- QR provisioning steps (Android 12+), see Provisioning.kt -->
+    <activity
+      android:name="com.mn.qmenu.selforder.kiosk.GetProvisioningModeActivity"
+      android:permission="android.permission.BIND_DEVICE_ADMIN"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.app.action.GET_PROVISIONING_MODE"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+    </activity>
+    <activity
+      android:name="com.mn.qmenu.selforder.kiosk.AdminPolicyComplianceActivity"
+      android:permission="android.permission.BIND_DEVICE_ADMIN"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+    </activity>
+    <activity android:name="com.mn.qmenu.selforder.kiosk.ProvisioningSuccessActivity" android:exported="true">
+      <intent-filter>
+        <action android:name="android.app.action.PROVISIONING_SUCCESSFUL"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

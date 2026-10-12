@@ -1,5 +1,4 @@
 import { gql } from '@apollo/client';
-import { PRODUCT_FIELDS, VARIANT_FIELDS } from '../fragments';
 
 export const ME = gql`
   {
@@ -32,27 +31,4 @@ export const ME = gql`
       }
     }
   }
-`;
-
-export const GET_CUSTOMER_PRODUCTS = gql`
-  {
-    getCustomerProducts {
-      id
-      spentOrder
-      state
-      code
-      transaction
-      expiredAt
-      issuedOrder
-      issuedType
-      product {
-        ...ProductFields
-        variants {
-          ...VariantFields
-        }
-      }
-    }
-  }
-  ${PRODUCT_FIELDS}
-  ${VARIANT_FIELDS}
 `;

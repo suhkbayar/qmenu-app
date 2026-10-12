@@ -1,0 +1,27 @@
+{
+  "mainPage": {
+    "NotPaidDescription": "Ваш счёт не был оплачен.",
+    "citizen": "Гражданин",
+    "enter_registration_number": "Введите регистрационный номер",
+    "validation": {
+      "mandatoryOptions": "Пожалуйста, выберите обязательные опции: {{options}}"
+    },
+    "Total": "Oбщий",
+    "Order": "Заказ",
+    "YourOrder": "Твоя очередь",
+    "GoBack": "Назад",
+    "Dining": "Столовая",
+    "TakeAway": "Забрать",
+    "OrganizationalRegisters": "Oрганизационные реестры",
+    "AmountPaid": "Необходимая к оплате сумма",
+    "Individual": "Индивидуальный",
+    "Institution": "Корпоративный",
+    "add": "Добавить",
+    "Variants": "Варианты",
+    "Required": "Обязательно",
+    "extra": "Дополнительно",
+    "call_waiter": "Позвать официанта",
+    "request_bill": "Попросить счёт",
+    "table_clean": "Попросить убрать стол"
+  }
+}

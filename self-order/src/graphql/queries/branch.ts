@@ -9,18 +9,6 @@ import {
 } from '../fragments/menu';
 import { CHANNEL_CONFIG_FIELDS, TIMETABLE_FIELDS } from '../fragments';
 
-export const GET_BRANCHES = gql`
-  {
-    getParticipants {
-      id
-      branch {
-        ...BranchFields
-      }
-    }
-  }
-  ${BRANCH_FIELDS}
-`;
-
 export const GET_BRANCH = gql`
   query getParticipant($id: ID!) {
     getParticipant(id: $id) {

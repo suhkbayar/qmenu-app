@@ -56,23 +56,12 @@ export interface IOrder {
   phone?: string;
   acceptedAt: string;
   preparedAt: string;
+  cancelledAt?: string;
   vatIncludeAmount: number;
   vatExcludeAmount: number;
   startAt: string;
   duration?: number;
   vats?: IVats[];
-}
-
-export interface ICustomerOrder {
-  items: IOrderItem[];
-  totalAmount: number;
-  grandTotal: number;
-  totalQuantity: number;
-  state: string;
-  type?: string;
-  buyer?: string;
-  register?: string;
-  vatType?: string;
 }
 
 export interface ICustomerTable {
@@ -120,14 +109,6 @@ export interface IOrderDiscount {
   value: number;
 }
 
-export interface IOrderItemOptions {
-  id: string;
-  name: string;
-  price: number;
-  value: any;
-  type: string;
-}
-
 export interface IOrderItem {
   id?: string;
   uuid: string;
@@ -135,6 +116,8 @@ export interface IOrderItem {
   quantity: number;
   comment?: string;
   price: number;
+  /** Line total as the server calculated it (placed orders only) */
+  total?: number;
   discount: number;
   state: string;
   image: string;

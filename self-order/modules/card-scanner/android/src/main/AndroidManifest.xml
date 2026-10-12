@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Android 11+ package visibility for the Gerege mPOS payment app we hand card payments to -->
+  <queries>
+    <package android:name="com.gerege.mpos"/>
+  </queries>
+</manifest>

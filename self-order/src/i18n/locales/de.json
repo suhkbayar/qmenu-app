@@ -1,0 +1,27 @@
+{
+  "mainPage": {
+    "citizen": "Bürger",
+    "enter_registration_number": "Registrierungsnummer eingeben",
+    "validation": {
+      "mandatoryOptions": "Bitte wählen Sie die erforderlichen Optionen aus: {{options}}"
+    },
+    "Total": "Gesamt",
+    "AmountPaid": "Zu zahlender Betrag",
+    "Order": "Befehl",
+    "YourOrder": "Deine Bestellung",
+    "GoBack": "Der Rücken",
+    "Dining": "Essen",
+    "TakeAway": "Wegbringen",
+    "OrganizationalRegisters": "Organisationsregister",
+    "Individual": "Ein Individuum",
+    "Institution": "Organisation",
+    "add": "Hinzufügen",
+    "Variants": "Optionen",
+    "NotPaidDescription": "Ihre Rechnung wurde nicht bezahlt.",
+    "Required": "Erforderlich",
+    "extra": "Zusatz",
+    "call_waiter": "Kellner rufen",
+    "request_bill": "Rechnung anfordern",
+    "table_clean": "Tisch reinigen lassen"
+  }
+}

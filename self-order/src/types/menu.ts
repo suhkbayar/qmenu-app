@@ -15,7 +15,7 @@ export interface IMenuCategory {
   sort: number;
   color: string;
   active: boolean;
-  children: any;
+  children?: IMenuCategory[];
   products?: IMenuProduct[];
   timetable: ITimeTable;
 }
