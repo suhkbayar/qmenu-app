@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { ScrollView, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useApolloClient } from '@apollo/client';
-import { Button, Dialog, PressableFeedback, Spinner, cn, useThemeColor } from 'heroui-native';
+import { Button, Dialog, Spinner, cn, useThemeColor } from 'heroui-native';
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Clock, CreditCard, QrCode, ReceiptText, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'react-native-qrcode-svg';
@@ -33,6 +33,7 @@ export const CheckoutDialog = () => {
   const window = useWindowDimensions();
   const orderId = useCheckout((s) => s.orderId);
   const payLater = useCheckout((s) => s.payLater);
+  const preview = useCheckout((s) => s.preview);
 
   const close = () => {
     useCheckout.getState().close();
@@ -52,19 +53,32 @@ export const CheckoutDialog = () => {
           style={{ width: Math.min(820, window.width - 48), height: Math.min(700, window.height - 40) }}
         >
           {/* A fresh checkout per order */}
-          {orderId && <Checkout key={orderId} orderId={orderId} payLater={payLater} onClose={close} />}
+          {orderId && (
+            <Checkout key={orderId} orderId={orderId} payLater={payLater} preview={preview} onClose={close} />
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog>
   );
 };
 
-const Checkout = ({ orderId, payLater, onClose }: { orderId: string; payLater: boolean; onClose: () => void }) => {
-  const payment = usePayment(orderId, payLater);
+const Checkout = ({
+  orderId,
+  payLater,
+  preview,
+  onClose,
+}: {
+  orderId: string;
+  payLater: boolean;
+  preview: IOrder | null;
+  onClose: () => void;
+}) => {
+  const payment = usePayment(orderId, payLater, preview);
   const receipt = useReceipt();
   const { order, step } = payment;
 
-  if (payment.failed) return <LoadFailed onRetry={payment.retry} onClose={onClose} />;
+  // Paying needs the server's copy; "sent, pay later" doesn't, so it stays up on the tablet's own
+  if (payment.failed && (step !== 'done' || !order)) return <LoadFailed onRetry={payment.retry} onClose={onClose} />;
 
   if (payment.loading || !order) {
     return (
@@ -261,7 +275,8 @@ const PayStep = ({
                 key={method}
                 method={method}
                 loading={payment.pendingMethod === method}
-                disabled={!!payment.pendingMethod || !receipt.ready}
+                // Until the server's copy of the order is here (a moment), so the amount paid is the server's
+                disabled={!!payment.pendingMethod || !receipt.ready || !payment.upToDate}
                 onPress={() => payment.select(method, paymentId, receipt.receipt)}
               />
             ))}
@@ -274,6 +289,8 @@ const PayStep = ({
 
 // М Банк's brand green, behind its wordmark
 const MBANK_GREEN = '#21CDA8';
+// Android's own touch ripple: the tiles are plain views, so the dialog has less to set up as it opens
+const RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
 
 type MethodLook = {
   name: string;
@@ -324,14 +341,16 @@ const MethodTile = ({
 }) => {
   const look = useMethodLook(method);
   return (
-    <PressableFeedback
+    <Pressable
       onPress={onPress}
-      isDisabled={disabled}
+      disabled={disabled}
+      android_ripple={RIPPLE}
       accessibilityRole="button"
       accessibilityLabel={look.name}
+      accessibilityState={{ disabled }}
       // Mark on top and the name under it, so the logo can be big and the text still has the full width
       className={cn(
-        'h-36 w-[31.8%] items-center justify-center gap-3 rounded-3xl border border-border bg-surface px-3',
+        'h-36 w-[31.8%] items-center justify-center gap-3 overflow-hidden rounded-3xl border border-border bg-surface px-3',
         disabled && !loading && 'opacity-50',
       )}
     >
@@ -345,7 +364,7 @@ const MethodTile = ({
       <Text className="self-stretch text-center text-lg font-bold" numberOfLines={1}>
         {look.name}
       </Text>
-    </PressableFeedback>
+    </Pressable>
   );
 };
 

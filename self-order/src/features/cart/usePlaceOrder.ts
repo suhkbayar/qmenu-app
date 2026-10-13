@@ -61,7 +61,10 @@ export const usePlaceOrder = () => {
       setFinishing(false);
       setConfirmOpen(false);
       useOrderSheet.getState().show('ordered');
-      useCheckout.getState().open(orderId, { payLater: true });
+      // The order as just reloaded: the "sent" screen opens on it at once
+      const orders = apollo.readQuery<{ getTabletOrders: IOrder[] }>({ query: GET_TABLET_ORDERS, variables: { limit: 10 } });
+      const order = orders?.getTabletOrders?.find((o) => o.id === orderId);
+      useCheckout.getState().open(orderId, { payLater: true, order });
       clearCart();
     },
     [apollo, clearCart],
@@ -88,7 +91,7 @@ export const usePlaceOrder = () => {
       } else {
         // Paid first: checkout opens over the sheet, which then shows the order on Захиалсан
         useOrderSheet.getState().show('ordered');
-        useCheckout.getState().open(orderId);
+        useCheckout.getState().open(orderId, { order: data.createOrder });
         clearCart();
       }
     },

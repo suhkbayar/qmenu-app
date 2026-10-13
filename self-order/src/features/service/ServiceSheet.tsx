@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import { Button, Dialog, PressableFeedback, Spinner, useThemeColor } from 'heroui-native';
+import { Pressable, View } from 'react-native';
+import { Button, Dialog, Spinner, useThemeColor } from 'heroui-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Bell, ChevronRight, History, QrCode, ReceiptText, Sparkles, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +19,9 @@ const REQUESTS: { id: ServiceRequest; labelKey: string; Icon: typeof Bell }[] = 
   { id: 'bill', labelKey: 'mainPage.request_bill', Icon: ReceiptText },
   { id: 'clean', labelKey: 'mainPage.table_clean', Icon: Sparkles },
 ];
+
+// Android's own touch ripple: the tiles are plain views, so the sheet has less to set up as it opens
+const RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
 
 /**
  * Call waiter, request the bill, ask for cleaning; or show the table's QR code for phone ordering,
@@ -74,11 +77,12 @@ export const ServiceSheet = ({ isOpen, onOpenChange }: Props) => {
             <>
               <View className="flex-row gap-4">
                 {REQUESTS.map(({ id, labelKey, Icon }) => (
-                  <PressableFeedback
+                  <Pressable
                     key={id}
                     onPress={() => request(id)}
-                    isDisabled={!!pending}
-                    className="h-44 flex-1 items-center justify-center gap-4 rounded-3xl border border-border bg-surface px-3"
+                    disabled={!!pending}
+                    android_ripple={RIPPLE}
+                    className="h-44 flex-1 items-center justify-center gap-4 overflow-hidden rounded-3xl border border-border bg-surface px-3"
                     accessibilityRole="button"
                   >
                     <View className="size-19 items-center justify-center rounded-full bg-accent">
@@ -88,12 +92,13 @@ export const ServiceSheet = ({ isOpen, onOpenChange }: Props) => {
                     <Text className="self-stretch text-center text-xl font-bold" numberOfLines={2}>
                       {t(labelKey)}
                     </Text>
-                  </PressableFeedback>
+                  </Pressable>
                 ))}
               </View>
-              <PressableFeedback
+              <Pressable
                 onPress={() => setShowQr(true)}
-                className="h-16 flex-row items-center gap-3.5 rounded-[18px] bg-background px-5"
+                android_ripple={RIPPLE}
+                className="h-16 flex-row items-center gap-3.5 overflow-hidden rounded-[18px] bg-background px-5"
                 accessibilityRole="button"
               >
                 <QrCode size={24} color={foreground} />
@@ -101,15 +106,16 @@ export const ServiceSheet = ({ isOpen, onOpenChange }: Props) => {
                   {t('mainPage.phoneOrder')}
                 </Text>
                 <ChevronRight size={22} color={muted} />
-              </PressableFeedback>
+              </Pressable>
               {/* Every order today at this table, for when a guest says they ordered but can't find it.
                   Here because Service is always in the top bar; the order bar isn't once all is done. */}
-              <PressableFeedback
+              <Pressable
                 onPress={() => {
                   onOpenChange(false);
                   router.push('/history');
                 }}
-                className="-mt-3 h-16 flex-row items-center gap-3.5 rounded-[18px] bg-background px-5"
+                android_ripple={RIPPLE}
+                className="-mt-3 h-16 flex-row items-center gap-3.5 overflow-hidden rounded-[18px] bg-background px-5"
                 accessibilityRole="button"
               >
                 <History size={24} color={foreground} />
@@ -117,7 +123,7 @@ export const ServiceSheet = ({ isOpen, onOpenChange }: Props) => {
                   {t('mainPage.orderHistory')}
                 </Text>
                 <ChevronRight size={22} color={muted} />
-              </PressableFeedback>
+              </Pressable>
             </>
           )}
         </Dialog.Content>

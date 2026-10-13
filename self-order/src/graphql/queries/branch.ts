@@ -76,3 +76,19 @@ export const GET_BRANCH = gql`
   ${MENU_FIELDS}
   ${BRANCH_FIELDS}
 `;
+
+/**
+ * Just the participant's settings (the admin PIN among them), without the menu: read straight from
+ * the server when the admin dialog checks a PIN, since staff may have just changed it.
+ */
+export const GET_PARTICIPANT_CONFIGS = gql`
+  query getParticipantConfigs($id: ID!) {
+    getParticipant(id: $id) {
+      id
+      configs {
+        ...ChannelConfigFields
+      }
+    }
+  }
+  ${CHANNEL_CONFIG_FIELDS}
+`;

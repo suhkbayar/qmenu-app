@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { PressableFeedback, cn } from 'heroui-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { cn, useThemeColor } from 'heroui-native';
 import { useTranslation } from 'react-i18next';
 import Animated, {
   Easing,
@@ -40,6 +40,8 @@ type Props = {
 
 // Light text on the marked table's colour, as a fixed colour: theme text colours on fills were unreliable
 const ON_COLOR = '#FFFFFF';
+// Android's own touch ripple: tables and tabs are plain views, not one animated button each
+const RIPPLE = { color: 'rgba(0,0,0,0.12)', foreground: true };
 
 const shapeBounds = (shape: ITableShape) =>
   shape.type === 'circle'
@@ -54,6 +56,7 @@ const shapeBounds = (shape: ITableShape) =>
 /** The restaurant's floor plan, one section at a time, drawn to fit. Tables without a shape show as chips. */
 export const TableFloorPlan = ({ tables, ownTableId, markedId, color, onSelect, compact, pulse }: Props) => {
   const { t } = useTranslation('language');
+  const [foreground, accentForeground] = useThemeColor(['foreground', 'accent-foreground']);
 
   const sections = useMemo(() => {
     const groups = new Map<string, { id: string; name: string; tables: ITable[] }>();
@@ -85,17 +88,26 @@ export const TableFloorPlan = ({ tables, ownTableId, markedId, color, onSelect, 
           {sections.map((s) => {
             const active = s.id === section?.id;
             return (
-              <PressableFeedback
+              <Pressable
                 key={s.id}
                 onPress={() => setActiveId(s.id)}
+                android_ripple={RIPPLE}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
-                className={cn('h-11 justify-center rounded-full px-4', active ? 'bg-accent' : 'border border-border bg-surface')}
+                className={cn(
+                  'h-11 justify-center overflow-hidden rounded-full px-4',
+                  active ? 'bg-accent' : 'border border-border bg-surface',
+                )}
               >
-                <Text className={cn(active ? 'font-bold text-accent-foreground' : 'font-medium')} numberOfLines={1}>
+                {/* Colour set directly: a changing colour class came out wrong on the tablets */}
+                <Text
+                  className={active ? 'font-bold' : 'font-medium'}
+                  style={{ color: active ? accentForeground : foreground }}
+                  numberOfLines={1}
+                >
                   {s.name}
                 </Text>
-              </PressableFeedback>
+              </Pressable>
             );
           })}
         </ScrollView>
@@ -262,16 +274,17 @@ const PlanTable = ({
     <>
       {marked && frame && <Halo frame={frame} rotate={rotate} color={color} compact={compact} pulse={pulse} />}
       {onSelect ? (
-        <PressableFeedback
+        <Pressable
           onPress={() => onSelect(table)}
+          android_ripple={RIPPLE}
           accessibilityRole="button"
           accessibilityLabel={table.name}
           accessibilityState={{ selected: marked }}
-          className={cn(shape, !marked && idle)}
+          className={cn(shape, 'overflow-hidden', !marked && idle)}
           style={[placed, look]}
         >
           {body}
-        </PressableFeedback>
+        </Pressable>
       ) : (
         <View pointerEvents="none" className={cn(shape, !marked && idle)} style={[placed, look]}>
           {body}

@@ -38,7 +38,7 @@ export const BillButtons = ({ order, stacked = false }: { order: IOrder; stacked
         <Button
           size="lg"
           className={cn('h-15 rounded-[18px]', !stacked && 'flex-1')}
-          onPress={() => openCheckout(order.id!)}
+          onPress={() => openCheckout(order.id!, { order })}
         >
           <Button.Label numberOfLines={1} className="font-bold">
             {t('mainPage.pay')}

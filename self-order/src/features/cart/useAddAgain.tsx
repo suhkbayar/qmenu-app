@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { Button, useThemeColor } from 'heroui-native';
 import { Plus } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { useOpenCategories } from '@/src/features/menu/useMenu';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { indexProducts, isConfigurable, isUnavailable } from '@/src/lib/menu';
 import { IMenuProduct, IOrderItem } from '@/src/types';
@@ -15,7 +16,8 @@ import { useCartStore } from './cartStore';
  */
 export const useAddAgain = (onOpenProduct: (product: IMenuProduct) => void) => {
   const orderable = useSessionStore((s) => s.participant?.orderable === true);
-  const categories = useSessionStore((s) => s.participant?.menu?.categories);
+  // Only dishes on the menu right now: no [+] on a lunch dish after lunch
+  const categories = useOpenCategories(useSessionStore((s) => s.participant?.menu?.categories));
   const products = useMemo(() => indexProducts(categories), [categories]);
   // Ordered items name their product: a fallback for servers that don't send its id yet, used only
   // when no other product on the menu has the same name

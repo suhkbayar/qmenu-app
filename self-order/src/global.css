@@ -65,6 +65,9 @@
       --border: #e6e2da;
       --separator: #d9d5cd;
       --segment: #ffffff;
+      /* No soft shadow round dialogs and sheets: Android blurs it again on every frame while they
+         animate, which stuttered on the tablets, and over the dimmed backdrop it barely showed */
+      --overlay-shadow: none;
 
       --positive: #1d6b43;
       --positive-soft: #e3f3ea;
@@ -97,6 +100,7 @@
       --separator: #46423c;
       --segment: #3a3732;
       --field-background: #272522;
+      --overlay-shadow: none;
 
       --positive: #6fd39d;
       --positive-soft: #173426;

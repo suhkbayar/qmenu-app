@@ -1,11 +1,17 @@
 import { create } from 'zustand';
+import { IOrder } from '@/src/types';
 
 type CheckoutState = {
   /** The order being paid; null = checkout closed */
   orderId: string | null;
-  /** The order was just sent to be paid at the end: open straight on the done step */
+  /** The order was just sent to be paid later: open straight on the done step */
   payLater: boolean;
-  open: (orderId: string, options?: { payLater?: boolean }) => void;
+  /**
+   * The order as the tablet already has it (from the orders list, or just placed): the checkout opens
+   * on it instead of a spinner, while the server's latest copy loads
+   */
+  preview: IOrder | null;
+  open: (orderId: string, options?: { payLater?: boolean; order?: IOrder | null }) => void;
   close: () => void;
 };
 
@@ -13,6 +19,7 @@ type CheckoutState = {
 export const useCheckout = create<CheckoutState>()((set) => ({
   orderId: null,
   payLater: false,
-  open: (orderId, options) => set({ orderId, payLater: options?.payLater ?? false }),
-  close: () => set({ orderId: null, payLater: false }),
+  preview: null,
+  open: (orderId, options) => set({ orderId, payLater: options?.payLater ?? false, preview: options?.order ?? null }),
+  close: () => set({ orderId: null, payLater: false, preview: null }),
 }));

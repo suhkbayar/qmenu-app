@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
+import { useApolloClient } from '@apollo/client';
 import { Button, Dialog, Spinner, cn, useThemeColor, useToast } from 'heroui-native';
 import { RefreshCw } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +8,8 @@ import * as Updates from 'expo-updates';
 import { create } from 'zustand';
 import { Kiosk } from '@/modules/kiosk';
 import { useSessionStore } from '@/src/features/session/sessionStore';
+import { GET_PARTICIPANT_CONFIGS } from '@/src/graphql/queries';
+import { IParticipant } from '@/src/types';
 import { Text } from '@/src/ui/Text';
 import { useAppUpdate } from './appUpdate';
 import { MAX_PIN_ATTEMPTS, usePinLock } from './pinLock';
@@ -18,6 +21,10 @@ import { VersionBadge } from './VersionBadge';
 const SUPPORT_PIN = process.env.EXPO_PUBLIC_SUPPORT_PIN;
 const TAPS_REQUIRED = 10;
 const TAP_WINDOW_MS = 3000;
+// Waiting longer than this for the server's PIN, the one the tablet last loaded is used instead
+const PIN_FETCH_TIMEOUT_MS = 5000;
+
+const adminPinOf = (configs?: IParticipant['configs']) => configs?.find((c) => c.name === 'ADMIN_PIN')?.value;
 
 /** 75000 → "1:15" */
 const formatCountdown = (ms: number) => {
@@ -67,10 +74,13 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
   const { t } = useTranslation('language');
   const { toast } = useToast();
   const [muted, foreground] = useThemeColor(['muted', 'foreground']);
-  const adminPin = useSessionStore((s) => s.participant?.configs?.find((c) => c.name === 'ADMIN_PIN')?.value);
+  const apollo = useApolloClient();
+  const participantId = useSessionStore((s) => s.participant?.id);
+  const adminPin = useSessionStore((s) => adminPinOf(s.participant?.configs));
   const { failures, lockedUntil, fail, reset } = usePinLock();
   const [pin, setPin] = useState('');
   const [wrong, setWrong] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [checked, setChecked] = useState(false);
   const [now, setNow] = useState(Date.now);
   const lockedFor = lockedUntil - now;
@@ -103,6 +113,34 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
               ? t('setup.upToDate')
               : null;
 
+  /**
+   * The branch's PIN as set on the server now. The tablet otherwise reloads its branch only every 10
+   * minutes, so a PIN staff just changed wouldn't work yet (and the old one still would). The answer
+   * also updates the tablet's copy. Offline, or with no answer in time, the PIN it last loaded.
+   */
+  const currentAdminPin = async () => {
+    if (!participantId) return adminPin;
+    try {
+      const request = apollo.query({
+        query: GET_PARTICIPANT_CONFIGS,
+        variables: { id: participantId },
+        fetchPolicy: 'network-only',
+      });
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), PIN_FETCH_TIMEOUT_MS),
+      );
+      const { data } = await Promise.race([request, timeout]);
+      return adminPinOf(data?.getParticipant?.configs);
+    } catch {
+      return adminPin;
+    }
+  };
+
+  // Opening the dialog loads the current settings, e.g. a PIN set for the first time enables the field
+  useEffect(() => {
+    if (isOpen) currentAdminPin();
+  }, [isOpen]);
+
   const close = () => {
     setPin('');
     setWrong(false);
@@ -111,8 +149,14 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
   };
 
   const submit = async () => {
-    if (locked || !pin) return;
-    if (pin !== adminPin && pin !== SUPPORT_PIN) {
+    if (locked || !pin || verifying) return;
+    let ok = pin === SUPPORT_PIN;
+    if (!ok) {
+      setVerifying(true);
+      ok = pin === (await currentAdminPin());
+      setVerifying(false);
+    }
+    if (!ok) {
       fail();
       setPin('');
       setWrong(true);
@@ -175,7 +219,8 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
             <Button size="lg" variant="secondary" className="flex-1 rounded-2xl" onPress={close}>
               <Button.Label numberOfLines={1}>{t('setup.cancel')}</Button.Label>
             </Button>
-            <Button size="lg" className="flex-1 rounded-2xl" isDisabled={!pin || locked} onPress={submit}>
+            <Button size="lg" className="flex-1 rounded-2xl" isDisabled={!pin || locked || verifying} onPress={submit}>
+              {verifying && <Spinner size="sm" />}
               <Button.Label numberOfLines={1} className="font-bold">{t('setup.exitKiosk')}</Button.Label>
             </Button>
           </View>

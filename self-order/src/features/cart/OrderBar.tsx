@@ -91,7 +91,7 @@ export const OrderBar = ({ hidden }: { hidden: boolean }) => {
         )}
       </PressableFeedback>
       {due > 0 && canPayHere && !!toPay?.id && (
-        <Button size="lg" className="h-14 rounded-[18px] px-7.5" onPress={() => openCheckout(toPay.id!)}>
+        <Button size="lg" className="h-14 rounded-[18px] px-7.5" onPress={() => openCheckout(toPay.id!, { order: toPay })}>
           <Button.Label numberOfLines={1} className="font-bold">
             {t('mainPage.pay')}
           </Button.Label>

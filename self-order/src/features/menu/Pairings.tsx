@@ -14,6 +14,7 @@ import { indexProducts, isConfigurable, isUnavailable } from '@/src/lib/menu';
 import { IMenuProduct } from '@/src/types';
 import { Image } from '@/src/ui/Image';
 import { Text } from '@/src/ui/Text';
+import { useOpenCategories } from './useMenu';
 
 /**
  * On a product's screen: up to two things that go with it (the restaurant's own pairings), each
@@ -24,7 +25,8 @@ export const Pairings = ({ product }: { product: IMenuProduct }) => {
   const { t } = useTranslation('language');
   const accentForeground = useThemeColor('accent-foreground');
   const menuId = useSessionStore((s) => s.participant?.menu?.id);
-  const categories = useSessionStore((s) => s.participant?.menu?.categories);
+  // Only dishes on the menu right now: no lunch dish suggested after lunch
+  const categories = useOpenCategories(useSessionStore((s) => s.participant?.menu?.categories));
   const hidePrice = useSessionStore((s) => s.config?.hidePrice === true);
   const menu = useMemo(() => indexProducts(categories), [categories]);
   const items = useCartStore((s) => s.items);

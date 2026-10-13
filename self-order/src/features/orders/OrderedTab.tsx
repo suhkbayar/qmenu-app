@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useOrderSheet } from '@/src/features/cart/orderSheetStore';
 import { lineTotal } from '@/src/features/cart/totals';
 import { AddAgainButton, useAddAgain } from '@/src/features/cart/useAddAgain';
+import { useOpenCategories } from '@/src/features/menu/useMenu';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { formatMoney, formatTime } from '@/src/lib/format';
 import { getCdnImageUrl } from '@/src/lib/image';
@@ -173,7 +174,8 @@ const DessertCard = ({ orders, onAdd }: { orders: IOrder[]; onAdd: (product: IMe
   const { t } = useTranslation('language');
   const accentForeground = useThemeColor('accent-foreground');
   const hidePrice = useSessionStore((s) => s.config?.hidePrice === true);
-  const categories = useSessionStore((s) => s.participant?.menu?.categories);
+  // Only desserts on the menu right now (a dessert menu with its own hours)
+  const categories = useOpenCategories(useSessionStore((s) => s.participant?.menu?.categories));
   const desserts = useMemo(() => findDesserts(categories), [categories]);
 
   const items = orders.flatMap((order) => order.items);

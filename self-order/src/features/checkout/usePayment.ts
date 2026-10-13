@@ -27,8 +27,11 @@ export type CheckoutStep = 'pay' | 'qr' | 'card' | 'done';
 /** The eBarimt receipt: personal ('1'), or for a registered taxpayer ('3') with its register number. */
 export type Receipt = { vatType: '1' | '3'; register?: string };
 
-/** Paying one order inside the checkout dialog. */
-export const usePayment = (orderId: string, payLater: boolean) => {
+/**
+ * Paying one order inside the checkout dialog. `preview` is the order as the tablet already has it,
+ * shown until the server's copy arrives; paying waits for that copy.
+ */
+export const usePayment = (orderId: string, payLater: boolean, preview?: IOrder | null) => {
   const { t } = useTranslation('language');
   const { toast } = useToast();
   const participant = useSessionStore((s) => s.participant);
@@ -50,14 +53,16 @@ export const usePayment = (orderId: string, payLater: boolean) => {
     notifyOnNetworkStatusChange: true,
   });
   // A later reload that fails (e.g. for the receipt, after paying) keeps the order already shown
-  const order: IOrder | undefined = data?.getOrder ?? previousData?.getOrder;
+  const latest: IOrder | undefined = data?.getOrder ?? previousData?.getOrder;
+  // Until the server's copy is here, the tablet's own: the dialog opens on it instead of a spinner
+  const order = latest ?? preview ?? undefined;
 
-  // Never an endless spinner: no order in time is a failure the guest can retry or leave
+  // Never an endless wait: no answer from the server in time is a failure the guest can retry or leave
   useEffect(() => {
-    if (order) return;
+    if (latest) return;
     const id = setTimeout(() => setTimedOut(true), LOAD_TIMEOUT_MS);
     return () => clearTimeout(id);
-  }, [order, attempt]);
+  }, [latest, attempt]);
 
   const retry = useCallback(() => {
     setTimedOut(false);
@@ -186,8 +191,10 @@ export const usePayment = (orderId: string, payLater: boolean) => {
   return {
     order,
     loading: loading && !order,
+    /** The server's latest copy is here: the amount to charge is the server's, so paying can start */
+    upToDate: !!latest,
     /** The order couldn't be opened: no connection, or the server wouldn't give it to this tablet */
-    failed: !order && ((!!error && !loading) || timedOut),
+    failed: !latest && ((!!error && !loading) || timedOut),
     retry,
     step,
     method,

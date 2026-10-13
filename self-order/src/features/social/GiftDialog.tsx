@@ -1,10 +1,11 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, View, useWindowDimensions } from 'react-native';
 import { useQuery } from '@apollo/client';
 import { Button, Dialog, PressableFeedback, Spinner, Switch, cn, useThemeColor } from 'heroui-native';
 import { FlashList } from '@shopify/flash-list';
 import { ArrowLeft, Check, EyeOff, Gift, MapPin, Minus, Plus, Send, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCSSVariable } from 'uniwind';
 import { MenuItemState, TABLE_MESSAGE_STICKERS } from '@/src/constants';
 import { IGiftTarget, useCartStore } from '@/src/features/cart/cartStore';
@@ -19,6 +20,7 @@ import { IMenuCategory, IMenuProduct, IOrderItem } from '@/src/types';
 import { ITable } from '@/src/types/table';
 import { Image } from '@/src/ui/Image';
 import { Text } from '@/src/ui/Text';
+import { useOpened, whenClosed } from '@/src/ui/useOpened';
 import { useSocialStore } from './socialStore';
 import { Sticker } from './Sticker';
 import { TableFloorPlan, useOwnTableId } from './TableFloorPlan';
@@ -75,9 +77,16 @@ const GiftFlow = ({ onClose }: { onClose: () => void }) => {
   const [stickerId, setStickerId] = useState<string | null>(null);
   const [anonymous, setAnonymous] = useState(() => useCartStore.getState().giftAnonymous);
 
-  const { data, loading } = useQuery(GET_ACTIVE_TABLES, { fetchPolicy: 'network-only' });
+  // The tables from the last open at once, brought up to date from the server straight after
+  const { data, loading } = useQuery(GET_ACTIVE_TABLES, { fetchPolicy: 'cache-and-network' });
   const tables: ITable[] = data?.getActiveTables ?? [];
   const ownTableId = useOwnTableId();
+  // The plan (a button per table) is drawn once the dialog is open, so it doesn't slow the opening
+  const opened = useOpened();
+  // The product panel, for dishes with options, is only built once one is picked
+  const sheetUsed = useRef(false);
+  if (configuring) sheetUsed.current = true;
+  const adding = useRef(false);
 
   const index = STEPS.indexOf(step);
   const ready = !!table && !!product;
@@ -106,14 +115,19 @@ const GiftFlow = ({ onClose }: { onClose: () => void }) => {
   };
 
   const addToOrder = () => {
-    if (!table || !product) return;
-    const cart = useCartStore.getState();
-    cart.setGiftTarget(table);
-    cart.setGiftSticker(stickerId);
-    cart.setGiftAnonymous(anonymous);
-    if (configured) cart.addGiftOrderItem({ ...configured, quantity }, table);
-    else cart.addGiftItem(product, quantity, table);
+    // A second tap while it closes doesn't add the gift twice
+    if (!table || !product || adding.current) return;
+    adding.current = true;
+    // The dialog closes before the cart changes, so the order bar redraws after the animation
     onClose();
+    whenClosed(() => {
+      const cart = useCartStore.getState();
+      cart.setGiftTarget(table);
+      cart.setGiftSticker(stickerId);
+      cart.setGiftAnonymous(anonymous);
+      if (configured) cart.addGiftOrderItem({ ...configured, quantity }, table);
+      else cart.addGiftItem(product, quantity, table);
+    });
   };
 
   const [title, subtitle] = {
@@ -170,10 +184,13 @@ const GiftFlow = ({ onClose }: { onClose: () => void }) => {
         </View>
 
         {step === 'table' &&
+          opened &&
           (loading && !tables.length ? (
             <Spinner className="mt-10 self-center" />
           ) : tables.some((tb) => tb.id !== ownTableId) ? (
-            <GiftTables tables={tables} ownTableId={ownTableId} markedId={table?.id} onPick={pickTable} />
+            <Animated.View entering={FadeIn.duration(150)} style={{ flex: 1 }}>
+              <GiftTables tables={tables} ownTableId={ownTableId} markedId={table?.id} onPick={pickTable} />
+            </Animated.View>
           ) : (
             <Text className="mt-10 text-center text-lg text-muted">{t('mainPage.no_other_tables')}</Text>
           ))}
@@ -257,7 +274,9 @@ const GiftFlow = ({ onClose }: { onClose: () => void }) => {
         </View>
       )}
 
-      <ProductSheet product={configuring} onClose={() => setConfiguring(null)} onConfigured={applyConfigured} />
+      {sheetUsed.current && (
+        <ProductSheet product={configuring} onClose={() => setConfiguring(null)} onConfigured={applyConfigured} />
+      )}
     </>
   );
 };

@@ -23,6 +23,8 @@ export type GridRow =
   | { type: 'products'; key: string; products: IMenuProduct[]; categoryId: string; subcategoryId: string | null };
 
 const MINUTE_MS = 60 * 1000;
+// The same empty list every time, so a menu not loaded yet doesn't restart the minute check on each render
+const NO_CATEGORIES: IMenuCategory[] = [];
 
 const visibleProducts = (category: IMenuCategory) =>
   (category.products ?? []).filter((p: IMenuProduct) => p.state !== MenuItemState.INACTIVE);
@@ -38,8 +40,12 @@ const openIds = (categories: IMenuCategory[]) =>
     .map((c) => c.id)
     .join(',');
 
-/** Categories whose timetable is open right now. Re-checked every minute, but only re-renders when the set changes. */
-const useOpenCategories = (categories: IMenuCategory[]) => {
+/**
+ * Categories whose timetable is open right now (a lunch menu only at lunch), subcategories too.
+ * Re-checked every minute on the tablet itself, but only re-renders when the set changes. Anything
+ * that offers dishes (the menu, pairings, [+] again, the dessert prompt) goes by it.
+ */
+export const useOpenCategories = (categories: IMenuCategory[] = NO_CATEGORIES) => {
   const [key, setKey] = useState(() => openIds(categories));
 
   useEffect(() => {

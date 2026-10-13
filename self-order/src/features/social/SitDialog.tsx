@@ -4,11 +4,13 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Button, Dialog, Spinner, useThemeColor, useToast } from 'heroui-native';
 import { Send, UsersRound, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCSSVariable } from 'uniwind';
 import { SEND_TABLE_REQUEST } from '@/src/graphql/mutations/tableRequest';
 import { GET_ACTIVE_TABLES } from '@/src/graphql/queries/tableMessage';
 import { ITable } from '@/src/types/table';
 import { Text } from '@/src/ui/Text';
+import { useOpened } from '@/src/ui/useOpened';
 import { useSocialStore } from './socialStore';
 import { TableFloorPlan, useOwnTableId } from './TableFloorPlan';
 
@@ -47,9 +49,12 @@ const SitFlow = ({ onClose }: { onClose: () => void }) => {
   const [foreground, accentForeground] = useThemeColor(['foreground', 'accent-foreground']);
   const color = useCSSVariable('--color-sit') as string;
   const [table, setTable] = useState<ITable | null>(null);
-  const { data, loading } = useQuery(GET_ACTIVE_TABLES, { fetchPolicy: 'network-only' });
+  // The tables from the last open at once, brought up to date from the server straight after
+  const { data, loading } = useQuery(GET_ACTIVE_TABLES, { fetchPolicy: 'cache-and-network' });
   const tables: ITable[] = data?.getActiveTables ?? [];
   const ownTableId = useOwnTableId();
+  // The plan (a button per table) is drawn once the dialog is open, so it doesn't slow the opening
+  const opened = useOpened();
   const [sendRequest, { loading: sending }] = useMutation(SEND_TABLE_REQUEST);
 
   // Stays open on failure, so the guest can try again
@@ -87,16 +92,18 @@ const SitFlow = ({ onClose }: { onClose: () => void }) => {
       </View>
 
       <View className="flex-1">
-        {loading && !tables.length ? (
+        {!opened ? null : loading && !tables.length ? (
           <Spinner className="mt-10 self-center" />
         ) : tables.some((tb) => tb.id !== ownTableId) ? (
-          <TableFloorPlan
-            tables={tables}
-            ownTableId={ownTableId}
-            markedId={table?.id}
-            color={color}
-            onSelect={setTable}
-          />
+          <Animated.View entering={FadeIn.duration(150)} style={{ flex: 1 }}>
+            <TableFloorPlan
+              tables={tables}
+              ownTableId={ownTableId}
+              markedId={table?.id}
+              color={color}
+              onSelect={setTable}
+            />
+          </Animated.View>
         ) : (
           <Text className="mt-10 text-center text-lg text-muted">{t('mainPage.no_other_tables')}</Text>
         )}

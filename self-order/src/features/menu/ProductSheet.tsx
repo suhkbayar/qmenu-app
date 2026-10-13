@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { Button, Dialog, cn, useThemeColor } from 'heroui-native';
 import * as Haptics from 'expo-haptics';
@@ -16,11 +16,10 @@ import { getCdnImageUrl } from '@/src/lib/image';
 import { Image } from '@/src/ui/Image';
 import { Stepper } from '@/src/ui/Stepper';
 import { Text } from '@/src/ui/Text';
+import { useOpened, whenClosed } from '@/src/ui/useOpened';
 import { Pairings } from './Pairings';
 import { useProductSheet } from './productSheetStore';
 
-// The dialog's opening animation (200 ms) and a frame: what's below the options is drawn after it
-const OPEN_ANIMATION_MS = 250;
 // Android's own touch ripple, drawn natively over the button
 const RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
 
@@ -66,19 +65,6 @@ export const MenuProductSheet = () => {
   const product = useProductSheet((s) => s.product);
   const close = useProductSheet((s) => s.close);
   return <ProductSheet product={product} onClose={close} />;
-};
-
-/**
- * false while the sheet animates open, then true. The heavier parts (the HTML description, the
- * pairings and their query) wait for it, so the opening isn't slowed down drawing them.
- */
-const useOpened = () => {
-  const [opened, setOpened] = useState(false);
-  useEffect(() => {
-    const id = setTimeout(() => setOpened(true), OPEN_ANIMATION_MS);
-    return () => clearTimeout(id);
-  }, []);
-  return opened;
 };
 
 // optionId → the chosen value, or true for an option without values (a plain add-on)
@@ -128,6 +114,8 @@ const ProductDetails = ({
   const [missing, setMissing] = useState<string[]>([]);
   const [comment, setComment] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
+  const [noteUsed, setNoteUsed] = useState(false);
+  const adding = useRef(false);
 
   const variant = variants.find((v) => v.id === variantId) ?? variants[0];
   const options = variant?.options ?? [];
@@ -166,9 +154,11 @@ const ProductDetails = ({
   };
 
   const add = () => {
-    if (!variant) return;
+    if (!variant || adding.current) return;
     const missingIds = options.filter((o) => o.mandatory && !picked[o.id]).map((o) => o.id);
     if (missingIds.length) return setMissing(missingIds);
+    // A second tap while it closes doesn't add it twice
+    adding.current = true;
 
     const item: IOrderItem = {
       id: variant.id,
@@ -185,10 +175,11 @@ const ProductDetails = ({
       reason: '',
       state: 'DRAFT',
     };
-    if (onConfigured) onConfigured(item);
-    else addItem(item);
+    // Felt at once, but the sheet closes before the cart changes: the card's stepper and the order
+    // bar redraw after the close animation rather than during it
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onDone();
+    whenClosed(() => (onConfigured ? onConfigured(item) : addItem(item)));
   };
 
   const optionPrice = (price: number) => (price ? `+${formatMoney(price)}` : t('mainPage.free'));
@@ -348,7 +339,10 @@ const ProductDetails = ({
                 <Tag required={false} />
               </View>
               <Pressable
-                onPress={() => setNoteOpen(true)}
+                onPress={() => {
+                  setNoteUsed(true);
+                  setNoteOpen(true);
+                }}
                 android_ripple={RIPPLE}
                 accessibilityRole="button"
                 accessibilityLabel={t('mainPage.note')}
@@ -407,14 +401,17 @@ const ProductDetails = ({
         )}
       </View>
 
-      <NoteDialog
-        target={noteOpen ? { name: product.name, comment } : null}
-        onSave={(next) => {
-          setComment(next);
-          setNoteOpen(false);
-        }}
-        onClose={() => setNoteOpen(false)}
-      />
+      {/* Built the first time it's needed (few guests write one), then kept so it animates closed */}
+      {noteUsed && (
+        <NoteDialog
+          target={noteOpen ? { name: product.name, comment } : null}
+          onSave={(next) => {
+            setComment(next);
+            setNoteOpen(false);
+          }}
+          onClose={() => setNoteOpen(false)}
+        />
+      )}
     </>
   );
 };
