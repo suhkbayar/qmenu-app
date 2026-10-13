@@ -120,6 +120,7 @@
     "vatLottery": "Lottery No.",
     "vatAmount": "Registered amount",
     "retry": "Try again",
+    "orderLoadFailed": "We couldn't open this order. Try again, or ask staff for the bill.",
     "quiz_load_error": "Couldn't load the page",
     "serviceTitle": "How can we help?",
     "serviceSubtitle": "Table {{table}} · goes straight to staff",

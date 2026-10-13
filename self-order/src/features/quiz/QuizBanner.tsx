@@ -10,7 +10,7 @@ const CARD = '#16181C';
 const TITLE = '#FFFFFF';
 const BODY = '#C9CDD3';
 
-/** The Mbank quiz, as a banner at the top of the menu for the branches that run it. */
+/** The Mbank quiz, as a banner at the top of every branch's menu. */
 export const QuizBanner = () => {
   const { t } = useTranslation('language');
   const openQuiz = useQuizStore((s) => s.openQuiz);

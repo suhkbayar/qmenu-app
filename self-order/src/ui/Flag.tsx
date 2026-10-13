@@ -1,6 +1,7 @@
+import { memo } from 'react';
 import { View } from 'react-native';
 import { cn } from 'heroui-native';
-import { SvgXml } from 'react-native-svg';
+import { SvgAst, parse } from 'react-native-svg';
 import CN from 'country-flag-icons/string/3x2/CN';
 import DE from 'country-flag-icons/string/3x2/DE';
 import FR from 'country-flag-icons/string/3x2/FR';
@@ -34,12 +35,23 @@ type Props = {
   className?: string;
 };
 
+// Each flag's SVG, parsed from text the first time it's shown and then kept. SvgXml parses it again
+// on every mount, which was ten flags each time the settings opened.
+const parsed = new Map<string, ReturnType<typeof parse>>();
+const flagAst = (language: string) => {
+  const code = FLAGS[language] ? language : 'en';
+  if (!parsed.has(code)) parsed.set(code, parse(FLAGS[code]));
+  return parsed.get(code) ?? null;
+};
+
+const FILL = { width: '100%', height: '100%', preserveAspectRatio: 'xMidYMid slice' };
+
 /** A language's flag with rounded corners and a hairline edge, so white flags (Japan, Korea) don't vanish. */
-export const Flag = ({ language, width = 36, className }: Props) => (
+export const Flag = memo(({ language, width = 36, className }: Props) => (
   <View
     className={cn('overflow-hidden rounded-[5px] border border-border', className)}
     style={{ width, height: Math.round((width * 2) / 3) }}
   >
-    <SvgXml xml={FLAGS[language] ?? FLAGS.en} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
+    <SvgAst ast={flagAst(language)} override={FILL} />
   </View>
-);
+));

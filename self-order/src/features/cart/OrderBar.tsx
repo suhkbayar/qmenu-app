@@ -26,7 +26,8 @@ export const OrderBar = ({ hidden }: { hidden: boolean }) => {
   const { t } = useTranslation('language');
   const [foreground, muted] = useThemeColor(['foreground', 'muted']);
   const cart = useCartTotals();
-  const { activeItems, due, toPay, comingState } = useTableOrders();
+  // Always on screen, so it's the one that loads the table's orders for the sheet and the rest
+  const { activeItems, due, toPay, comingState } = useTableOrders({ fresh: true });
   const canPayHere = useSessionStore((s) => (s.participant?.payments?.length ?? 0) > 0);
   const show = useOrderSheet((s) => s.show);
   const openCheckout = useCheckout((s) => s.open);

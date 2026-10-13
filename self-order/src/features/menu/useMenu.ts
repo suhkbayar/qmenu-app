@@ -4,9 +4,10 @@ import { IMenuCategory, IMenuProduct } from '@/src/types';
 import { isCurrentlyOpen } from '@/src/lib/menu';
 
 /**
- * One cell of the product grid: a full-width banner, category title (with its subcategory buttons)
- * or subcategory title, or a product card. categoryId (top-level) and subcategoryId (null = none,
- * or the category's own title) let the rail and the subcategory buttons follow the scroll.
+ * One row of the product list: a full-width banner, a category title (with its subcategory buttons),
+ * a subcategory title, or a row of product cards (as many as fit across). categoryId (top-level) and
+ * subcategoryId (null = none, or the category's own title) let the rail and the subcategory buttons
+ * follow the scroll.
  */
 export type GridRow =
   | { type: 'quiz'; key: string; categoryId: string; subcategoryId: null }
@@ -19,7 +20,7 @@ export type GridRow =
       subcategoryId: null;
     }
   | { type: 'subsection'; key: string; title: string; categoryId: string; subcategoryId: string }
-  | { type: 'product'; key: string; product: IMenuProduct; categoryId: string; subcategoryId: string | null };
+  | { type: 'products'; key: string; products: IMenuProduct[]; categoryId: string; subcategoryId: string | null };
 
 const MINUTE_MS = 60 * 1000;
 
@@ -57,9 +58,9 @@ const useOpenCategories = (categories: IMenuCategory[]) => {
 
 /**
  * The open menu as one continuous list: each category's title (with its subcategory buttons), its
- * subcategories' titles and products. withQuiz puts the Mbank quiz banner first.
+ * subcategories' titles and products, `columns` cards to a row, with the Mbank quiz banner first.
  */
-export const useMenu = (allCategories: IMenuCategory[] = [], withQuiz = false) => {
+export const useMenu = (allCategories: IMenuCategory[] = [], columns = 4) => {
   const openCategories = useOpenCategories(allCategories);
 
   const menu = useMemo(() => {
@@ -80,7 +81,7 @@ export const useMenu = (allCategories: IMenuCategory[] = [], withQuiz = false) =
       const split = groups.length > 1;
 
       // The banner sits above the first category and counts as part of it
-      if (withQuiz && !rows.length) {
+      if (!rows.length) {
         rows.push({ type: 'quiz', key: 'quiz', categoryId: category.id, subcategoryId: null });
       }
       categories.push(category);
@@ -99,11 +100,11 @@ export const useMenu = (allCategories: IMenuCategory[] = [], withQuiz = false) =
           subsectionStart[sub.id] = rows.length;
           rows.push({ type: 'subsection', key: `ss-${sub.id}`, title: sub.name, categoryId: category.id, subcategoryId: sub.id });
         }
-        for (const product of products) {
+        for (let i = 0; i < products.length; i += columns) {
           rows.push({
-            type: 'product',
-            key: `${sub.id}-${product.productId}`,
-            product,
+            type: 'products',
+            key: `${sub.id}-${i}`,
+            products: products.slice(i, i + columns),
             categoryId: category.id,
             subcategoryId: split ? sub.id : null,
           });
@@ -111,7 +112,7 @@ export const useMenu = (allCategories: IMenuCategory[] = [], withQuiz = false) =
       }
     }
     return { rows, sectionStart, subsectionStart, categories, subcategoriesOf };
-  }, [openCategories, withQuiz]);
+  }, [openCategories, columns]);
 
   return menu;
 };

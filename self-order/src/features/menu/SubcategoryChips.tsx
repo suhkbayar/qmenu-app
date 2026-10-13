@@ -1,8 +1,10 @@
 import { memo, useEffect, useRef } from 'react';
-import { ScrollView } from 'react-native';
-import { PressableFeedback, cn, useThemeColor } from 'heroui-native';
+import { Pressable, ScrollView, Text } from 'react-native';
+import { useThemeColor } from 'heroui-native';
 import { IMenuCategory } from '@/src/types';
-import { Text } from '@/src/ui/Text';
+
+// Android's own touch ripple, drawn natively over the tab
+const RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
 
 type Props = {
   /** The current category's subcategories */
@@ -24,6 +26,14 @@ export const SubcategoryChips = memo(({ subcategories, activeId, onSelect }: Pro
   const barRef = useRef<ScrollView>(null);
   const chipLayouts = useRef<Record<string, { x: number; width: number }>>({});
   const viewport = useRef({ x: 0, width: 0 });
+  // Another category's tabs (the pinned bar stays put as the guest scrolls into the next category)
+  // start from the left. Before the highlight below, so it can still bring the current one into view.
+  const shown = useRef(subcategories);
+  useEffect(() => {
+    if (shown.current === subcategories) return;
+    shown.current = subcategories;
+    barRef.current?.scrollTo({ x: 0, animated: false });
+  }, [subcategories]);
   useEffect(() => {
     if (!activeId) return;
     const chip = chipLayouts.current[activeId];
@@ -47,10 +57,11 @@ export const SubcategoryChips = memo(({ subcategories, activeId, onSelect }: Pro
       {subcategories.map((sub) => {
         const active = sub.id === activeId;
         return (
-          <PressableFeedback
+          <Pressable
             key={sub.id}
             onLayout={(e) => (chipLayouts.current[sub.id] = e.nativeEvent.layout)}
             onPress={() => onSelect(sub.id)}
+            android_ripple={RIPPLE}
             // Tall enough to tap; the underline sits along the bottom
             className="h-11 justify-center border-b-[3px]"
             style={{ borderBottomColor: active ? accent : 'transparent' }}
@@ -58,13 +69,13 @@ export const SubcategoryChips = memo(({ subcategories, activeId, onSelect }: Pro
             accessibilityState={{ selected: active }}
           >
             <Text
-              className={cn('text-[17px]', active ? 'font-bold' : 'font-medium')}
+              className={active ? 'font-bold text-[17px]' : 'font-medium text-[17px]'}
               style={{ color: active ? foreground : muted }}
               numberOfLines={1}
             >
               {sub.name}
             </Text>
-          </PressableFeedback>
+          </Pressable>
         );
       })}
     </ScrollView>

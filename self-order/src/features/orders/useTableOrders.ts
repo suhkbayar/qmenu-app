@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { useApolloClient, useQuery, useSubscription } from '@apollo/client';
+import { useEffect, useState } from 'react';
+import { useApolloClient, useQuery } from '@apollo/client';
 import { TYPE } from '@/src/constants';
+import { subscribeNetwork } from '@/src/lib/network';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { GET_TABLET_ORDERS } from '@/src/graphql/queries';
 import { ON_UPDATED_ORDER } from '@/src/graphql/subscriptions';
@@ -45,13 +46,17 @@ export const itemsByTime = (items: IOrderItem[]) => {
 /**
  * This table's recent orders. Fetched when the menu opens and refetched after ordering or paying,
  * and when the server reports a change (useOrderUpdates). No polling, so 600 tablets don't keep
- * hitting the server. `cacheOnly` reads what's already loaded without asking the server (the
+ * hitting the server.
+ *
+ * Only the order bar, always on screen, passes `fresh` and asks the server when it appears. The
+ * rest read what it loaded: the order sheet would otherwise ask again every time it slides in, and
+ * redraw as the answer arrived. `cacheOnly` never asks, not even with nothing loaded (the
  * screensaver, which comes and goes all the time).
  */
-export const useTableOrders = ({ cacheOnly = false }: { cacheOnly?: boolean } = {}) => {
+export const useTableOrders = ({ fresh = false, cacheOnly = false }: { fresh?: boolean; cacheOnly?: boolean } = {}) => {
   const { data, loading, refetch } = useQuery(GET_TABLET_ORDERS, {
     variables: { limit: 10 },
-    fetchPolicy: cacheOnly ? 'cache-only' : 'cache-and-network',
+    fetchPolicy: cacheOnly ? 'cache-only' : fresh ? 'cache-and-network' : 'cache-first',
   });
   const ownTableId = useSessionStore((s) => s.participant?.table?.id);
   const orders: IOrder[] = data?.getTabletOrders ?? [];
@@ -91,30 +96,73 @@ export const useTableOrders = ({ cacheOnly = false }: { cacheOnly?: boolean } = 
   };
 };
 
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30_000;
+
 /**
  * Refreshes this table's orders when the server reports a change to one of them (staff accepted it,
  * closed it, took payment at the till), so the open order and the badge don't outlive the bill. Used
  * once, by the menu screen.
+ *
+ * Tablets stay on all day, so a dropped connection mustn't end the updates: the subscription
+ * reconnects with backoff, and again when the network comes back, each time loading the orders
+ * afresh for whatever changed while it was down.
  */
 export const useOrderUpdates = () => {
   const apollo = useApolloClient();
   const [customerId, setCustomerId] = useState<string | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     getPayload().then((payload) => setCustomerId(payload?.sub ?? null));
-    return () => clearTimeout(timer.current);
   }, []);
 
-  useSubscription(ON_UPDATED_ORDER, {
-    variables: { customer: customerId },
-    skip: !customerId,
-    onData() {
-      // A burst of changes (accepted, printed, paid) refetches once
-      clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
+  useEffect(() => {
+    if (!customerId) return;
+    let subscription: { unsubscribe: () => void } | undefined;
+    let debounce: ReturnType<typeof setTimeout> | undefined;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0;
+    let stopped = false;
+
+    // A burst of changes (accepted, printed, paid) refetches once
+    const refresh = () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => {
         apollo.refetchQueries({ include: [GET_TABLET_ORDERS] }).catch(() => {});
       }, 1000);
-    },
-  });
+    };
+
+    const connect = () => {
+      subscription?.unsubscribe();
+      subscription = apollo.subscribe({ query: ON_UPDATED_ORDER, variables: { customer: customerId } }).subscribe({
+        next: () => {
+          failures = 0;
+          refresh();
+        },
+        error: () => {
+          if (stopped) return;
+          clearTimeout(retry);
+          retry = setTimeout(connect, Math.min(RECONNECT_BASE_MS * 2 ** failures++, RECONNECT_MAX_MS));
+        },
+      });
+    };
+
+    connect();
+    // Back online: reconnect now rather than at the next retry, and catch up on what was missed
+    const unsubscribeNetwork = subscribeNetwork((offline) => {
+      if (offline) return;
+      clearTimeout(retry);
+      failures = 0;
+      connect();
+      refresh();
+    });
+
+    return () => {
+      stopped = true;
+      subscription?.unsubscribe();
+      clearTimeout(debounce);
+      clearTimeout(retry);
+      unsubscribeNetwork();
+    };
+  }, [apollo, customerId]);
 };

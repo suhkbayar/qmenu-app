@@ -8,8 +8,12 @@ import { useSessionStore } from '@/src/features/session/sessionStore';
 import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/src/graphql/mutations/order';
 import { GET_ORDER } from '@/src/graphql/queries';
 import { ON_UPDATED_ORDER } from '@/src/graphql/subscriptions';
-import { getPayload } from '@/src/providers/auth';
 import { IOrder, ITransaction } from '@/src/types';
+
+// The order not here by then counts as failed (the retries on a bad connection can take longer)
+const LOAD_TIMEOUT_MS = 15_000;
+// While the bank QR is up, the order is also checked this often, in case the "paid" message is missed
+const PAID_CHECK_MS = 5_000;
 
 /**
  * Ways to pay, each shown only when the branch has it set up. Paying at the cashier needs nothing
@@ -32,23 +36,34 @@ export const usePayment = (orderId: string, payLater: boolean) => {
   const [step, setStep] = useState<CheckoutStep>(payLater ? 'done' : 'pay');
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [transaction, setTransaction] = useState<ITransaction>();
-  const [customerId, setCustomerId] = useState<string | null>(null);
   const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const warn = useCallback((label: string) => toast.show({ variant: 'warning', label }), [toast]);
   const fail = useCallback((label: string) => toast.show({ variant: 'danger', label }), [toast]);
 
-  useEffect(() => {
-    getPayload().then((payload) => setCustomerId(payload?.sub ?? null));
-  }, []);
-
   // Never cached: the amount, payment state and receipt must be the server's latest
-  const { data, loading, refetch } = useQuery(GET_ORDER, {
+  const { data, previousData, loading, error, refetch } = useQuery(GET_ORDER, {
     variables: { id: orderId },
     fetchPolicy: 'no-cache',
     notifyOnNetworkStatusChange: true,
   });
-  const order: IOrder | undefined = data?.getOrder;
+  // A later reload that fails (e.g. for the receipt, after paying) keeps the order already shown
+  const order: IOrder | undefined = data?.getOrder ?? previousData?.getOrder;
+
+  // Never an endless spinner: no order in time is a failure the guest can retry or leave
+  useEffect(() => {
+    if (order) return;
+    const id = setTimeout(() => setTimedOut(true), LOAD_TIMEOUT_MS);
+    return () => clearTimeout(id);
+  }, [order, attempt]);
+
+  const retry = useCallback(() => {
+    setTimedOut(false);
+    setAttempt((n) => n + 1);
+    refetch().catch(() => {});
+  }, [refetch]);
 
   const done = useCallback(() => {
     setStep('done');
@@ -56,15 +71,24 @@ export const usePayment = (orderId: string, payLater: boolean) => {
     refetch().catch(() => {});
   }, [refetch]);
 
-  // Opened for an order that's already paid: straight to done
+  // Opened for an order that's already paid, or found paid by the check below: on to done
   useEffect(() => {
-    if (order?.paymentState === 'PAID' && step !== 'done') setStep('done');
+    if (order?.paymentState === 'PAID' && step !== 'done') done();
   }, [order?.paymentState]);
 
-  // The server pushes the order as soon as the bank confirms, so the guest doesn't have to press anything
+  // The "paid" message can be missed (a dropped connection), so the QR step also checks the order itself
+  useEffect(() => {
+    if (step !== 'qr') return;
+    const id = setInterval(() => refetch().catch(() => {}), PAID_CHECK_MS);
+    return () => clearInterval(id);
+  }, [step, refetch]);
+
+  // The server pushes the order as soon as the bank confirms, so the guest doesn't have to press
+  // anything. It goes to the order's customer, which isn't this tablet's guest for an order placed
+  // before the tablet signed in again.
   useSubscription(ON_UPDATED_ORDER, {
-    variables: { customer: customerId },
-    skip: !customerId,
+    variables: { customer: order?.customerId },
+    skip: !order?.customerId,
     onData({ data: event }) {
       const updated = event?.data?.onUpdatedOrder?.order;
       if (updated?.id === orderId && updated.paymentState === 'PAID') done();
@@ -162,6 +186,9 @@ export const usePayment = (orderId: string, payLater: boolean) => {
   return {
     order,
     loading: loading && !order,
+    /** The order couldn't be opened: no connection, or the server wouldn't give it to this tablet */
+    failed: !order && ((!!error && !loading) || timedOut),
+    retry,
     step,
     method,
     back: () => setStep('pay'),

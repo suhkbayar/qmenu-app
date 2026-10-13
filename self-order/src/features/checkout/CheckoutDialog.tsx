@@ -2,11 +2,12 @@ import { ReactNode, useEffect, useState } from 'react';
 import { ScrollView, View, useWindowDimensions } from 'react-native';
 import { useApolloClient } from '@apollo/client';
 import { Button, Dialog, PressableFeedback, Spinner, cn, useThemeColor } from 'heroui-native';
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Clock, CreditCard, QrCode, X } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Clock, CreditCard, QrCode, ReceiptText, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'react-native-qrcode-svg';
 import { useCSSVariable } from 'uniwind';
 import { lineTotal } from '@/src/features/cart/totals';
+import { useServiceRequest } from '@/src/features/service/useServiceRequest';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { GET_TABLET_ORDERS } from '@/src/graphql/queries';
 import { formatMoney } from '@/src/lib/format';
@@ -63,6 +64,8 @@ const Checkout = ({ orderId, payLater, onClose }: { orderId: string; payLater: b
   const receipt = useReceipt();
   const { order, step } = payment;
 
+  if (payment.failed) return <LoadFailed onRetry={payment.retry} onClose={onClose} />;
+
   if (payment.loading || !order) {
     return (
       <View className="flex-1 items-center justify-center">
@@ -83,6 +86,48 @@ const Checkout = ({ orderId, payLater, onClose }: { orderId: string; payLater: b
 };
 
 type Payment = ReturnType<typeof usePayment>;
+
+/**
+ * The order couldn't be opened: no connection, or the server won't give this tablet an order placed
+ * before it signed in again. The guest can try again, or ask staff for the bill instead.
+ */
+const LoadFailed = ({ onRetry, onClose }: { onRetry: () => void; onClose: () => void }) => {
+  const { t } = useTranslation('language');
+  const [foreground, muted] = useThemeColor(['foreground', 'muted']);
+  const { send, pending } = useServiceRequest();
+
+  return (
+    <View className="flex-1 gap-5.5 px-8 py-7">
+      <StepHeader title={t('mainPage.checkoutTitle')} onClose={onClose} />
+      <View className="flex-1 items-center justify-center gap-5">
+        <View className="size-24 items-center justify-center rounded-full bg-surface-secondary">
+          <ReceiptText size={44} color={muted} strokeWidth={1.8} />
+        </View>
+        {/* Full width: Android cuts off a centred label sized to its own text */}
+        <Text className="self-stretch px-10 text-center text-xl leading-8">{t('mainPage.orderLoadFailed')}</Text>
+      </View>
+      <View className="flex-row gap-3">
+        <Button
+          size="lg"
+          variant="outline"
+          className="h-15 flex-1 rounded-[18px] border-2 border-foreground"
+          isDisabled={!!pending}
+          onPress={() => send('bill')}
+        >
+          {pending === 'bill' ? <Spinner /> : <ReceiptText size={20} color={foreground} />}
+          <Button.Label numberOfLines={1} className="font-bold">
+            {t('mainPage.request_bill')}
+          </Button.Label>
+        </Button>
+        <Button size="lg" className="h-15 flex-1 rounded-[18px]" onPress={onRetry}>
+          <Button.Label numberOfLines={1} className="font-bold">
+            {t('mainPage.retry')}
+          </Button.Label>
+        </Button>
+      </View>
+    </View>
+  );
+};
 
 // A charge in effect (A = active; inactive, pending and cancelled ones aren't in the total)
 const ACTIVE_CHARGE = 'A';

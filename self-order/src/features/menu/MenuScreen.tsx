@@ -5,15 +5,15 @@ import { OrderSheet } from '@/src/features/cart/OrderSheet';
 import { useOrderSheet } from '@/src/features/cart/orderSheetStore';
 import { CheckoutDialog } from '@/src/features/checkout/CheckoutDialog';
 import { useOrderUpdates } from '@/src/features/orders/useTableOrders';
-import { MBANK_QUIZ_BRANCHES } from '@/src/features/quiz/quizStore';
 import { ServiceSheet } from '@/src/features/service/ServiceSheet';
 import { SettingsDialog } from '@/src/features/session/SettingsDialog';
 import { useSessionStore } from '@/src/features/session/sessionStore';
-import { IMenuProduct, IParticipant } from '@/src/types';
+import { IParticipant } from '@/src/types';
 import { CategoryRail } from './CategoryRail';
 import { PinnedSubcategories } from './PinnedSubcategories';
-import { ProductGrid, ProductGridHandle } from './ProductGrid';
-import { ProductSheet } from './ProductSheet';
+import { ProductGrid, ProductGridHandle, gridColumns } from './ProductGrid';
+import { MenuProductSheet } from './ProductSheet';
+import { useProductSheet } from './productSheetStore';
 import { TopBar } from './TopBar';
 import { GridRow, useMenu } from './useMenu';
 
@@ -29,10 +29,12 @@ const BAR_INSET = 24;
  * checkout open over it.
  */
 export const MenuScreen = ({ participant }: { participant: IParticipant }) => {
-  const quiz = MBANK_QUIZ_BRANCHES.includes(participant.branch?.id ?? '');
-  const menu = useMenu(participant.menu?.categories, quiz);
+  // Nothing squeezes the grid any more: the order sits over it, along the bottom or in the sheet
+  const gridWidth = useWindowDimensions().width - RAIL_WIDTH;
+  const columns = gridColumns(gridWidth);
+  const menu = useMenu(participant.menu?.categories, columns);
   const hidePrice = useSessionStore((s) => s.config?.hidePrice === true);
-  const [product, setProduct] = useState<IMenuProduct | null>(null);
+  const openProduct = useProductSheet((s) => s.open);
   const [serviceOpen, setServiceOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const scroll = useCategoryScroll(menu.sectionStart, menu.subsectionStart, menu.categories[0]?.id);
@@ -41,12 +43,8 @@ export const MenuScreen = ({ participant }: { participant: IParticipant }) => {
   useOrderUpdates();
   const sheetOpen = useOrderSheet((s) => s.open);
 
-  // Nothing squeezes the grid any more: the order sits over it, along the bottom or in the sheet
-  const gridWidth = useWindowDimensions().width - RAIL_WIDTH;
-
   const openService = useCallback(() => setServiceOpen(true), []);
   const openSettings = useCallback(() => setSettingsOpen(true), []);
-  const closeProduct = useCallback(() => setProduct(null), []);
 
   const activeCategory = menu.categories.find((c) => c.id === scroll.activeId);
   const pinnedSubcategories = (activeCategory && menu.subcategoriesOf[activeCategory.id]) || [];
@@ -64,14 +62,14 @@ export const MenuScreen = ({ participant }: { participant: IParticipant }) => {
   const overlays = useMemo(
     () => (
       <>
-        <OrderSheet onOpenProduct={setProduct} />
-        <ProductSheet product={product} onClose={closeProduct} />
+        <OrderSheet onOpenProduct={openProduct} />
+        <MenuProductSheet />
         <ServiceSheet isOpen={serviceOpen} onOpenChange={setServiceOpen} />
         <SettingsDialog isOpen={settingsOpen} onOpenChange={setSettingsOpen} />
         <CheckoutDialog />
       </>
     ),
-    [product, serviceOpen, settingsOpen, closeProduct],
+    [serviceOpen, settingsOpen, openProduct],
   );
 
   return (
@@ -85,20 +83,18 @@ export const MenuScreen = ({ participant }: { participant: IParticipant }) => {
           <ProductGrid
             ref={scroll.gridRef}
             width={gridWidth}
+            columns={columns}
             rows={menu.rows}
             orderable={participant.orderable}
             hidePrice={hidePrice}
-            onOpenProduct={setProduct}
+            onOpenProduct={openProduct}
             onTopRowChange={scroll.onTopRowChange}
             onUserScroll={scroll.onUserScroll}
-            activeCategoryId={scroll.activeId}
-            activeSubcategoryId={activeSubId}
             onSelectSubcategory={scroll.selectSub}
           />
-          {scroll.pastTitle && activeCategory && pinnedSubcategories.length > 0 && (
+          {activeCategory && pinnedSubcategories.length > 0 && (
             <PinnedSubcategories
-              // A new category starts its buttons from the left
-              key={activeCategory.id}
+              visible={scroll.pastTitle}
               title={activeCategory.name}
               subcategories={pinnedSubcategories}
               activeId={activeSubId}
@@ -160,7 +156,7 @@ const useCategoryScroll = (
 
   const onTopRowChange = useCallback((row: GridRow) => {
     // Past the category's own title (and its subcategory buttons): pin them over the products
-    setPastTitle(row.type === 'product' || row.type === 'subsection');
+    setPastTitle(row.type === 'products' || row.type === 'subsection');
     if (jumping.current) return;
     setPosition((current) =>
       current.categoryId === row.categoryId && current.subcategoryId === row.subcategoryId

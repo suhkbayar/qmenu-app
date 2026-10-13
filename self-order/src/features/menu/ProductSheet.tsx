@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View, useWindowDimensions } from 'react-native';
-import { Button, Dialog, PressableFeedback, cn, useThemeColor } from 'heroui-native';
+import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
+import { Button, Dialog, cn, useThemeColor } from 'heroui-native';
 import * as Haptics from 'expo-haptics';
 import { Check, MessageSquareText, Pencil, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,12 @@ import { Image } from '@/src/ui/Image';
 import { Stepper } from '@/src/ui/Stepper';
 import { Text } from '@/src/ui/Text';
 import { Pairings } from './Pairings';
+import { useProductSheet } from './productSheetStore';
+
+// The dialog's opening animation (200 ms) and a frame: what's below the options is drawn after it
+const OPEN_ANIMATION_MS = 250;
+// Android's own touch ripple, drawn natively over the button
+const RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
 
 type Props = {
   /** The product to show; null closes the panel */
@@ -53,6 +59,26 @@ export const ProductSheet = ({ product, onClose, onConfigured }: Props) => {
       </Dialog.Portal>
     </Dialog>
   );
+};
+
+/** The menu's product sheet, showing the dish in useProductSheet. */
+export const MenuProductSheet = () => {
+  const product = useProductSheet((s) => s.product);
+  const close = useProductSheet((s) => s.close);
+  return <ProductSheet product={product} onClose={close} />;
+};
+
+/**
+ * false while the sheet animates open, then true. The heavier parts (the HTML description, the
+ * pairings and their query) wait for it, so the opening isn't slowed down drawing them.
+ */
+const useOpened = () => {
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setOpened(true), OPEN_ANIMATION_MS);
+    return () => clearTimeout(id);
+  }, []);
+  return opened;
 };
 
 // optionId → the chosen value, or true for an option without values (a plain add-on)
@@ -93,6 +119,7 @@ const ProductDetails = ({
   const addItem = useCartStore((s) => s.addItem);
   const orderable = useSessionStore((s) => s.participant?.orderable === true);
   const hidePrice = useSessionStore((s) => s.config?.hidePrice === true);
+  const opened = useOpened();
 
   const variants = product.variants ?? [];
   const [variantId, setVariantId] = useState(variants[0]?.id);
@@ -172,6 +199,7 @@ const ProductDetails = ({
         source={product.image ? { uri: getCdnImageUrl(product.image, 'md') } : require('@/assets/images/noImage.jpg')}
         className="h-full w-100 bg-surface-tertiary"
         contentFit="cover"
+        transition={150}
       />
 
       <View className="flex-1">
@@ -194,7 +222,7 @@ const ProductDetails = ({
         </View>
 
         <ScrollView className="flex-1" contentContainerClassName="gap-6 px-7 py-5">
-          {!!product.specification && (
+          {opened && !!product.specification && (
             <RenderHtml
               contentWidth={480}
               source={{ html: product.specification }}
@@ -212,11 +240,12 @@ const ProductDetails = ({
                 {variants.map((v) => {
                   const active = v.id === variant?.id;
                   return (
-                    <PressableFeedback
+                    <Pressable
                       key={v.id}
                       onPress={() => pickVariant(v.id)}
+                      android_ripple={RIPPLE}
                       className={cn(
-                        'min-h-18 min-w-44 justify-center gap-0.5 rounded-[18px] px-4 py-2.5',
+                        'min-h-18 min-w-44 justify-center gap-0.5 overflow-hidden rounded-[18px] px-4 py-2.5',
                         active ? 'border-2 border-accent bg-accent-tint' : 'border border-border bg-surface',
                       )}
                       accessibilityRole="radio"
@@ -224,7 +253,7 @@ const ProductDetails = ({
                     >
                       <Text className={active ? 'font-bold' : 'font-semibold'}>{v.name}</Text>
                       {!hidePrice && <Text className="text-sm text-muted">{formatMoney(v.salePrice)}</Text>}
-                    </PressableFeedback>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -244,21 +273,27 @@ const ProductDetails = ({
                 {option.values.map((value: string) => {
                   const active = picked[option.id] === value;
                   return (
-                    <PressableFeedback
+                    <Pressable
                       key={value}
                       onPress={() => toggle(option, value)}
+                      android_ripple={RIPPLE}
                       // Selected = brand yellow, like the selected category in the rail
                       className={cn(
-                        'h-12 justify-center rounded-full px-5',
+                        'h-12 justify-center overflow-hidden rounded-full px-5',
                         active ? 'bg-accent' : 'border border-border bg-surface',
                       )}
                       accessibilityRole="radio"
                       accessibilityState={{ checked: active }}
                     >
-                      <Text className={cn('font-semibold', active && 'font-bold text-accent-foreground')} numberOfLines={1}>
+                      {/* Colour set directly: a changing colour class came out wrong on the tablets */}
+                      <Text
+                        className={active ? 'font-bold' : 'font-semibold'}
+                        style={{ color: active ? accentForeground : foreground }}
+                        numberOfLines={1}
+                      >
                         {value}
                       </Text>
-                    </PressableFeedback>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -275,11 +310,12 @@ const ProductDetails = ({
                 const active = !!picked[option.id];
                 const missed = missing.includes(option.id);
                 return (
-                  <PressableFeedback
+                  <Pressable
                     key={option.id}
                     onPress={() => toggle(option)}
+                    android_ripple={RIPPLE}
                     className={cn(
-                      'min-h-14 flex-row items-center gap-3.5 rounded-2xl bg-surface px-4',
+                      'min-h-14 flex-row items-center gap-3.5 overflow-hidden rounded-2xl bg-surface px-4',
                       missed ? 'border-2 border-danger' : active ? 'border-2 border-accent' : 'border border-border',
                     )}
                     accessibilityRole="checkbox"
@@ -298,7 +334,7 @@ const ProductDetails = ({
                       {option.mandatory && <Text className="text-danger"> *</Text>}
                     </Text>
                     {!hidePrice && <Text className="text-base text-muted">{optionPrice(option.price)}</Text>}
-                  </PressableFeedback>
+                  </Pressable>
                 );
               })}
             </View>
@@ -311,12 +347,13 @@ const ProductDetails = ({
                 <Text className="text-lg font-bold">{t('mainPage.note')}</Text>
                 <Tag required={false} />
               </View>
-              <PressableFeedback
+              <Pressable
                 onPress={() => setNoteOpen(true)}
+                android_ripple={RIPPLE}
                 accessibilityRole="button"
                 accessibilityLabel={t('mainPage.note')}
                 className={cn(
-                  'min-h-14 flex-row items-center gap-3 rounded-2xl bg-surface px-4 py-3',
+                  'min-h-14 flex-row items-center gap-3 overflow-hidden rounded-2xl bg-surface px-4 py-3',
                   comment ? 'border-2 border-accent' : 'border border-border',
                 )}
               >
@@ -325,12 +362,12 @@ const ProductDetails = ({
                   {comment || t('mainPage.note_placeholder')}
                 </Text>
                 <Pencil size={18} color={muted} />
-              </PressableFeedback>
+              </Pressable>
             </View>
           )}
 
           {/* What goes with it, while the guest is choosing (not when picking a dish for a gift) */}
-          {orderable && !unavailable && !onConfigured && <Pairings product={product} />}
+          {opened && orderable && !unavailable && !onConfigured && <Pairings product={product} />}
 
           {missing.length > 0 && (
             <Text className="font-semibold text-danger">
