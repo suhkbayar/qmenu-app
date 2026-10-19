@@ -10,8 +10,10 @@ import { GET_ORDER } from '@/src/graphql/queries';
 import { ON_UPDATED_ORDER } from '@/src/graphql/subscriptions';
 import { IOrder, ITransaction } from '@/src/types';
 
-// The order not here by then counts as failed (the retries on a bad connection can take longer)
-const LOAD_TIMEOUT_MS = 15_000;
+// The order still not here after this long counts as failed; until then the dialog shows loading
+const LOAD_GIVE_UP_MS = 45_000;
+// After a temporary failure (no connection, no answer), the order is asked for again this often
+const LOAD_RETRY_MS = 5_000;
 // While the bank QR is up, the order is also checked this often, in case the "paid" message is missed
 const PAID_CHECK_MS = 5_000;
 
@@ -57,10 +59,21 @@ export const usePayment = (orderId: string, payLater: boolean, preview?: IOrder 
   // Until the server's copy is here, the tablet's own: the dialog opens on it instead of a spinner
   const order = latest ?? preview ?? undefined;
 
-  // Never an endless wait: no answer from the server in time is a failure the guest can retry or leave
+  // The server answered with an error (e.g. it won't give this tablet the order): asking again won't help
+  const refused = !latest && !!error?.graphQLErrors?.length;
+
+  // Temporary trouble (a dropped connection, a slow answer) is retried quietly while the dialog shows
+  // loading, so the guest isn't shown an error for a hiccup
+  useEffect(() => {
+    if (latest || refused || !error) return;
+    const id = setTimeout(() => refetch().catch(() => {}), LOAD_RETRY_MS);
+    return () => clearTimeout(id);
+  }, [latest, refused, error, refetch]);
+
+  // But never an endless wait: still nothing after a while is a failure the guest can retry or leave
   useEffect(() => {
     if (latest) return;
-    const id = setTimeout(() => setTimedOut(true), LOAD_TIMEOUT_MS);
+    const id = setTimeout(() => setTimedOut(true), LOAD_GIVE_UP_MS);
     return () => clearTimeout(id);
   }, [latest, attempt]);
 
@@ -193,8 +206,11 @@ export const usePayment = (orderId: string, payLater: boolean, preview?: IOrder 
     loading: loading && !order,
     /** The server's latest copy is here: the amount to charge is the server's, so paying can start */
     upToDate: !!latest,
-    /** The order couldn't be opened: no connection, or the server wouldn't give it to this tablet */
-    failed: !latest && ((!!error && !loading) || timedOut),
+    /**
+     * The order couldn't be opened: the server wouldn't give it to this tablet, or there was still no
+     * answer after a long wait. Anything shorter shows as loading.
+     */
+    failed: !latest && ((refused && !loading) || timedOut),
     retry,
     step,
     method,

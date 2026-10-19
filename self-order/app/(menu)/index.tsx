@@ -5,6 +5,7 @@ import { Screensaver } from '@/src/features/kiosk/Screensaver';
 import { MenuScreen } from '@/src/features/menu/MenuScreen';
 import { IdleOverlay } from '@/src/features/session/IdleOverlay';
 import { PlanExpired } from '@/src/features/session/PlanExpired';
+import { useSessionStore } from '@/src/features/session/sessionStore';
 import { useTableSession } from '@/src/features/session/useTableSession';
 import { LoadingScreen } from '@/src/ui/LoadingScreen';
 
@@ -12,6 +13,7 @@ import { LoadingScreen } from '@/src/ui/LoadingScreen';
 export default function MenuRoute() {
   const { pid } = useLocalSearchParams<{ pid?: string }>();
   const { participant, planExpired, retry, screensaverBanners } = useTableSession(pid);
+  const bannerSound = useSessionStore((s) => s.config?.bannerSound === true);
 
   useFocusEffect(
     useCallback(() => {
@@ -28,7 +30,13 @@ export default function MenuRoute() {
 
   return (
     // 8 s a banner: long enough to read, within the 8–12 s kiosks use
-    <Screensaver banners={screensaverBanners} delay={10000} interval={8000} overlay={<IdleOverlay />}>
+    <Screensaver
+      banners={screensaverBanners}
+      delay={10000}
+      interval={8000}
+      overlay={<IdleOverlay />}
+      sound={bannerSound}
+    >
       <MenuScreen participant={participant} />
     </Screensaver>
   );

@@ -1,9 +1,11 @@
 import 'react-native-get-random-values';
 import '@/src/i18n';
 import '@/src/global.css';
+// First, so a crash anywhere after this shows the error page rather than a blank screen
+import { markAppStarted, useCrash } from '@/src/features/kiosk/crash';
 
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { ApolloProvider } from '@apollo/client';
 // One import per weight, so only these four go into the bundle (the package has nine)
 import { Onest_400Regular } from '@expo-google-fonts/onest/400Regular';
@@ -28,6 +30,7 @@ import { markActivity } from '@/src/features/kiosk/activity';
 import { AdminExit } from '@/src/features/kiosk/AdminExit';
 import { EXTRA_ALLOWED_APPS } from '@/src/features/kiosk/allowedApps';
 import { AppUpdater } from '@/src/features/kiosk/AppUpdater';
+import { ErrorScreen } from '@/src/features/kiosk/ErrorScreen';
 import { HiddenNavigationBar } from '@/src/features/kiosk/HiddenNavigationBar';
 import { NightlyRestart } from '@/src/features/kiosk/NightlyRestart';
 import { OfflineNotice } from '@/src/features/kiosk/OfflineNotice';
@@ -41,6 +44,10 @@ import { LoadingScreen } from '@/src/ui/LoadingScreen';
 import { useThemeStore } from '@/src/ui/themeStore';
 
 SplashScreen.preventAutoHideAsync();
+
+// An error anywhere in the app (the menu and setup screens have their own) shows what went wrong and
+// restarts, never a blank screen
+export { ErrorScreen as ErrorBoundary };
 
 /** True once the saved light/dark choice has been read, so the first frame is drawn in the right theme. */
 const useThemeLoaded = () => {
@@ -67,6 +74,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!ready) return;
+    markAppStarted();
     SplashScreen.hideAsync();
     getStorage('language').then((lang) => {
       if (lang) i18n.changeLanguage(lang.toLowerCase());
@@ -103,9 +111,22 @@ export default function RootLayout() {
           </SafeAreaProvider>
         </AuthProvider>
       </ApolloProvider>
+      {/* Last, so it covers everything, dialogs included */}
+      <CrashOverlay />
     </GestureHandlerRootView>
   );
 }
+
+/** A crash outside any screen's drawing (a button, a timer): the error page over the app (see crash.ts). */
+const CrashOverlay = () => {
+  const error = useCrash((s) => s.error);
+  if (!error) return null;
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <ErrorScreen error={error} retry={async () => useCrash.setState({ error: null })} />
+    </View>
+  );
+};
 
 /**
  * (menu): the guests' screens, at / and /history. setup: staff link the tablet to a table, at /setup.

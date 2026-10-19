@@ -5,10 +5,11 @@ import { AuthOptions, AUTH_TYPE, createAuthLink } from 'aws-appsync-auth-link';
 import { createSubscriptionHandshakeLink } from 'aws-appsync-subscription-link';
 import { endSession, getToken, isValidToken } from './auth';
 import { RetryLink } from '@apollo/client/link/retry';
+import { API_URL } from '@/src/constants';
 import { DEFAULT_TOKEN } from '@/src/constants/token';
-import { setOffline } from '@/src/lib/network';
+import { markNoAnswer, markOnline } from '@/src/lib/network';
 
-const url = 'https://graph.qmenu.mn/graphql';
+const url = API_URL;
 const region = 'ap-east-1';
 
 const auth: AuthOptions = {
@@ -19,7 +20,21 @@ const auth: AuthOptions = {
   },
 };
 
-const httpLink = createHttpLink({ uri: url });
+// React Native's requests never time out by themselves: on Wi-Fi without internet one could wait for
+// minutes. AppSync gives up at 30 s anyway, so nothing that would have been answered is cut off.
+const REQUEST_TIMEOUT_MS = 30 * 1000;
+
+const fetchWithTimeout: typeof fetch = (input, init) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  // Apollo cancels a request it no longer needs through its own signal
+  const cancel = init?.signal;
+  if (cancel?.aborted) controller.abort();
+  else cancel?.addEventListener('abort', () => controller.abort());
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+};
+
+const httpLink = createHttpLink({ uri: url, fetch: fetchWithTimeout });
 const authLink = createAuthLink({ url, region, auth });
 
 const isSubscription = (operation: Operation) =>
@@ -41,19 +56,26 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
   }
 
   if (networkError) {
-    if (!isSubscription(operation)) setOffline(true);
+    // Any answer from the server, an error status too, means the tablet is online; only no answer at
+    // all (or the timeout) means it isn't. Error answers once kept the "no internet" banner up.
+    if (!isSubscription(operation)) {
+      if ('statusCode' in networkError) markOnline();
+      else markNoAnswer(operation.getContext().sentAt ?? Date.now());
+    }
     console.log(`[Network error]: ${networkError}`);
   }
 });
 
 const subscriptionLink = createSubscriptionHandshakeLink({ url, region, auth }, httpLink);
 
-const networkStatusLink = new ApolloLink((operation, forward) =>
-  forward(operation).map((result) => {
-    setOffline(false);
+// When each request went out, so a late failure from before the internet came back is ignored
+const networkStatusLink = new ApolloLink((operation, forward) => {
+  operation.setContext({ sentAt: Date.now() });
+  return forward(operation).map((result) => {
+    markOnline();
     return result;
-  }),
-);
+  });
+});
 
 const retryLink = new RetryLink({
   delay: { initial: 1000, max: 8000, jitter: true },

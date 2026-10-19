@@ -6,6 +6,9 @@ import { SitDialog } from '@/src/features/social/SitDialog';
 import { TableEventListener } from '@/src/features/social/TableEventListener';
 import { useValid } from '@/src/providers/ValidProvider';
 
+// An error on these screens shows what went wrong and a restart, never a blank screen
+export { ErrorScreen as ErrorBoundary } from '@/src/features/kiosk/ErrorScreen';
+
 /** Guests' screens: they need a table session, so without one the tablet goes to setup. */
 export default function MenuLayout() {
   const { valid } = useValid();

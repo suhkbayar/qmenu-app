@@ -1,3 +1,5 @@
+export const API_URL = 'https://graph.qmenu.mn/graphql';
+
 export const PAYMENT_TYPE = {
   QPay: 'QPay',
   QPay2: 'QPay2',
@@ -83,6 +85,10 @@ export const qmenuConfigs = [
   {
     name: 'sitTogether',
     value: 'SIT_TOGETHER',
+  },
+  {
+    name: 'bannerSound',
+    value: 'BANNER_SOUND',
   },
 ];
 

@@ -87,12 +87,34 @@ export const useTableSession = (pid?: string) => {
     return () => clearTimeout(id);
   }, [participantId, participant, error, refetch]);
 
+  // The restaurant's tablet banners (pictures or videos) become the screensaver. Loaded with the
+  // table, and again with every reload below, so a new banner shows without restarting the app.
+  const [getBanners] = useLazyQuery(GET_BANNERS, { fetchPolicy: 'network-only' });
+  const loadBanners = useCallback(() => {
+    getBanners()
+      .then(({ data: bannerData }) => {
+        const banners: Banner[] = (bannerData?.getBanners ?? [])
+          .filter((b: { image: string; type: string }) => b.image && b.type === 'TB')
+          .map((b: { image: string }) => toBanner(b.image));
+        // The same list keeps the same array, so a slideshow that's on isn't restarted
+        setScreensaverBanners((current) =>
+          current.length === banners.length && current.every((b, i) => b.uri === banners[i].uri) ? current : banners,
+        );
+      })
+      .catch(() => {});
+  }, [getBanners]);
+
+  useEffect(() => {
+    if (participantId) loadBanners();
+  }, [participantId, loadBanners]);
+
   // When the table and menu were last asked for: the reloads below go by it
   const lastLoad = useRef(Date.now());
   const reload = useCallback(() => {
     lastLoad.current = Date.now();
     refetch().catch(() => {});
-  }, [refetch]);
+    loadBanners();
+  }, [refetch, loadBanners]);
 
   // Every 30 minutes while the tablet is in use. Untouched for 30 minutes (night, a quiet spell), it
   // waits instead, and reloads at the first touch if the menu is older than that: 600 tablets
@@ -204,18 +226,6 @@ export const useTableSession = (pid?: string) => {
       ]);
     }
   }, [data]);
-
-  // The restaurant's tablet banners (pictures or videos) become the screensaver
-  const [getBanners] = useLazyQuery(GET_BANNERS, { fetchPolicy: 'network-only' });
-  useEffect(() => {
-    if (!participantId) return;
-    getBanners().then(({ data: bannerData }) => {
-      const banners = (bannerData?.getBanners ?? [])
-        .filter((b: { image: string; type: string }) => b.image && b.type === 'TB')
-        .map((b: { image: string }) => toBanner(b.image));
-      setScreensaverBanners(banners);
-    });
-  }, [participantId]);
 
   useBatteryReport(participant?.table?.id, participant?.table?.code, leave);
 

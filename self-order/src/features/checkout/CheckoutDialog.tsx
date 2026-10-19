@@ -2,7 +2,17 @@ import { ReactNode, useEffect, useState } from 'react';
 import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useApolloClient } from '@apollo/client';
 import { Button, Dialog, Spinner, cn, useThemeColor } from 'heroui-native';
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Clock, CreditCard, QrCode, ReceiptText, X } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  CreditCard,
+  QrCode,
+  ReceiptText,
+  X,
+} from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'react-native-qrcode-svg';
 import { useCSSVariable } from 'uniwind';
@@ -269,18 +279,23 @@ const PayStep = ({
         {vatBranch && <ReceiptPicker receipt={receipt} />}
         <View className="gap-3">
           <Text className="text-lg font-bold">{t('mainPage.paymentMethod')}</Text>
-          <View className="flex-row flex-wrap gap-3">
-            {payment.methods.map(({ method, paymentId }) => (
-              <MethodTile
-                key={method}
-                method={method}
-                loading={payment.pendingMethod === method}
-                // Until the server's copy of the order is here (a moment), so the amount paid is the server's
-                disabled={!!payment.pendingMethod || !receipt.ready || !payment.upToDate}
-                onPress={() => payment.select(method, paymentId, receipt.receipt)}
-              />
-            ))}
-          </View>
+          {payment.upToDate ? (
+            <View className="flex-row flex-wrap gap-3">
+              {payment.methods.map(({ method, paymentId }) => (
+                <MethodTile
+                  key={method}
+                  method={method}
+                  loading={payment.pendingMethod === method}
+                  disabled={!!payment.pendingMethod || !receipt.ready}
+                  onPress={() => payment.select(method, paymentId, receipt.receipt)}
+                />
+              ))}
+            </View>
+          ) : (
+            <View className="h-36 items-center justify-center rounded-3xl border border-border bg-surface">
+              <Spinner />
+            </View>
+          )}
         </View>
       </ScrollView>
     </>

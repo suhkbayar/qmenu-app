@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import { Button, useThemeColor, useToast } from 'heroui-native';
 import { ArrowLeft, CameraOff, SwitchCamera } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { LoadingScreen } from '@/src/ui/LoadingScreen';
 import { LogoLoader } from '@/src/ui/LogoLoader';
 import { Text } from '@/src/ui/Text';
 import { useTableLogin } from './useTableLogin';
@@ -39,7 +38,17 @@ export const QrScanScreen = () => {
     }
   };
 
-  if (!permission) return <LoadingScreen />;
+  // Back stays on screen in every state, so staff can never be stuck here
+  if (!permission) {
+    return (
+      <View className="flex-1 items-center justify-center bg-background">
+        <LogoLoader size={120} />
+        <View className="absolute left-6 top-6">
+          <BackButton />
+        </View>
+      </View>
+    );
+  }
 
   if (!permission.granted) {
     return (
@@ -64,6 +73,11 @@ export const QrScanScreen = () => {
         facing={facing}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={onScan}
+        // The camera didn't start: back to the code field with the reason, rather than a black screen
+        onMountError={({ message }) => {
+          toast.show({ variant: 'warning', label: message });
+          router.back();
+        }}
       />
 
       <View pointerEvents="none" style={StyleSheet.absoluteFill} className="items-center justify-center gap-6">
@@ -74,10 +88,7 @@ export const QrScanScreen = () => {
       </View>
 
       <View className="absolute left-6 right-6 top-6 flex-row justify-between">
-        <Button variant="secondary" className="h-13 rounded-2xl px-4" onPress={() => router.back()}>
-          <ArrowLeft size={22} color={foreground} />
-          <Button.Label numberOfLines={1} className="font-semibold">{t('mainPage.GoBack')}</Button.Label>
-        </Button>
+        <BackButton />
         <Button
           variant="secondary"
           className="h-13 rounded-2xl px-4"
@@ -94,5 +105,16 @@ export const QrScanScreen = () => {
         </View>
       )}
     </View>
+  );
+};
+
+const BackButton = () => {
+  const { t } = useTranslation('language');
+  const foreground = useThemeColor('foreground');
+  return (
+    <Button variant="secondary" className="h-13 rounded-2xl px-4" onPress={() => router.back()}>
+      <ArrowLeft size={22} color={foreground} />
+      <Button.Label numberOfLines={1} className="font-semibold">{t('mainPage.GoBack')}</Button.Label>
+    </Button>
   );
 };

@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { Button, Dialog, PressableFeedback, Spinner, cn, useThemeColor, useToast } from 'heroui-native';
-import { ArrowLeft, Moon, Plus, ScanQrCode, Sun } from 'lucide-react-native';
+import { ArrowLeft, Moon, Plus, RefreshCw, ScanQrCode, Sun } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { SecretTap } from '@/src/features/kiosk/AdminExit';
 import { NetworkIndicator } from '@/src/features/kiosk/NetworkIndicator';
 import { VersionBadge } from '@/src/features/kiosk/VersionBadge';
+import { checkConnection, useNoInternet } from '@/src/lib/network';
 import { ICustomerTable } from '@/src/types';
 import { Image } from '@/src/ui/Image';
 import { Text } from '@/src/ui/Text';
@@ -25,6 +26,7 @@ export const TableLoginScreen = () => {
   const tables = useSessionStore((s) => s.tables);
   const [adding, setAdding] = useState(false);
   const showForm = adding || tables.length === 0;
+  const offline = useNoInternet();
 
   return (
     <View className="flex-1 bg-background">
@@ -40,6 +42,7 @@ export const TableLoginScreen = () => {
           </Button>
         )}
         <View className="flex-1" />
+        {offline && <CheckConnectionButton />}
         <NetworkIndicator />
         <Button
           isIconOnly
@@ -65,12 +68,38 @@ export const TableLoginScreen = () => {
   );
 };
 
+/** While offline: tries the QMenu server now, rather than at the next automatic check. */
+const CheckConnectionButton = () => {
+  const { t } = useTranslation('language');
+  const { toast } = useToast();
+  const foreground = useThemeColor('foreground');
+  const [checking, setChecking] = useState(false);
+
+  const check = async () => {
+    setChecking(true);
+    const online = await checkConnection();
+    setChecking(false);
+    if (!online) toast.show({ variant: 'warning', label: t('mainPage.no_internet') });
+  };
+
+  return (
+    <Button variant="secondary" className="h-13 rounded-2xl px-4" isDisabled={checking} onPress={check}>
+      {checking ? <Spinner size="sm" /> : <RefreshCw size={20} color={foreground} />}
+      <Button.Label numberOfLines={1} className="font-semibold">{t('setup.checkAgain')}</Button.Label>
+    </Button>
+  );
+};
+
 const CodeForm = () => {
   const { t } = useTranslation('language');
   const [foreground, muted] = useThemeColor(['foreground', 'muted']);
   const { login, loading } = useTableLogin();
+  const offline = useNoInternet();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Scanning only leads to a login, which needs the internet (and offline the camera once went black)
+  const scan = () => (offline ? setError(t('mainPage.no_internet')) : router.push('/setup/scan'));
 
   const submit = async () => {
     const trimmed = code.trim();
@@ -110,7 +139,7 @@ const CodeForm = () => {
             returnKeyType="go"
             className="flex-1 font-normal text-lg text-foreground"
           />
-          <Button variant="secondary" className="h-12 rounded-xl px-3.5" onPress={() => router.push('/setup/scan')}>
+          <Button variant="secondary" className="h-12 rounded-xl px-3.5" onPress={scan}>
             <ScanQrCode size={20} color={foreground} />
             <Button.Label numberOfLines={1} className="font-semibold">{t('setup.scanQr')}</Button.Label>
           </Button>
@@ -132,6 +161,8 @@ const SavedTables = ({ tables, onAdd }: { tables: ICustomerTable[]; onAdd: () =>
   const accentForeground = useThemeColor('accent-foreground');
   const deleteTable = useSessionStore((s) => s.deleteTable);
   const { login } = useTableLogin();
+  // Adding a table needs the server (and its camera screen once went black offline)
+  const offline = useNoInternet();
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [removing, setRemoving] = useState<ICustomerTable | null>(null);
 
@@ -187,8 +218,11 @@ const SavedTables = ({ tables, onAdd }: { tables: ICustomerTable[]; onAdd: () =>
 
         <PressableFeedback
           onPress={onAdd}
-          isDisabled={!!pendingCode}
-          className="h-56 w-48 items-center justify-center gap-2 rounded-3xl bg-accent"
+          isDisabled={!!pendingCode || offline}
+          className={cn(
+            'h-56 w-48 items-center justify-center gap-2 rounded-3xl bg-accent',
+            offline && 'opacity-40',
+          )}
           accessibilityRole="button"
         >
           <Plus size={48} color={accentForeground} />

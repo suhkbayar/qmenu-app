@@ -165,6 +165,8 @@
     "planExpiredTitle": "Service plan is not active",
     "planExpiredBody": "This tablet has no active service plan. Please contact staff to continue.",
     "checkAgain": "Check again",
+    "errorTitle": "Something went wrong",
+    "restartApp": "Restart",
     "adminAccess": "Admin access",
     "enterPin": "Enter PIN",
     "wrongPin_one": "Wrong PIN · 1 try left",

@@ -1,8 +1,9 @@
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Button, Tabs, useThemeColor } from 'heroui-native';
 import { X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import Animated, { Easing, FadeIn, FadeOut, SlideInRight, SlideOutRight } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { OrderedTab } from '@/src/features/orders/OrderedTab';
 import { useTableOrders } from '@/src/features/orders/useTableOrders';
 import { useSessionStore } from '@/src/features/session/sessionStore';
@@ -13,8 +14,10 @@ import { useCartTotals } from './cartStore';
 import { OrderSheetTab, useOrderSheet } from './orderSheetStore';
 
 // Slides in by transform only, which the tablets draw smoothly
-const slideIn = SlideInRight.duration(260).easing(Easing.out(Easing.cubic));
-const slideOut = SlideOutRight.duration(220).easing(Easing.in(Easing.cubic));
+const SLIDE_IN_MS = 260;
+const SLIDE_OUT_MS = 220;
+// The sheet's width (w-115) and a little more, so its rounded edge starts off screen too
+const OFFSCREEN_X = 480;
 
 /**
  * The order, over the menu from the right, in two tabs with one job each: Сагс (what's about to be
@@ -24,24 +27,45 @@ const slideOut = SlideOutRight.duration(220).easing(Easing.in(Easing.cubic));
 export const OrderSheet = ({ onOpenProduct }: { onOpenProduct: (product: IMenuProduct) => void }) => {
   const open = useOrderSheet((s) => s.open);
   const close = useOrderSheet((s) => s.close);
+  // Stays mounted while it slides out
+  const [shown, setShown] = useState(open);
+  if (open && !shown) setShown(true);
+
+  // 0 closed, 1 open. Driven here rather than by an entering animation: one of those once didn't
+  // start, leaving the sheet off screen behind the dimmed menu
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    if (open) {
+      progress.value = withTiming(1, { duration: SLIDE_IN_MS, easing: Easing.out(Easing.cubic) });
+      // However the slide went, the sheet ends up fully on screen
+      const id = setTimeout(() => (progress.value = 1), SLIDE_IN_MS + 150);
+      return () => clearTimeout(id);
+    }
+    progress.value = withTiming(0, { duration: SLIDE_OUT_MS, easing: Easing.in(Easing.cubic) });
+    const id = setTimeout(() => setShown(false), SLIDE_OUT_MS + 30);
+    return () => clearTimeout(id);
+  }, [open, progress]);
+
+  const dim = useAnimatedStyle(() => ({ opacity: progress.value }));
+  const slide = useAnimatedStyle(() => ({ transform: [{ translateX: (1 - progress.value) * OFFSCREEN_X }] }));
+
+  if (!shown) return null;
 
   return (
     <>
-      {/* Two siblings so each animates out */}
-      {open && (
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(180)}
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(22, 24, 28, 0.45)' }]}
-        >
-          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessible={false} />
-        </Animated.View>
-      )}
-      {open && (
-        <Animated.View entering={slideIn} exiting={slideOut} style={{ position: 'absolute', top: 0, right: 0, bottom: 0 }}>
-          <Sheet onOpenProduct={onOpenProduct} />
-        </Animated.View>
-      )}
+      {/* While closing, taps already reach the menu */}
+      <Animated.View
+        pointerEvents={open ? 'auto' : 'none'}
+        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(22, 24, 28, 0.45)' }, dim]}
+      >
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessible={false} />
+      </Animated.View>
+      <Animated.View
+        pointerEvents={open ? 'auto' : 'none'}
+        style={[{ position: 'absolute', top: 0, right: 0, bottom: 0 }, slide]}
+      >
+        <Sheet onOpenProduct={onOpenProduct} />
+      </Animated.View>
     </>
   );
 };

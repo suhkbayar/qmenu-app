@@ -11,4 +11,5 @@ export interface IConfig {
   hidePrice?: boolean;
   giftOrder?: boolean;
   sitTogether?: boolean;
+  bannerSound?: boolean;
 }
