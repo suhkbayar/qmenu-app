@@ -235,8 +235,10 @@ const SavedTables = ({ tables, onAdd }: { tables: ICustomerTable[]; onAdd: () =>
 
       <Dialog isOpen={!!removing} onOpenChange={(isOpen) => !isOpen && setRemoving(null)}>
         <Dialog.Portal>
-          <Dialog.Overlay />
-          <Dialog.Content isSwipeable={false} className="w-110 gap-4 self-center p-7">
+          {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
+              dim backdrop stuck on screen */}
+          <Dialog.Overlay animation={false} />
+          <Dialog.Content animation={false} isSwipeable={false} className="w-110 gap-4 self-center p-7">
             <Dialog.Title className="text-2xl">{t('setup.removeTitle')}</Dialog.Title>
             <Dialog.Description className="text-base">
               {t('setup.removeBody', { table: removing?.tableName })}

@@ -182,6 +182,8 @@
     "deviceSettings": "Тохиргоо",
     "changeTable": "Ширээ солих",
     "actionFailed": "Гүйцэтгэж чадсангүй. Дахин оролдоно уу.",
+    "rebootTablet": "Таблет дахин асаах",
+    "lastError": "Сүүлийн алдаа",
     "checkUpdate": "Шинэчлэл шалгах",
     "updateChecking": "Шалгаж байна…",
     "updateDownloading": "Татаж байна…",

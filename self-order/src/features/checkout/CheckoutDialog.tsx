@@ -58,10 +58,14 @@ export const CheckoutDialog = () => {
   return (
     <Dialog isOpen={!!orderId} onOpenChange={(open) => !open && close()}>
       <Dialog.Portal>
-        {/* No closing by tapping outside: it's too easy to lose a payment that way */}
-        <Dialog.Overlay isCloseOnPress={false} />
+        {/* No closing by tapping outside: it's too easy to lose a payment that way. And no open or
+            close animation: heroui's is a layout animation, and this dialog's content changes while it
+            runs (the methods replace their spinner as the order arrives). That is the likeliest cause
+            of the black screen some merchants' tablets showed on Pay. */}
+        <Dialog.Overlay isCloseOnPress={false} animation={false} />
         {/* 820×700, smaller on a smaller screen */}
         <Dialog.Content
+          animation={false}
           isSwipeable={false}
           className="self-center overflow-hidden p-0"
           style={{ width: Math.min(820, window.width - 48), height: Math.min(700, window.height - 40) }}

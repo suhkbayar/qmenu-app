@@ -31,9 +31,12 @@ export const SitDialog = () => {
   return (
     <Dialog isOpen={isOpen} onOpenChange={(open) => !open && close()}>
       <Dialog.Portal>
-        <Dialog.Overlay />
+        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
+            dim backdrop stuck on screen */}
+        <Dialog.Overlay animation={false} />
         {/* Not swipeable: dragging should not move the dialog. 760×660, smaller on a smaller screen */}
         <Dialog.Content
+          animation={false}
           isSwipeable={false}
           className="gap-5 self-center p-7"
           style={{ width: Math.min(760, window.width - 48), height: Math.min(660, window.height - 40) }}

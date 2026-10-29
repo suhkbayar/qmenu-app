@@ -33,8 +33,10 @@ export const NoteDialog = ({ target, onSave, onClose }: Props) => {
   return (
     <Dialog isOpen={!!target} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay />
-        <Dialog.Content isSwipeable={false} className="w-150 gap-5 self-center p-7">
+        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
+            dim backdrop stuck on screen */}
+        <Dialog.Overlay animation={false} />
+        <Dialog.Content animation={false} isSwipeable={false} className="w-150 gap-5 self-center p-7">
           {current && (
             <NoteForm key={target ? 'open' : 'closing'} target={current} onSave={onSave} onClose={onClose} />
           )}

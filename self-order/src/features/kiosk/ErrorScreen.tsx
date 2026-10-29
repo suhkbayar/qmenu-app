@@ -5,6 +5,7 @@ import { useThemeColor } from 'heroui-native';
 import { TriangleAlert } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import * as Updates from 'expo-updates';
+import { Kiosk } from '@/modules/kiosk';
 import { Text } from '@/src/ui/Text';
 import { SecretTap } from './AdminExit';
 import { handOverIfStarting } from './crash';
@@ -23,16 +24,18 @@ export const ErrorScreen = ({ error, retry }: ErrorBoundaryProps) => {
   const [restarting, setRestarting] = useState(false);
   const [seconds, setSeconds] = useState(AUTO_RESTART_S);
 
-  // Before the first screen, expo-updates gets the crash, to roll a broken update back
+  // Before the first screen, expo-updates gets the crash, to roll a broken update back. Otherwise it's
+  // kept for the admin dialog's "last error", for support.
   useEffect(() => {
-    handOverIfStarting(error);
+    if (!handOverIfStarting(error)) Kiosk.recordCrash(error.message);
   }, [error]);
 
-  // A fresh start of the app; where that isn't possible (development), draw it again
+  // A fresh start of the app: a new process where the build can, otherwise the JavaScript reloaded;
+  // where neither is possible (development), draw it again
   const restart = () => {
     if (restarting) return;
     setRestarting(true);
-    Updates.reloadAsync().catch(() => {
+    (Kiosk.canRestartApp() ? Kiosk.restartApp() : Updates.reloadAsync()).catch(() => {
       setRestarting(false);
       setSeconds(AUTO_RESTART_S);
       retry();

@@ -3,7 +3,7 @@ import { Linking, Platform, Pressable, TextInput, View } from 'react-native';
 import { useApolloClient } from '@apollo/client';
 import { router } from 'expo-router';
 import { Button, Dialog, Spinner, cn, useThemeColor, useToast } from 'heroui-native';
-import { Armchair, LogOut, RefreshCw, RotateCcw, Settings, Wifi } from 'lucide-react-native';
+import { Armchair, LogOut, Power, RefreshCw, RotateCcw, Settings, Wifi } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import * as Updates from 'expo-updates';
@@ -11,6 +11,7 @@ import { create } from 'zustand';
 import { Kiosk } from '@/modules/kiosk';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { GET_PARTICIPANT_CONFIGS } from '@/src/graphql/queries';
+import { formatDateTime } from '@/src/lib/format';
 import { IParticipant } from '@/src/types';
 import { Text } from '@/src/ui/Text';
 import { useAppUpdate } from './appUpdate';
@@ -177,9 +178,14 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
   return (
     <Dialog isOpen={isOpen} onOpenChange={(open) => !open && close()}>
       <Dialog.Portal>
-        {/* A stray tap after the ten on the logo shouldn't close it; Cancel does */}
-        <Dialog.Overlay isCloseOnPress={false} />
-        <Dialog.Content isSwipeable={false} className={cn('gap-4 self-center p-7', unlocked ? 'w-170' : 'w-110')}>
+        {/* A stray tap after the ten on the logo shouldn't close it; Cancel does. No open/close
+            animation: on the tablets it sometimes stalled, leaving the dialog or its backdrop stuck. */}
+        <Dialog.Overlay isCloseOnPress={false} animation={false} />
+        <Dialog.Content
+          animation={false}
+          isSwipeable={false}
+          className={cn('gap-4 self-center p-7', unlocked ? 'w-170' : 'w-110')}
+        >
           <Dialog.Title className="text-center text-2xl">{t('setup.adminAccess')}</Dialog.Title>
 
           {unlocked ? (
@@ -271,13 +277,14 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
   );
 };
 
-type AdminAction = 'restart' | 'wifi' | 'settings' | 'table' | 'exit';
+type AdminAction = 'restart' | 'wifi' | 'settings' | 'table' | 'reboot' | 'exit';
 
 const ADMIN_ACTIONS: { id: AdminAction; labelKey: string; Icon: LucideIcon }[] = [
   { id: 'restart', labelKey: 'setup.appRestart', Icon: RotateCcw },
   { id: 'wifi', labelKey: 'setup.wifiSettings', Icon: Wifi },
   { id: 'settings', labelKey: 'setup.deviceSettings', Icon: Settings },
   { id: 'table', labelKey: 'setup.changeTable', Icon: Armchair },
+  { id: 'reboot', labelKey: 'setup.rebootTablet', Icon: Power },
   { id: 'exit', labelKey: 'setup.exitKiosk', Icon: LogOut },
 ];
 
@@ -286,14 +293,18 @@ const RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
 
 /**
  * What staff can do once the PIN is in, as big tiles, so nobody at the restaurant needs to know
- * Android: restart the app, fix the Wi-Fi or other settings, pick another table, or leave kiosk mode.
- * Settings are outside the kiosk lock, so the lock comes off first; Home brings the app back, locked.
+ * Android: restart the app or the tablet, fix the Wi-Fi or other settings, pick another table, or
+ * leave kiosk mode. Settings are outside the kiosk lock, so the lock comes off first; Home brings the
+ * app back, locked. Under the tiles, the last error the app hit, for support.
  */
 const AdminMenu = ({ onDone }: { onDone: () => void }) => {
   const { t } = useTranslation('language');
   const { toast } = useToast();
   const foreground = useThemeColor('foreground');
   const [busy, setBusy] = useState<AdminAction | null>(null);
+  // Restarting the tablet needs the device owner and a build from 2.0.6
+  const actions = ADMIN_ACTIONS.filter(({ id }) => id !== 'reboot' || Kiosk.canReboot());
+  const [lastCrash] = useState(Kiosk.lastCrash);
 
   const openSettings = async (intent: string) => {
     await Kiosk.stop();
@@ -304,7 +315,9 @@ const AdminMenu = ({ onDone }: { onDone: () => void }) => {
     if (busy) return;
     setBusy(action);
     try {
-      if (action === 'restart') await Updates.reloadAsync();
+      // A fresh process where the build can, otherwise the JavaScript reloaded
+      if (action === 'restart') await (Kiosk.canRestartApp() ? Kiosk.restartApp() : Updates.reloadAsync());
+      else if (action === 'reboot') await Kiosk.reboot();
       else if (action === 'wifi') await openSettings('android.settings.WIFI_SETTINGS');
       else if (action === 'settings') await openSettings('android.settings.SETTINGS');
       else if (action === 'table') router.replace('/setup');
@@ -318,26 +331,33 @@ const AdminMenu = ({ onDone }: { onDone: () => void }) => {
   };
 
   return (
-    <View className="flex-row flex-wrap gap-3">
-      {ADMIN_ACTIONS.map(({ id, labelKey, Icon }) => (
-        <Pressable
-          key={id}
-          onPress={() => run(id)}
-          disabled={!!busy}
-          android_ripple={RIPPLE}
-          accessibilityRole="button"
-          className={cn(
-            'h-28 w-[31.8%] items-center justify-center gap-2.5 overflow-hidden rounded-3xl border border-border bg-surface px-3',
-            !!busy && busy !== id && 'opacity-50',
-          )}
-        >
-          {busy === id ? <Spinner /> : <Icon size={28} color={foreground} />}
-          {/* Full tile width: Android cuts off a centred label sized to its own text */}
-          <Text className="self-stretch text-center font-semibold" numberOfLines={2}>
-            {t(labelKey)}
-          </Text>
-        </Pressable>
-      ))}
+    <View className="gap-3">
+      <View className="flex-row flex-wrap gap-3">
+        {actions.map(({ id, labelKey, Icon }) => (
+          <Pressable
+            key={id}
+            onPress={() => run(id)}
+            disabled={!!busy}
+            android_ripple={RIPPLE}
+            accessibilityRole="button"
+            className={cn(
+              'h-28 w-[31.8%] items-center justify-center gap-2.5 overflow-hidden rounded-3xl border border-border bg-surface px-3',
+              !!busy && busy !== id && 'opacity-50',
+            )}
+          >
+            {busy === id ? <Spinner /> : <Icon size={28} color={foreground} />}
+            {/* Full tile width: Android cuts off a centred label sized to its own text */}
+            <Text className="self-stretch text-center font-semibold" numberOfLines={2}>
+              {t(labelKey)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {!!lastCrash && (
+        <Text selectable className="self-stretch text-center text-sm text-muted" numberOfLines={3}>
+          {t('setup.lastError')}: {formatDateTime(new Date(lastCrash.at))} · {lastCrash.message}
+        </Text>
+      )}
     </View>
   );
 };

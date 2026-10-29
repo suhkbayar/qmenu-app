@@ -47,6 +47,14 @@
       </intent-filter>
     </receiver>
 
+    <!-- Restarts the app from outside its own process (AppRestarter); never shown -->
+    <activity
+      android:name="com.mn.qmenu.selforder.kiosk.RestartActivity"
+      android:process=":restart"
+      android:theme="@android:style/Theme.Translucent.NoTitleBar"
+      android:excludeFromRecents="true"
+      android:exported="false"/>
+
     <!-- QR provisioning steps (Android 12+), see Provisioning.kt -->
     <activity
       android:name="com.mn.qmenu.selforder.kiosk.GetProvisioningModeActivity"

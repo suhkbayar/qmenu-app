@@ -85,8 +85,10 @@ export const UpdatePrompt = () => {
     // Asked only while a guest is at the tablet; an idle one restarts without showing anything
     <Dialog isOpen={isUpdatePending && !guestBusy && inUse} onOpenChange={() => {}}>
       <Dialog.Portal>
-        <Dialog.Overlay isCloseOnPress={false} />
-        <Dialog.Content isSwipeable={false} className="w-110 gap-5 self-center p-7">
+        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
+            dim backdrop stuck on screen */}
+        <Dialog.Overlay isCloseOnPress={false} animation={false} />
+        <Dialog.Content animation={false} isSwipeable={false} className="w-110 gap-5 self-center p-7">
           <Dialog.Title className="text-center text-2xl">{t('mainPage.update_title')}</Dialog.Title>
           <Dialog.Description className="text-center text-base">{t('mainPage.update_body')}</Dialog.Description>
           <Button size="lg" className="rounded-2xl" isDisabled={restarting} onPress={restart}>

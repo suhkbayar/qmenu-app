@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { Kiosk } from '@/modules/kiosk';
 
 let started = false;
 
@@ -28,5 +29,7 @@ export const useCrash = create<{ error: Error | null }>()(() => ({ error: null }
 ErrorUtils.setGlobalHandler((error, isFatal) => {
   if (!isFatal) return defaultHandler(error, isFatal);
   const crash = error instanceof Error ? error : new Error(String(error));
-  if (!handOverIfStarting(crash)) useCrash.setState({ error: crash });
+  if (handOverIfStarting(crash)) return;
+  Kiosk.recordCrash(crash.message);
+  useCrash.setState({ error: crash });
 });

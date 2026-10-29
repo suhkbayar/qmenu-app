@@ -174,7 +174,8 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
   }, [step, transaction, order]);
 
   const methods = useMemo(() => {
-    const find = (...types: string[]) => participant?.payments.find((p) => types.includes(p.type));
+    // A branch with no payments set up has none in its list, or no list at all
+    const find = (...types: string[]) => participant?.payments?.find((p) => types.includes(p.type));
     // Shown in this order: М Банк, Toki, QR Pay (Most), QPay, then card
     const online: [PaymentMethod, string[]][] = [
       ['MPY', [PAYMENT_TYPE.MPY]],

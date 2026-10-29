@@ -40,9 +40,15 @@ export const IncomingMessages = () => {
   return (
     <Dialog isOpen={!!message} onOpenChange={(open) => !open && message && !mustAnswer && dismiss(message.key)}>
       <Dialog.Portal>
-        <Dialog.Overlay isCloseOnPress={!mustAnswer} />
+        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
+            dim backdrop stuck on screen */}
+        <Dialog.Overlay isCloseOnPress={!mustAnswer} animation={false} />
         {/* Not swipeable: an invitation can't be swiped away unanswered */}
-        <Dialog.Content isSwipeable={false} className={cn('self-center overflow-hidden p-0', answer ? 'w-130' : 'w-150')}>
+        <Dialog.Content
+          animation={false}
+          isSwipeable={false}
+          className={cn('self-center overflow-hidden p-0', answer ? 'w-130' : 'w-150')}
+        >
           {message &&
             (answer ? (
               <AnswerCard key={message.key} message={message} onDone={() => dismiss(message.key)} />

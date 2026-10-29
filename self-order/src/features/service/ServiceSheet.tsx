@@ -37,8 +37,10 @@ export const ServiceSheet = ({ isOpen, onOpenChange }: Props) => {
   return (
     <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay />
-        <Dialog.Content isSwipeable={false} className="w-215 gap-6 self-center p-8">
+        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
+            dim backdrop stuck on screen */}
+        <Dialog.Overlay animation={false} />
+        <Dialog.Content animation={false} isSwipeable={false} className="w-215 gap-6 self-center p-8">
           <View className="flex-row items-start justify-between gap-4">
             <View className="gap-1">
               <Dialog.Title className="text-3xl font-bold tracking-tight">{t('mainPage.serviceTitle')}</Dialog.Title>

@@ -52,9 +52,12 @@ export const GiftDialog = () => {
   return (
     <Dialog isOpen={isOpen} onOpenChange={(open) => !open && close()}>
       <Dialog.Portal>
-        <Dialog.Overlay />
+        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
+            dim backdrop stuck on screen */}
+        <Dialog.Overlay animation={false} />
         {/* Not swipeable: dragging should scroll the dishes, not move the dialog. 1080×660, smaller on a smaller screen */}
         <Dialog.Content
+          animation={false}
           isSwipeable={false}
           className="self-center overflow-hidden p-0"
           style={{ width: Math.min(1080, window.width - 48), height: Math.min(660, window.height - 40) }}

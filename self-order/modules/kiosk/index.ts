@@ -7,6 +7,11 @@ type KioskNative = {
   setAllowedApps(extra: string[]): Promise<void>;
   installedVersion(packageName: string): number | null;
   installApp(packageName: string, url: string): Promise<void>;
+  // Builds from 2.0.6 on; missing from older builds, which an update can still reach
+  restartApp?(): Promise<void>;
+  reboot?(): Promise<void>;
+  lastCrash?(): { at: number; message: string } | null;
+  recordCrash?(message: string): void;
 };
 
 // Android only; elsewhere every call is a no-op
@@ -41,4 +46,21 @@ export const Kiosk = {
     if (!native) throw new Error('Not supported on this device');
     await native.installApp(packageName, url);
   },
+
+  /** The whole app afresh, in a new process. False on builds that can't: reload the JavaScript instead. */
+  canRestartApp: (): boolean => !!native?.restartApp,
+  restartApp: async (): Promise<void> => {
+    await native?.restartApp?.();
+  },
+
+  /** Restart the tablet itself: device-owner tablets on builds from 2.0.6. */
+  canReboot: (): boolean => !!native?.reboot && Kiosk.isDeviceOwner(),
+  reboot: async (): Promise<void> => {
+    if (!native?.reboot) throw new Error('Not supported on this device');
+    await native.reboot();
+  },
+
+  /** The last error the app restarted after or showed its error page for, if any. */
+  lastCrash: (): { at: number; message: string } | null => native?.lastCrash?.() ?? null,
+  recordCrash: (message: string): void => native?.recordCrash?.(message),
 };

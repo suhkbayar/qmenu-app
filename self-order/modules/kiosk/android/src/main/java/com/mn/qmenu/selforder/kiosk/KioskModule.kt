@@ -50,6 +50,25 @@ class KioskModule : Module() {
             activity.stopLockTask()
             openSystemLauncher(activity)
         }.runOnQueue(Queues.MAIN)
+
+        // The admin menu's restart: the whole app afresh, in a new process (see AppRestarter)
+        AsyncFunction("restartApp") {
+            AppRestarter.restart(context)
+        }.runOnQueue(Queues.MAIN)
+
+        // The admin menu's "restart tablet", instead of holding the power button. Device owner only.
+        AsyncFunction("reboot") {
+            DeviceOwner.reboot(context)
+        }
+
+        // The last error the app restarted after or showed its error page for, for the admin dialog
+        Function("lastCrash") {
+            AppRestarter.lastCrash(context)
+        }
+
+        Function("recordCrash") { message: String ->
+            AppRestarter.recordCrash(context, message)
+        }
     }
 
     // Open the stock launcher so staff can reach Settings, Calculator, etc.

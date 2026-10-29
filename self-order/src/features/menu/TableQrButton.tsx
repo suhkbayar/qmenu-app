@@ -30,8 +30,10 @@ export const TableQrButton = () => {
       />
       <Dialog isOpen={open} onOpenChange={setOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay />
-          <Dialog.Content isSwipeable={false} className="w-110 gap-5 self-center p-7">
+          {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
+              dim backdrop stuck on screen */}
+          <Dialog.Overlay animation={false} />
+          <Dialog.Content animation={false} isSwipeable={false} className="w-110 gap-5 self-center p-7">
             <View className="flex-row items-start justify-between gap-4">
               <View className="gap-1">
                 <Dialog.Title className="text-3xl font-bold tracking-tight">{t('mainPage.qrCode')}</Dialog.Title>

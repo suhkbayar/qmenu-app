@@ -133,6 +133,11 @@ internal object DeviceOwner {
         dpm(context).setKeyguardDisabled(admin(context), true)
     }
 
+    /** Restarts the tablet. Throws unless the app is the device owner. */
+    fun reboot(context: Context) {
+        dpm(context).reboot(admin(context))
+    }
+
     fun launchApp(context: Context) {
         context.startActivity(
             Intent().setComponent(mainActivity(context))

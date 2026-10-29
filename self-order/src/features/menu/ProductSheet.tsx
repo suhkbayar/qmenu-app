@@ -45,10 +45,13 @@ export const ProductSheet = ({ product, onClose, onConfigured }: Props) => {
   return (
     <Dialog isOpen={!!product} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay />
+        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
+            dim backdrop stuck on screen */}
+        <Dialog.Overlay animation={false} />
         {/* Not swipeable: dragging should scroll the options, not move the dialog */}
         {/* 980×640, smaller on a smaller screen */}
         <Dialog.Content
+          animation={false}
           isSwipeable={false}
           className="flex-row self-center overflow-hidden p-0"
           style={{ width: Math.min(980, window.width - 48), height: Math.min(640, window.height - 40) }}

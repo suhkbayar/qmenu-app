@@ -183,6 +183,8 @@
     "deviceSettings": "Settings",
     "changeTable": "Change table",
     "actionFailed": "That didn't work. Please try again.",
+    "rebootTablet": "Restart tablet",
+    "lastError": "Last error",
     "checkUpdate": "Check for update",
     "updateChecking": "Checking…",
     "updateDownloading": "Downloading…",

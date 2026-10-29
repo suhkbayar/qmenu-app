@@ -62,7 +62,7 @@ export const useTableSession = (pid?: string) => {
 
   useEffect(() => onSessionEnd(leave), [leave]);
 
-  const { data, refetch, error } = useQuery(GET_BRANCH, {
+  const { data, refetch } = useQuery(GET_BRANCH, {
     variables: { id: participantId },
     skip: !participantId,
     fetchPolicy: 'cache-and-network',
@@ -80,12 +80,22 @@ export const useTableSession = (pid?: string) => {
   const participant = data?.getParticipant;
   const branchId = participant?.branch?.id;
 
-  // Started without a connection and nothing cached: keep trying
+  // Nothing loaded yet (started without a connection, e.g. just after the tablet was switched on):
+  // keep trying every few seconds, and at once when the connection is back. On a timer, not on each
+  // failure: a failure just like the one before doesn't redraw, so after a reboot the first retry was
+  // also the last, and the tablet showed loading for good though the internet was back.
   useEffect(() => {
-    if (!participantId || participant || !error?.networkError) return;
-    const id = setTimeout(() => refetch().catch(() => {}), COLD_RETRY_MS);
-    return () => clearTimeout(id);
-  }, [participantId, participant, error, refetch]);
+    if (!participantId || data || planExpired) return;
+    const retry = () => refetch().catch(() => {});
+    const id = setInterval(retry, COLD_RETRY_MS);
+    const unsubscribeNetwork = subscribeNetwork((offline) => {
+      if (!offline) retry();
+    });
+    return () => {
+      clearInterval(id);
+      unsubscribeNetwork();
+    };
+  }, [participantId, data, planExpired, refetch]);
 
   // The restaurant's tablet banners (pictures or videos) become the screensaver. Loaded with the
   // table, and again with every reload below, so a new banner shows without restarting the app.
