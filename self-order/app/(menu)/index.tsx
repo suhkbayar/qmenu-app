@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import { BackHandler } from 'react-native';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { Screensaver } from '@/src/features/kiosk/Screensaver';
+import { useHoldScreensaver } from '@/src/features/kiosk/screensaverHold';
 import { MenuScreen } from '@/src/features/menu/MenuScreen';
 import { IdleOverlay } from '@/src/features/session/IdleOverlay';
 import { PlanExpired } from '@/src/features/session/PlanExpired';
@@ -14,6 +15,8 @@ export default function MenuRoute() {
   const { pid } = useLocalSearchParams<{ pid?: string }>();
   const { participant, planExpired, retry, screensaverBanners } = useTableSession(pid);
   const bannerSound = useSessionStore((s) => s.config?.bannerSound === true);
+  // Only over the menu itself: not while the order history is open on top of it
+  useHoldScreensaver(!useIsFocused());
 
   useFocusEffect(
     useCallback(() => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApolloError, useApolloClient, useMutation } from '@apollo/client';
 import { useToast } from 'heroui-native';
 import { useTranslation } from 'react-i18next';
@@ -15,10 +15,10 @@ import { useOrderSheet } from './orderSheetStore';
 
 /**
  * Sends the cart. Branches that take payment first (advancePayment): the order is created and the
- * checkout opens. Everywhere else the guest pays at the end, like a tab at the till: after a
- * confirmation the cart goes straight to the kitchen, as a new round on the table's open order when
- * there is one, and the bill is paid from My orders. The cart empties once it's sent, so pressing
- * Order again can't send it twice.
+ * checkout opens. Everywhere else the guest pays at the end, like a tab at the till: Order sends the
+ * cart straight to the kitchen, as a new round on the table's open order when there is one, and the
+ * bill is paid from the order panel. The cart empties once it's sent, so pressing Order again can't
+ * send it twice.
  */
 export const usePlaceOrder = () => {
   const { t } = useTranslation('language');
@@ -34,9 +34,11 @@ export const usePlaceOrder = () => {
   const clearCart = useCartStore((s) => s.clear);
 
   const [serviceType, setServiceType] = useState<string>(TYPE.DINIG);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [addingRound, setAddingRound] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  // With no confirmation step, a second tap before the button shows it's sending mustn't send the
+  // cart twice: taps are ignored from the first one until sending is over
+  const busy = useRef(false);
   const canTakeAway = participant?.services?.includes(TYPE.TAKE_AWAY) ?? false;
   const payLater = !participant?.advancePayment;
 
@@ -50,33 +52,24 @@ export const usePlaceOrder = () => {
   }, [giftEnabled, items, clearGift]);
 
   /**
-   * In the kitchen, to be paid later: shows the "sent" screen, with the order panel left open behind
-   * it on the table's order. The orders are reloaded first, so the panel goes straight from the cart
-   * to the order with the new round in it.
+   * In the kitchen, to be paid later: no page of its own (that's for after paying, with the receipt).
+   * The orders are reloaded first, so in the order panel the dishes go straight from the new ones at
+   * the top to the order below, as the new ones clear.
    */
-  const sent = useCallback(
-    async (orderId: string) => {
-      setFinishing(true);
-      await apollo.refetchQueries({ include: [GET_TABLET_ORDERS] }).catch(() => {});
-      setFinishing(false);
-      setConfirmOpen(false);
-      useOrderSheet.getState().show('ordered');
-      // The order as just reloaded: the "sent" screen opens on it at once
-      const orders = apollo.readQuery<{ getTabletOrders: IOrder[] }>({ query: GET_TABLET_ORDERS, variables: { limit: 10 } });
-      const order = orders?.getTabletOrders?.find((o) => o.id === orderId);
-      useCheckout.getState().open(orderId, { payLater: true, order });
-      clearCart();
-    },
-    [apollo, clearCart],
-  );
+  const sent = useCallback(async () => {
+    setFinishing(true);
+    await apollo.refetchQueries({ include: [GET_TABLET_ORDERS] }).catch(() => {});
+    setFinishing(false);
+    clearCart();
+    toast.show({ variant: 'success', label: t('mainPage.orderSent') });
+  }, [apollo, clearCart, toast, t]);
 
   // A new order goes to the kitchen unpaid. The receipt is personal until the guest picks another when paying.
   const [sendUnpaid, { loading: sending }] = useMutation(GET_PAY_ORDER, {
     onCompleted(data) {
-      if (data?.payOrder) sent(data.payOrder.order.id);
+      if (data?.payOrder) sent();
     },
     onError(err) {
-      setConfirmOpen(false);
       showError(err.message);
     },
   });
@@ -89,14 +82,13 @@ export const usePlaceOrder = () => {
           variables: { input: { order: orderId, confirm: true, payment: '', vatType: participant?.vat ? 1 : 0 } },
         });
       } else {
-        // Paid first: checkout opens over the sheet, which then shows the order on Захиалсан
-        useOrderSheet.getState().show('ordered');
+        // Paid first: checkout opens over the sheet, which then shows the order under Захиалсан
+        useOrderSheet.getState().show();
         useCheckout.getState().open(orderId, { order: data.createOrder });
         clearCart();
       }
     },
     onError(err) {
-      setConfirmOpen(false);
       showError(err.message || t('mainPage.orderCreationFailed'));
     },
   });
@@ -116,21 +108,19 @@ export const usePlaceOrder = () => {
     const open = findOpenOrder((data?.getTabletOrders ?? []) as IOrder[], participant?.table?.id);
     if (!open?.id) return false;
 
-    let orderId: string;
     try {
-      const result = await addOrderItems({ variables: { participant: participant?.id, id: open.id, items: lines } });
-      orderId = result.data.addOrderItems.id;
+      await addOrderItems({ variables: { participant: participant?.id, id: open.id, items: lines } });
     } catch (err) {
       // No answer at all: the round may have gone through, so don't risk sending it twice
       const answered = err instanceof ApolloError && (err.graphQLErrors.length > 0 || 'statusCode' in (err.networkError ?? {}));
       if (!answered) throw err;
       return false;
     }
-    await sent(orderId);
+    await sent();
     return true;
   };
 
-  /** Sends the order now (after the confirmation, or straight away when paying first). */
+  /** Sends the order. */
   const submit = useCallback(async () => {
     const hasGift = giftEnabled && items.some((i) => i.giftToTableId);
     const lines = items.map(({ id, quantity, comment, options, giftToTableId }) => ({
@@ -149,7 +139,6 @@ export const usePlaceOrder = () => {
       try {
         if (await addRound(lines)) return;
       } catch (err) {
-        setConfirmOpen(false);
         return showError((err as Error).message || t('mainPage.orderCreationFailed'));
       } finally {
         setAddingRound(false);
@@ -173,9 +162,9 @@ export const usePlaceOrder = () => {
     });
   }, [createOrder, participant, serviceType, items, giftEnabled, giftStickerId, giftAnonymous, payLater]);
 
-  /** The "Order" button: drops dishes that just became unavailable, then confirms or submits. */
+  /** The "Order" button: drops dishes that just became unavailable, then sends, no confirmation. */
   const placeOrder = useCallback(() => {
-    if (!items.length || !participant) return;
+    if (!items.length || !participant || busy.current) return;
 
     const closed = findClosedItems(items, participant.menu?.categories);
     if (closed.length) {
@@ -184,16 +173,18 @@ export const usePlaceOrder = () => {
       return;
     }
 
-    if (payLater) setConfirmOpen(true);
-    else submit();
-  }, [items, participant, payLater, removeItems, showError, submit, t]);
+    busy.current = true;
+    submit();
+  }, [items, participant, removeItems, showError, submit, t]);
+
+  const loading = creating || sending || addingRound || finishing;
+  useEffect(() => {
+    if (!loading) busy.current = false;
+  }, [loading]);
 
   return {
     placeOrder,
-    submit,
-    loading: creating || sending || addingRound || finishing,
-    confirmOpen,
-    setConfirmOpen,
+    loading,
     serviceType,
     setServiceType,
     canTakeAway,

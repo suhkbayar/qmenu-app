@@ -4,24 +4,29 @@ import { useThemeColor } from 'heroui-native';
 import { Bell, Settings } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { SecretTap } from '@/src/features/kiosk/AdminExit';
+import { QuizHeaderButton } from '@/src/features/quiz/QuizBanner';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { GiftButton, SitTogetherButton } from '@/src/features/social/SocialButtons';
 import { ActionButton } from '@/src/ui/ActionButton';
 import { Flag } from '@/src/ui/Flag';
 import { Image } from '@/src/ui/Image';
 import { Text } from '@/src/ui/Text';
+import { TableQrButton } from './TableQrButton';
 
 type Props = {
+  /** The quiz banner at the top of the menu is scrolled out of view */
+  showQuiz: boolean;
   onOpenService: () => void;
   onOpenSettings: () => void;
 };
 
 /**
- * Full width across the top: the restaurant and table on the left; Gift and Sit together (branches
- * that have them), Service, and at the far end the settings cog (language, light/dark) on the right.
- * The order has its own bar along the bottom. Ten quick taps on the logo open the admin dialog.
+ * Full width across the top: the restaurant and table, with the table's QR code, on the left; the
+ * Mbank quiz (while its banner is scrolled away), Gift and Sit together (branches that have them),
+ * Зөөгч өө (service), and at the far end the settings cog (language, light/dark) on the right. The
+ * order has its own bar along the bottom. Ten quick taps on the logo open the admin dialog.
  */
-export const TopBar = memo(({ onOpenService, onOpenSettings }: Props) => {
+export const TopBar = memo(({ showQuiz, onOpenService, onOpenSettings }: Props) => {
   const { t, i18n } = useTranslation('language');
   const [foreground, accentForeground] = useThemeColor(['foreground', 'accent-foreground']);
   const branch = useSessionStore((s) => s.participant?.branch);
@@ -48,8 +53,10 @@ export const TopBar = memo(({ onOpenService, onOpenSettings }: Props) => {
             </Text>
           )}
         </View>
+        <TableQrButton />
       </View>
 
+      {showQuiz && <QuizHeaderButton />}
       {giftEnabled && <GiftButton />}
       {sitEnabled && <SitTogetherButton />}
       <ActionButton

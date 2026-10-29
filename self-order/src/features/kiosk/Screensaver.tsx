@@ -4,10 +4,11 @@ import { cn } from 'heroui-native';
 import { useEventListener } from 'expo';
 import { Image as ExpoImage } from 'expo-image';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import Animated, { Easing, SlideInRight } from 'react-native-reanimated';
 import { WebView } from 'react-native-webview';
+import { Appear } from '@/src/ui/Appear';
 import { Image } from '@/src/ui/Image';
 import { useActivity } from './activity';
+import { useScreensaverHeld } from './screensaverHold';
 
 /**
  * One of the branch's tablet banners: a picture, a video file, or a YouTube video, each by its
@@ -46,19 +47,24 @@ type Props = {
 // Low enough to be background in a restaurant, with several tablets playing at once
 const BANNER_VOLUME = 0.35;
 
-const enter = SlideInRight.duration(800).easing(Easing.out(Easing.cubic));
-
 /**
- * After a while without touches, covers the screen with a slideshow of the branch's banners: each
- * picture for `interval`, each video (a file or YouTube; muted unless banner sound is on) to its
- * end. Any touch ends it.
+ * After a while without touches on the bare menu (no panel or dialog open, see useHoldScreensaver),
+ * covers the screen with a slideshow of the branch's banners: each picture for `interval`, each video
+ * (a file or YouTube; muted unless banner sound is on) to its end. Any touch ends it.
  */
 export const Screensaver = ({ children, banners, delay = 30000, interval = 8000, overlay, sound = false }: Props) => {
   const [idle, setIdle] = useState(false);
   const [index, setIndex] = useState(0);
+  // A panel or dialog is open (the order, payment, a dish, …), or another screen is over the menu
+  const held = useScreensaverHeld();
 
-  // Restart the idle timer on any touch (dialogs included), on keyboard use and when the app comes back
+  // Restart the idle timer on any touch (dialogs included), on keyboard use and when the app comes
+  // back. While something holds it back there's no timer at all; the wait starts over once it's gone.
   useEffect(() => {
+    if (held) {
+      setIdle(false);
+      return;
+    }
     let timer: ReturnType<typeof setTimeout> | undefined;
     const reset = () => {
       clearTimeout(timer);
@@ -75,7 +81,7 @@ export const Screensaver = ({ children, banners, delay = 30000, interval = 8000,
       keyboard.remove();
       unsubscribe();
     };
-  }, [delay]);
+  }, [delay, held]);
 
   // Download the pictures ahead of time so each slide is ready when it comes up (video files are
   // cached the first time they play; YouTube streams each time)
@@ -103,7 +109,7 @@ export const Screensaver = ({ children, banners, delay = 30000, interval = 8000,
     <View className={cn('flex-1', showing && 'bg-black')}>
       <View className={cn('flex-1', showing && 'opacity-0')}>{children}</View>
       {showing && (
-        <Animated.View key={index} entering={enter} style={StyleSheet.absoluteFill}>
+        <Appear key={index} from="right" duration={800} style={StyleSheet.absoluteFill}>
           {banner.kind === 'video' ? (
             <VideoSlide uri={banner.uri} loop={loop} sound={sound} retryAfter={interval} onEnd={next} />
           ) : banner.kind === 'youtube' ? (
@@ -111,7 +117,7 @@ export const Screensaver = ({ children, banners, delay = 30000, interval = 8000,
           ) : (
             <Image source={{ uri: banner.uri }} className="size-full" contentFit="cover" />
           )}
-        </Animated.View>
+        </Appear>
       )}
       {showing && overlay}
     </View>
@@ -248,7 +254,9 @@ function onYouTubeIframeAPIReady() {
 /**
  * A YouTube banner, streamed from YouTube every time it plays (it isn't kept on the tablet), in a
  * web view. Touches go to a cover over it, so a tap ends the screensaver as on any slide. One that
- * can't play (no connection, a private or removed video) moves on after `retryAfter`.
+ * can't play (no connection, a private or removed video) moves on after `retryAfter`, as does one
+ * whose web view Android shut down (low memory): that web view is dropped at once, as using a dead
+ * one can crash the app, and the next slide gets a fresh one.
  */
 const YouTubeSlide = ({
   id,
@@ -264,6 +272,7 @@ const YouTubeSlide = ({
   onEnd: () => void;
 }) => {
   const [failed, setFailed] = useState(false);
+  const [gone, setGone] = useState(false);
   const html = useMemo(() => youtubeHtml(id, sound, loop), [id, sound, loop]);
 
   useEffect(() => {
@@ -274,22 +283,28 @@ const YouTubeSlide = ({
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <WebView
-        source={{ html, baseUrl: YOUTUBE_ORIGIN }}
-        style={styles.youtube}
-        javaScriptEnabled
-        // Starts by itself, with sound when that's on: nobody taps play on a screensaver
-        mediaPlaybackRequiresUserAction={false}
-        allowsInlineMediaPlayback
-        scrollEnabled={false}
-        setSupportMultipleWindows={false}
-        onMessage={(e) => {
-          if (e.nativeEvent.data === 'ended') onEnd();
-          else if (e.nativeEvent.data === 'error') setFailed(true);
-        }}
-        onError={() => setFailed(true)}
-        onHttpError={() => setFailed(true)}
-      />
+      {!gone && (
+        <WebView
+          source={{ html, baseUrl: YOUTUBE_ORIGIN }}
+          style={styles.youtube}
+          javaScriptEnabled
+          // Starts by itself, with sound when that's on: nobody taps play on a screensaver
+          mediaPlaybackRequiresUserAction={false}
+          allowsInlineMediaPlayback
+          scrollEnabled={false}
+          setSupportMultipleWindows={false}
+          onMessage={(e) => {
+            if (e.nativeEvent.data === 'ended') onEnd();
+            else if (e.nativeEvent.data === 'error') setFailed(true);
+          }}
+          onError={() => setFailed(true)}
+          onHttpError={() => setFailed(true)}
+          onRenderProcessGone={() => {
+            setGone(true);
+            setFailed(true);
+          }}
+        />
+      )}
       {/* Over the player, so a tap reaches the app (and ends the screensaver), not YouTube */}
       <View style={StyleSheet.absoluteFill} />
     </View>

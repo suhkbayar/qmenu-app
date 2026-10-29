@@ -37,10 +37,10 @@ export const findOpenOrder = (orders: IOrder[], ownTableId?: string) =>
       !order.vatBillId,
   );
 
-/** An order's items (returned ones left out) in the order they were added, oldest first. */
+/** An order's items (returned ones left out) by when they were added, the latest first. */
 export const itemsByTime = (items: IOrderItem[]) => {
   const addedAt = (item: IOrderItem) => new Date(item.createdAt ?? 0).getTime();
-  return items.filter((item) => item.state !== 'RETURN').sort((a, b) => addedAt(a) - addedAt(b));
+  return items.filter((item) => item.state !== 'RETURN').sort((a, b) => addedAt(b) - addedAt(a));
 };
 
 /**
@@ -60,14 +60,13 @@ export const useTableOrders = ({ fresh = false, cacheOnly = false }: { fresh?: b
   });
   const ownTableId = useSessionStore((s) => s.participant?.table?.id);
   const orders: IOrder[] = data?.getTabletOrders ?? [];
-  // Gifts from other tables are listed, but don't count towards our badge or bill
+  // Another table's order that sent us a gift isn't ours: not listed, counted or paid here (the gift
+  // itself is announced when it's sent)
   const ours = orders.filter((order) => !isReceivedGift(order, ownTableId));
   const unpaid = ours.filter(isUnpaid);
-  // The guests at the table now: what's still being made, or still to pay (a gift to us is never ours
-  // to pay). Earlier guests' orders, delivered and paid, aren't theirs to see here.
-  const isCurrent = (order: IOrder) =>
-    !order.cancelledAt &&
-    (!FINISHED.includes(order.state) || (!isReceivedGift(order, ownTableId) && isUnpaid(order)));
+  // The guests at the table now: what's still being made, or still to pay. Earlier guests' orders,
+  // delivered and paid, aren't theirs to see here.
+  const isCurrent = (order: IOrder) => !order.cancelledAt && (!FINISHED.includes(order.state) || isUnpaid(order));
   const active = ours.filter(isCurrent);
   // Of our orders not at the table yet, the one furthest behind: what the guests are waiting for
   const coming = active
@@ -77,8 +76,8 @@ export const useTableOrders = ({ fresh = false, cacheOnly = false }: { fresh?: b
   return {
     /** Today's orders at this table, earlier guests' included: the order history */
     orders,
-    /** The current guests' orders, gifts to them included: the Захиалсан tab */
-    current: orders.filter(isCurrent),
+    /** The current guests' own orders: Захиалсан in the order panel */
+    current: active,
     ownTableId,
     loading,
     refetch,

@@ -92,7 +92,7 @@ const CheckConnectionButton = () => {
 
 const CodeForm = () => {
   const { t } = useTranslation('language');
-  const [foreground, muted] = useThemeColor(['foreground', 'muted']);
+  const [foreground, muted, accentForeground] = useThemeColor(['foreground', 'muted', 'accent-foreground']);
   const { login, loading } = useTableLogin();
   const offline = useNoInternet();
   const [code, setCode] = useState('');
@@ -137,7 +137,9 @@ const CodeForm = () => {
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="go"
-            className="flex-1 font-normal text-lg text-foreground"
+            className="flex-1 font-normal text-lg"
+            // Typed text in the theme's colour through style; unset, Android draws it black
+            style={{ color: foreground }}
           />
           <Button variant="secondary" className="h-12 rounded-xl px-3.5" onPress={scan}>
             <ScanQrCode size={20} color={foreground} />
@@ -148,7 +150,8 @@ const CodeForm = () => {
       </View>
 
       <Button size="lg" className="h-15 w-full rounded-2xl" isDisabled={loading} onPress={submit}>
-        {loading && <Spinner />}
+        {/* Spinners default to the brand yellow, which vanishes on the yellow button */}
+        {loading && <Spinner color={accentForeground} />}
         <Button.Label numberOfLines={1} className="text-lg font-bold">{t('setup.continue')}</Button.Label>
       </Button>
     </View>

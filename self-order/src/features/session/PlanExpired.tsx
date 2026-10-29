@@ -9,7 +9,7 @@ import { Text } from '@/src/ui/Text';
 /** Shown instead of the menu when the branch's QMenu plan has run out (server error PE0001). */
 export const PlanExpired = ({ onRetry }: { onRetry: () => Promise<unknown> }) => {
   const { t } = useTranslation('language');
-  const muted = useThemeColor('muted');
+  const [muted, accentForeground] = useThemeColor(['muted', 'accent-foreground']);
   const [checking, setChecking] = useState(false);
 
   const retry = async () => {
@@ -32,7 +32,8 @@ export const PlanExpired = ({ onRetry }: { onRetry: () => Promise<unknown> }) =>
       <Text className="self-stretch text-center text-3xl font-bold">{t('setup.planExpiredTitle')}</Text>
       <Text className="max-w-140 self-stretch text-center text-lg text-muted">{t('setup.planExpiredBody')}</Text>
       <Button size="lg" className="mt-2 rounded-2xl px-8" isDisabled={checking} onPress={retry}>
-        {checking && <Spinner />}
+        {/* Spinners default to the brand yellow, which vanishes on the yellow button */}
+        {checking && <Spinner color={accentForeground} />}
         <Button.Label numberOfLines={1} className="font-bold">{t('setup.checkAgain')}</Button.Label>
       </Button>
     </View>

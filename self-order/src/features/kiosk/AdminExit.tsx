@@ -1,8 +1,10 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, TextInput, View } from 'react-native';
+import { Linking, Platform, Pressable, TextInput, View } from 'react-native';
 import { useApolloClient } from '@apollo/client';
+import { router } from 'expo-router';
 import { Button, Dialog, Spinner, cn, useThemeColor, useToast } from 'heroui-native';
-import { RefreshCw } from 'lucide-react-native';
+import { Armchair, LogOut, RefreshCw, RotateCcw, Settings, Wifi } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import * as Updates from 'expo-updates';
 import { create } from 'zustand';
@@ -13,6 +15,7 @@ import { IParticipant } from '@/src/types';
 import { Text } from '@/src/ui/Text';
 import { useAppUpdate } from './appUpdate';
 import { MAX_PIN_ATTEMPTS, usePinLock } from './pinLock';
+import { useHoldScreensaver } from './screensaverHold';
 import { checkForUpdate } from './UpdatePrompt';
 import { VersionBadge } from './VersionBadge';
 
@@ -62,8 +65,9 @@ export const SecretTap = ({ children }: { children: ReactNode }) => {
 };
 
 /**
- * Staff exit from kiosk mode: after the logo taps (SecretTap), enter the branch's ADMIN_PIN or
- * QMenu support's code. The dialog also shows the version and can check for updates.
+ * Staff's way in, after the logo taps (SecretTap): the branch's ADMIN_PIN or QMenu support's code,
+ * then a menu (restart the app, Wi-Fi and other settings, another table, leaving kiosk mode). The
+ * dialog also shows the version and can check for updates.
  */
 export const AdminExit = () => {
   const open = useAdminDialog((s) => s.open);
@@ -72,8 +76,7 @@ export const AdminExit = () => {
 
 const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const { t } = useTranslation('language');
-  const { toast } = useToast();
-  const [muted, foreground] = useThemeColor(['muted', 'foreground']);
+  const [muted, foreground, accentForeground] = useThemeColor(['muted', 'foreground', 'accent-foreground']);
   const apollo = useApolloClient();
   const participantId = useSessionStore((s) => s.participant?.id);
   const adminPin = useSessionStore((s) => adminPinOf(s.participant?.configs));
@@ -82,6 +85,9 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
   const [wrong, setWrong] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [checked, setChecked] = useState(false);
+  // The right PIN is in: the menu instead of the PIN field
+  const [unlocked, setUnlocked] = useState(false);
+  useHoldScreensaver(isOpen);
   const [now, setNow] = useState(Date.now);
   const lockedFor = lockedUntil - now;
   const locked = lockedFor > 0;
@@ -145,6 +151,7 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
     setPin('');
     setWrong(false);
     setChecked(false);
+    setUnlocked(false);
     onClose();
   };
 
@@ -163,12 +170,8 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
       return;
     }
     reset();
-    close();
-    try {
-      await Kiosk.stop();
-    } catch {
-      toast.show({ variant: 'danger', label: t('setup.exitFailed') });
-    }
+    setPin('');
+    setUnlocked(true);
   };
 
   return (
@@ -176,54 +179,69 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
       <Dialog.Portal>
         {/* A stray tap after the ten on the logo shouldn't close it; Cancel does */}
         <Dialog.Overlay isCloseOnPress={false} />
-        <Dialog.Content isSwipeable={false} className="w-110 gap-4 self-center p-7">
+        <Dialog.Content isSwipeable={false} className={cn('gap-4 self-center p-7', unlocked ? 'w-170' : 'w-110')}>
           <Dialog.Title className="text-center text-2xl">{t('setup.adminAccess')}</Dialog.Title>
 
-          <View className="gap-2">
-            <TextInput
-              value={pin}
-              onChangeText={(value) => {
-                setPin(value);
-                setWrong(false);
-              }}
-              onSubmitEditing={submit}
-              placeholder={t('setup.enterPin')}
-              placeholderTextColor={muted}
-              secureTextEntry
-              keyboardType="number-pad"
-              autoFocus
-              editable={!locked && !noPin}
-              className={cn(
-                'h-15 rounded-2xl border bg-surface px-4 text-center font-normal text-2xl text-foreground',
-                wrong || locked ? 'border-danger' : 'border-border',
-                (locked || noPin) && 'opacity-50',
-              )}
-              style={{ letterSpacing: 6 }}
-            />
-            {locked ? (
-              <Text className="text-center text-sm font-medium text-danger">
-                {t('setup.pinLocked', { time: formatCountdown(lockedFor) })}
-              </Text>
-            ) : noPin ? (
-              <Text className="text-center text-sm font-medium text-muted">{t('setup.noPin')}</Text>
-            ) : (
-              wrong && (
-                <Text className="text-center text-sm font-medium text-danger">
-                  {t('setup.wrongPin', { count: MAX_PIN_ATTEMPTS - failures })}
-                </Text>
-              )
-            )}
-          </View>
+          {unlocked ? (
+            <AdminMenu onDone={close} />
+          ) : (
+            <>
+              <View className="gap-2">
+                <TextInput
+                  value={pin}
+                  onChangeText={(value) => {
+                    setPin(value);
+                    setWrong(false);
+                  }}
+                  onSubmitEditing={submit}
+                  placeholder={t('setup.enterPin')}
+                  placeholderTextColor={muted}
+                  secureTextEntry
+                  keyboardType="number-pad"
+                  autoFocus
+                  editable={!locked && !noPin}
+                  className={cn(
+                    'h-15 rounded-2xl border bg-surface px-4 text-center font-normal text-2xl text-foreground',
+                    wrong || locked ? 'border-danger' : 'border-border',
+                    (locked || noPin) && 'opacity-50',
+                  )}
+                  // Typed text in the theme's colour through style; unset, Android draws it black
+                  style={{ letterSpacing: 6, color: foreground }}
+                />
+                {locked ? (
+                  <Text className="text-center text-sm font-medium text-danger">
+                    {t('setup.pinLocked', { time: formatCountdown(lockedFor) })}
+                  </Text>
+                ) : noPin ? (
+                  <Text className="text-center text-sm font-medium text-muted">{t('setup.noPin')}</Text>
+                ) : (
+                  wrong && (
+                    <Text className="text-center text-sm font-medium text-danger">
+                      {t('setup.wrongPin', { count: MAX_PIN_ATTEMPTS - failures })}
+                    </Text>
+                  )
+                )}
+              </View>
 
-          <View className="flex-row gap-3">
-            <Button size="lg" variant="secondary" className="flex-1 rounded-2xl" onPress={close}>
-              <Button.Label numberOfLines={1}>{t('setup.cancel')}</Button.Label>
-            </Button>
-            <Button size="lg" className="flex-1 rounded-2xl" isDisabled={!pin || locked || verifying} onPress={submit}>
-              {verifying && <Spinner size="sm" />}
-              <Button.Label numberOfLines={1} className="font-bold">{t('setup.exitKiosk')}</Button.Label>
-            </Button>
-          </View>
+              <View className="flex-row gap-3">
+                <Button size="lg" variant="secondary" className="flex-1 rounded-2xl" onPress={close}>
+                  <Button.Label numberOfLines={1}>{t('setup.cancel')}</Button.Label>
+                </Button>
+                <Button
+                  size="lg"
+                  className="flex-1 rounded-2xl"
+                  isDisabled={!pin || locked || verifying}
+                  onPress={submit}
+                >
+                  {/* Spinners default to the brand yellow, which vanishes on the yellow button */}
+                  {verifying && <Spinner size="sm" color={accentForeground} />}
+                  <Button.Label numberOfLines={1} className="font-bold">
+                    {t('setup.continue')}
+                  </Button.Label>
+                </Button>
+              </View>
+            </>
+          )}
 
           <View className="items-center gap-1.5 border-t border-border pt-4">
             <Button
@@ -239,7 +257,9 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
             {!!appUpdate.available && (
               <Button size="sm" variant="secondary" isDisabled={appUpdate.installing} onPress={appUpdate.install}>
                 {appUpdate.installing && <Spinner size="sm" />}
-                <Button.Label numberOfLines={1}>{t('setup.installBuild', { version: appUpdate.available })}</Button.Label>
+                <Button.Label numberOfLines={1}>
+                  {t('setup.installBuild', { version: appUpdate.available })}
+                </Button.Label>
               </Button>
             )}
             {!!appUpdate.error && <Text className="text-center text-sm text-danger">{appUpdate.error}</Text>}
@@ -248,5 +268,76 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog>
+  );
+};
+
+type AdminAction = 'restart' | 'wifi' | 'settings' | 'table' | 'exit';
+
+const ADMIN_ACTIONS: { id: AdminAction; labelKey: string; Icon: LucideIcon }[] = [
+  { id: 'restart', labelKey: 'setup.appRestart', Icon: RotateCcw },
+  { id: 'wifi', labelKey: 'setup.wifiSettings', Icon: Wifi },
+  { id: 'settings', labelKey: 'setup.deviceSettings', Icon: Settings },
+  { id: 'table', labelKey: 'setup.changeTable', Icon: Armchair },
+  { id: 'exit', labelKey: 'setup.exitKiosk', Icon: LogOut },
+];
+
+// Android's own touch ripple, as on the other tiles
+const RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
+
+/**
+ * What staff can do once the PIN is in, as big tiles, so nobody at the restaurant needs to know
+ * Android: restart the app, fix the Wi-Fi or other settings, pick another table, or leave kiosk mode.
+ * Settings are outside the kiosk lock, so the lock comes off first; Home brings the app back, locked.
+ */
+const AdminMenu = ({ onDone }: { onDone: () => void }) => {
+  const { t } = useTranslation('language');
+  const { toast } = useToast();
+  const foreground = useThemeColor('foreground');
+  const [busy, setBusy] = useState<AdminAction | null>(null);
+
+  const openSettings = async (intent: string) => {
+    await Kiosk.stop();
+    await Linking.sendIntent(intent);
+  };
+
+  const run = async (action: AdminAction) => {
+    if (busy) return;
+    setBusy(action);
+    try {
+      if (action === 'restart') await Updates.reloadAsync();
+      else if (action === 'wifi') await openSettings('android.settings.WIFI_SETTINGS');
+      else if (action === 'settings') await openSettings('android.settings.SETTINGS');
+      else if (action === 'table') router.replace('/setup');
+      else await Kiosk.stop();
+      onDone();
+    } catch {
+      toast.show({ variant: 'danger', label: t(action === 'exit' ? 'setup.exitFailed' : 'setup.actionFailed') });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <View className="flex-row flex-wrap gap-3">
+      {ADMIN_ACTIONS.map(({ id, labelKey, Icon }) => (
+        <Pressable
+          key={id}
+          onPress={() => run(id)}
+          disabled={!!busy}
+          android_ripple={RIPPLE}
+          accessibilityRole="button"
+          className={cn(
+            'h-28 w-[31.8%] items-center justify-center gap-2.5 overflow-hidden rounded-3xl border border-border bg-surface px-3',
+            !!busy && busy !== id && 'opacity-50',
+          )}
+        >
+          {busy === id ? <Spinner /> : <Icon size={28} color={foreground} />}
+          {/* Full tile width: Android cuts off a centred label sized to its own text */}
+          <Text className="self-stretch text-center font-semibold" numberOfLines={2}>
+            {t(labelKey)}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
   );
 };

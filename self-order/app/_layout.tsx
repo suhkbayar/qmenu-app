@@ -14,6 +14,7 @@ import { Onest_600SemiBold } from '@expo-google-fonts/onest/600SemiBold';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import { Camera } from 'expo-camera';
 import { useFonts } from 'expo-font';
+import { useKeepAwake } from 'expo-keep-awake';
 import { Stack } from 'expo-router';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -60,6 +61,9 @@ const useThemeLoaded = () => {
 };
 
 export default function RootLayout() {
+  // A kiosk: the screen never times out while the app is up. The power button and a flat battery
+  // still turn it off.
+  useKeepAwake();
   const { i18n } = useTranslation();
   const isDark = useThemeStore((s) => s.isDark);
   const themeLoaded = useThemeLoaded();

@@ -33,12 +33,12 @@ export type Receipt = { vatType: '1' | '3'; register?: string };
  * Paying one order inside the checkout dialog. `preview` is the order as the tablet already has it,
  * shown until the server's copy arrives; paying waits for that copy.
  */
-export const usePayment = (orderId: string, payLater: boolean, preview?: IOrder | null) => {
+export const usePayment = (orderId: string, preview?: IOrder | null) => {
   const { t } = useTranslation('language');
   const { toast } = useToast();
   const participant = useSessionStore((s) => s.participant);
 
-  const [step, setStep] = useState<CheckoutStep>(payLater ? 'done' : 'pay');
+  const [step, setStep] = useState<CheckoutStep>('pay');
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [transaction, setTransaction] = useState<ITransaction>();
   const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null>(null);

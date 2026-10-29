@@ -42,7 +42,9 @@ export const CategoryRail = memo(({ categories, activeId, onSelect }: Props) => 
     >
       {categories.map((category) => (
         <RailItem
-          key={category.id}
+          // Drawn anew when it becomes or stops being the current one: a fill that changed on
+          // screen could cover the label on the tablets
+          key={`${category.id}-${category.id === activeId}`}
           id={category.id}
           name={category.name}
           active={category.id === activeId}

@@ -144,13 +144,16 @@ const OrderCard = ({ order, ownTableId }: { order: IOrder; ownTableId: string | 
         </View>
         <View className="flex-row flex-wrap justify-end gap-1.5">
           {!!order.state && (
+            // Drawn anew for each state: a changed colour class could keep the old colour on the tablets
             <Chip
+              key={order.state}
               label={ORDER_STATE_LABEL[order.state] ?? order.state}
               tone={ORDER_STATE_TONE[order.state] ?? NEUTRAL_TONE}
             />
           )}
           {!!order.paymentState && (
             <Chip
+              key={order.paymentState}
               label={PAYMENT_STATE_LABEL[order.paymentState] ?? order.paymentState}
               tone={PAYMENT_STATE_TONE[order.paymentState] ?? NEUTRAL_TONE}
             />

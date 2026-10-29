@@ -115,9 +115,8 @@ const RegisterInput = ({
   placeholder: string;
   status?: 'loading' | 'found' | 'error';
 }) => {
-  const muted = useThemeColor('muted');
+  const [muted, foreground, danger] = useThemeColor(['muted', 'foreground', 'danger']);
   const positive = useCSSVariable('--color-positive') as string;
-  const danger = useThemeColor('danger');
   return (
     <View
       className={cn(
@@ -132,7 +131,9 @@ const RegisterInput = ({
         maxLength={maxLength}
         placeholder={placeholder}
         placeholderTextColor={muted}
-        className="flex-1 font-semibold text-lg text-foreground"
+        className="flex-1 font-semibold text-lg"
+        // Typed text in the theme's colour through style; unset, Android draws it black
+        style={{ color: foreground }}
       />
       {status === 'loading' && <Spinner />}
       {status === 'found' && <CircleCheck size={22} color={positive} />}

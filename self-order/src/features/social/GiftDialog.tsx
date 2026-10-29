@@ -1,15 +1,15 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useQuery } from '@apollo/client';
 import { Button, Dialog, PressableFeedback, Spinner, Switch, cn, useThemeColor } from 'heroui-native';
 import { FlashList } from '@shopify/flash-list';
 import { ArrowLeft, Check, EyeOff, Gift, MapPin, Minus, Plus, Send, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCSSVariable } from 'uniwind';
 import { MenuItemState, TABLE_MESSAGE_STICKERS } from '@/src/constants';
 import { IGiftTarget, useCartStore } from '@/src/features/cart/cartStore';
 import { lineTotal } from '@/src/features/cart/totals';
+import { useHoldScreensaver } from '@/src/features/kiosk/screensaverHold';
 import { ProductSheet } from '@/src/features/menu/ProductSheet';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { GET_ACTIVE_TABLES } from '@/src/graphql/queries/tableMessage';
@@ -18,6 +18,7 @@ import { getCdnImageUrl } from '@/src/lib/image';
 import { isConfigurable, isCurrentlyOpen } from '@/src/lib/menu';
 import { IMenuCategory, IMenuProduct, IOrderItem } from '@/src/types';
 import { ITable } from '@/src/types/table';
+import { Appear } from '@/src/ui/Appear';
 import { Image } from '@/src/ui/Image';
 import { Text } from '@/src/ui/Text';
 import { useOpened, whenClosed } from '@/src/ui/useOpened';
@@ -40,6 +41,7 @@ export const GiftDialog = () => {
   const isOpen = useSocialStore((s) => s.composer === 'gift');
   const close = useSocialStore((s) => s.closeComposer);
   const window = useWindowDimensions();
+  useHoldScreensaver(isOpen);
 
   // Each open starts fresh; the last one stays on screen while the dialog animates closed
   const [session, setSession] = useState(0);
@@ -188,9 +190,9 @@ const GiftFlow = ({ onClose }: { onClose: () => void }) => {
           (loading && !tables.length ? (
             <Spinner className="mt-10 self-center" />
           ) : tables.some((tb) => tb.id !== ownTableId) ? (
-            <Animated.View entering={FadeIn.duration(150)} style={{ flex: 1 }}>
+            <Appear duration={150} style={{ flex: 1 }}>
               <GiftTables tables={tables} ownTableId={ownTableId} markedId={table?.id} onPick={pickTable} />
-            </Animated.View>
+            </Appear>
           ) : (
             <Text className="mt-10 text-center text-lg text-muted">{t('mainPage.no_other_tables')}</Text>
           ))}
@@ -365,9 +367,19 @@ const useGiftableDishes = () => {
   }, [categories]);
 };
 
+// Android's own touch ripple, as on the category rail
+const CHIP_RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
+
 /** Category chips over a 5-column grid of that category's dishes. */
 const DishStep = ({ selectedId, onPick }: { selectedId?: string; onPick: (product: IMenuProduct) => void }) => {
   const { t } = useTranslation('language');
+  const [foreground, accent, accentForeground, surface, border] = useThemeColor([
+    'foreground',
+    'accent',
+    'accent-foreground',
+    'surface',
+    'border',
+  ]);
   const groups = useGiftableDishes();
   const [groupId, setGroupId] = useState(
     () => groups.find((g) => g.products.some((p) => p.productId === selectedId))?.id ?? groups[0]?.id,
@@ -382,17 +394,26 @@ const DishStep = ({ selectedId, onPick }: { selectedId?: string; onPick: (produc
         {groups.map((g) => {
           const active = g.id === group.id;
           return (
-            <PressableFeedback
-              key={g.id}
+            // A plain Pressable with every colour through style, like the category rail: with heroui's
+            // PressableFeedback and a toggled fill class, a selected chip came out plain yellow
+            <Pressable
+              // Drawn anew when picked or not: a chip whose fill changed on screen lost its label
+              key={`${g.id}-${active}`}
               onPress={() => setGroupId(g.id)}
+              android_ripple={CHIP_RIPPLE}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              className={cn('h-11 justify-center rounded-full px-4', active ? 'bg-accent' : 'border border-border bg-surface')}
+              className="h-11 justify-center overflow-hidden rounded-full border px-4"
+              style={{ backgroundColor: active ? accent : surface, borderColor: active ? accent : border }}
             >
-              <Text className={cn(active ? 'font-bold text-accent-foreground' : 'font-medium')} numberOfLines={1}>
+              <Text
+                className={active ? 'font-bold' : 'font-medium'}
+                style={{ color: active ? accentForeground : foreground }}
+                numberOfLines={1}
+              >
                 {g.name}
               </Text>
-            </PressableFeedback>
+            </Pressable>
           );
         })}
       </ScrollView>

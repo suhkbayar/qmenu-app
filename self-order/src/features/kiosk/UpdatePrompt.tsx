@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
-import { Button, Dialog, Spinner } from 'heroui-native';
+import { Button, Dialog, Spinner, useThemeColor } from 'heroui-native';
 import { useTranslation } from 'react-i18next';
 import * as Updates from 'expo-updates';
 import { checkConnection } from '@/src/lib/network';
@@ -31,6 +31,7 @@ export const checkForUpdate = () =>
  */
 export const UpdatePrompt = () => {
   const { t } = useTranslation('language');
+  const accentForeground = useThemeColor('accent-foreground');
   const { isUpdatePending } = Updates.useUpdates();
   // Restarting would empty the cart or interrupt a payment
   const guestBusy = useGuestBusy();
@@ -89,7 +90,8 @@ export const UpdatePrompt = () => {
           <Dialog.Title className="text-center text-2xl">{t('mainPage.update_title')}</Dialog.Title>
           <Dialog.Description className="text-center text-base">{t('mainPage.update_body')}</Dialog.Description>
           <Button size="lg" className="rounded-2xl" isDisabled={restarting} onPress={restart}>
-            {restarting && <Spinner />}
+            {/* Spinners default to the brand yellow, which vanishes on the yellow button */}
+            {restarting && <Spinner color={accentForeground} />}
             <Button.Label numberOfLines={1} className="font-bold">{t('mainPage.update_button')}</Button.Label>
           </Button>
         </Dialog.Content>

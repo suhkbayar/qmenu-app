@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Button, Tabs, useThemeColor } from 'heroui-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, useThemeColor } from 'heroui-native';
 import { X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { OrderedTab } from '@/src/features/orders/OrderedTab';
+import { useHoldScreensaver } from '@/src/features/kiosk/screensaverHold';
+import { BillBar, OrderedList } from '@/src/features/orders/OrderedList';
 import { useTableOrders } from '@/src/features/orders/useTableOrders';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { IMenuProduct } from '@/src/types';
 import { Text } from '@/src/ui/Text';
-import { CartTab } from './CartTab';
 import { useCartTotals } from './cartStore';
-import { OrderSheetTab, useOrderSheet } from './orderSheetStore';
+import { NewItems, SendBar } from './NewItems';
+import { useOrderSheet } from './orderSheetStore';
 
 // Slides in by transform only, which the tablets draw smoothly
 const SLIDE_IN_MS = 260;
@@ -20,13 +21,14 @@ const SLIDE_OUT_MS = 220;
 const OFFSCREEN_X = 480;
 
 /**
- * The order, over the menu from the right, in two tabs with one job each: Сагс (what's about to be
- * sent, then Order) and Захиалсан (what the table has ordered today, [+] to have it again, then
- * settling up). Opened from the order bar; after an order is sent it shows Захиалсан.
+ * The order, over the menu from the right, in one list like a till: the new dishes at the top in
+ * their own tint (then Order), what the table has ordered today below them ([+] to have it again),
+ * and the bill once nothing new is waiting. Opened from the order bar.
  */
 export const OrderSheet = ({ onOpenProduct }: { onOpenProduct: (product: IMenuProduct) => void }) => {
   const open = useOrderSheet((s) => s.open);
   const close = useOrderSheet((s) => s.close);
+  useHoldScreensaver(open);
   // Stays mounted while it slides out
   const [shown, setShown] = useState(open);
   if (open && !shown) setShown(true);
@@ -74,11 +76,14 @@ const Sheet = ({ onOpenProduct }: { onOpenProduct: (product: IMenuProduct) => vo
   const { t } = useTranslation('language');
   const foreground = useThemeColor('foreground');
   const tableName = useSessionStore((s) => s.participant?.table?.name);
-  const tab = useOrderSheet((s) => s.tab);
-  const show = useOrderSheet((s) => s.show);
   const close = useOrderSheet((s) => s.close);
   const cart = useCartTotals();
-  const { activeItems } = useTableOrders();
+  const { current, loading } = useTableOrders();
+  const empty = !cart.quantity && !current.length && !loading;
+
+  // [+] again puts the dish among the new ones at the top: scroll up to it
+  const scroll = useRef<ScrollView>(null);
+  const toTop = useCallback(() => scroll.current?.scrollTo({ y: 0, animated: true }), []);
 
   return (
     <View className="h-full w-115 rounded-l-[28px] bg-surface">
@@ -98,25 +103,13 @@ const Sheet = ({ onOpenProduct }: { onOpenProduct: (product: IMenuProduct) => vo
         </Button>
       </View>
 
-      <View className="px-6.5">
-        <Tabs value={tab} onValueChange={(value) => show(value as OrderSheetTab)}>
-          <Tabs.List className="w-full">
-            <Tabs.Indicator />
-            <Tabs.Trigger value="cart" className="flex-1">
-              <Tabs.Label numberOfLines={1}>
-                {t('mainPage.cartTab')} · {cart.quantity}
-              </Tabs.Label>
-            </Tabs.Trigger>
-            <Tabs.Trigger value="ordered" className="flex-1">
-              <Tabs.Label numberOfLines={1}>
-                {t('mainPage.ordered')} · {activeItems}
-              </Tabs.Label>
-            </Tabs.Trigger>
-          </Tabs.List>
-        </Tabs>
-      </View>
+      <ScrollView ref={scroll} className="flex-1" contentContainerClassName="gap-4 px-6.5 pb-5 pt-1">
+        {empty && <Text className="mt-10 self-stretch text-center text-muted">{t('mainPage.cartEmpty')}</Text>}
+        <NewItems />
+        <OrderedList onOpenProduct={onOpenProduct} onAdded={toTop} />
+      </ScrollView>
 
-      {tab === 'cart' ? <CartTab /> : <OrderedTab onOpenProduct={onOpenProduct} />}
+      {cart.quantity > 0 ? <SendBar /> : <BillBar />}
     </View>
   );
 };

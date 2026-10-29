@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { TextInput, View } from 'react-native';
-import { Button, Dialog, PressableFeedback, cn, useThemeColor } from 'heroui-native';
+import { Pressable, TextInput, View } from 'react-native';
+import { Button, Dialog, useThemeColor } from 'heroui-native';
 import { X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/src/ui/Text';
@@ -8,6 +8,8 @@ import { Text } from '@/src/ui/Text';
 const MAX_LENGTH = 100;
 // Requests kitchens hear most; a tap adds one to the note, or takes it out again
 const QUICK_NOTES = ['note_no_onion', 'note_no_spice', 'note_no_ice'];
+// Android's own touch ripple, as on the category rail
+const RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
 
 type Props = {
   /** The dish whose note is being written; null closes */
@@ -52,7 +54,14 @@ const NoteForm = ({
   onClose: () => void;
 }) => {
   const { t } = useTranslation('language');
-  const [foreground, muted] = useThemeColor(['foreground', 'muted']);
+  const [foreground, muted, accent, accentForeground, surface, border] = useThemeColor([
+    'foreground',
+    'muted',
+    'accent',
+    'accent-foreground',
+    'surface',
+    'border',
+  ]);
   const [text, setText] = useState(target.comment ?? '');
 
   const parts = text
@@ -90,18 +99,27 @@ const NoteForm = ({
           const label = t(`mainPage.${key}`);
           const active = parts.includes(label);
           return (
-            <PressableFeedback
-              key={key}
+            // Selected = brand yellow, like the other choices in the app. A plain Pressable with every
+            // colour through style, like the category rail: with heroui's PressableFeedback and a
+            // toggled fill class, a selected chip came out plain yellow, its label gone
+            <Pressable
+              // Drawn anew when picked or not: a chip whose fill changed on screen lost its label
+              key={`${key}-${active}`}
               onPress={() => toggle(label)}
+              android_ripple={RIPPLE}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: active }}
-              // Selected = brand yellow, like the other choices in the app
-              className={cn('h-11 justify-center rounded-full px-4', active ? 'bg-accent' : 'border border-border bg-surface')}
+              className="h-11 justify-center overflow-hidden rounded-full border px-4"
+              style={{ backgroundColor: active ? accent : surface, borderColor: active ? accent : border }}
             >
-              <Text className={cn('font-semibold', active && 'font-bold text-accent-foreground')} numberOfLines={1}>
+              <Text
+                className={active ? 'font-bold' : 'font-semibold'}
+                style={{ color: active ? accentForeground : foreground }}
+                numberOfLines={1}
+              >
                 {label}
               </Text>
-            </PressableFeedback>
+            </Pressable>
           );
         })}
       </View>
@@ -116,7 +134,9 @@ const NoteForm = ({
           multiline
           autoFocus
           textAlignVertical="top"
-          className="min-h-24 rounded-2xl border border-border bg-surface px-4 py-3 font-normal text-lg text-foreground"
+          className="min-h-24 rounded-2xl border border-border bg-surface px-4 py-3 font-normal text-lg"
+          // Typed text in the theme's colour through style; unset, Android draws it black
+          style={{ color: foreground }}
         />
         <Text className="self-end text-xs text-muted">
           {text.length}/{MAX_LENGTH}

@@ -4,11 +4,12 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Button, Dialog, Spinner, useThemeColor, useToast } from 'heroui-native';
 import { Send, UsersRound, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCSSVariable } from 'uniwind';
+import { useHoldScreensaver } from '@/src/features/kiosk/screensaverHold';
 import { SEND_TABLE_REQUEST } from '@/src/graphql/mutations/tableRequest';
 import { GET_ACTIVE_TABLES } from '@/src/graphql/queries/tableMessage';
 import { ITable } from '@/src/types/table';
+import { Appear } from '@/src/ui/Appear';
 import { Text } from '@/src/ui/Text';
 import { useOpened } from '@/src/ui/useOpened';
 import { useSocialStore } from './socialStore';
@@ -19,6 +20,7 @@ export const SitDialog = () => {
   const isOpen = useSocialStore((s) => s.composer === 'sit');
   const close = useSocialStore((s) => s.closeComposer);
   const window = useWindowDimensions();
+  useHoldScreensaver(isOpen);
 
   // Each open starts fresh; the last one stays on screen while the dialog animates closed
   const [session, setSession] = useState(0);
@@ -95,7 +97,7 @@ const SitFlow = ({ onClose }: { onClose: () => void }) => {
         {!opened ? null : loading && !tables.length ? (
           <Spinner className="mt-10 self-center" />
         ) : tables.some((tb) => tb.id !== ownTableId) ? (
-          <Animated.View entering={FadeIn.duration(150)} style={{ flex: 1 }}>
+          <Appear duration={150} style={{ flex: 1 }}>
             <TableFloorPlan
               tables={tables}
               ownTableId={ownTableId}
@@ -103,7 +105,7 @@ const SitFlow = ({ onClose }: { onClose: () => void }) => {
               color={color}
               onSelect={setTable}
             />
-          </Animated.View>
+          </Appear>
         ) : (
           <Text className="mt-10 text-center text-lg text-muted">{t('mainPage.no_other_tables')}</Text>
         )}
@@ -122,7 +124,7 @@ const SitFlow = ({ onClose }: { onClose: () => void }) => {
           )}
         </View>
         <Button size="lg" className="h-15 rounded-[18px] px-7" isDisabled={!table || sending} onPress={send}>
-          {sending ? <Spinner /> : <Send size={20} color={accentForeground} />}
+          {sending ? <Spinner color={accentForeground} /> : <Send size={20} color={accentForeground} />}
           <Button.Label numberOfLines={1} className="text-lg font-bold">
             {t('mainPage.sit_send')}
           </Button.Label>

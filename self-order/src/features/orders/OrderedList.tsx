@@ -1,10 +1,9 @@
 import { useEffect, useMemo } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { Button, Spinner, cn, useThemeColor } from 'heroui-native';
 import { router } from 'expo-router';
-import { Gift, History, Plus } from 'lucide-react-native';
+import { History, Plus } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { useOrderSheet } from '@/src/features/cart/orderSheetStore';
 import { lineTotal } from '@/src/features/cart/totals';
 import { AddAgainButton, useAddAgain } from '@/src/features/cart/useAddAgain';
 import { useOpenCategories } from '@/src/features/menu/useMenu';
@@ -17,23 +16,27 @@ import { Image } from '@/src/ui/Image';
 import { Text } from '@/src/ui/Text';
 import { BillButtons } from './BillButtons';
 import { NEUTRAL_TONE, ORDER_STATE_LABEL, ORDER_STATE_TONE } from './orderStatus';
-import { isReceivedGift, itemsByTime, useTableOrders } from './useTableOrders';
+import { itemsByTime, useTableOrders } from './useTableOrders';
 
 /**
- * The order sheet's Захиалсан tab: the current guests' orders like a ticket at the till, each item
- * with the time it was ordered and [+] to order it again; and while something is unpaid, the bill:
- * paying it here or asking staff for it. Earlier guests' orders are only in the order history.
+ * The order panel under the new dishes: the current guests' orders like a ticket at the till, each
+ * item with the time it was ordered and [+] to have it again, which puts it up among the new dishes
+ * (`onAdded`). Earlier guests' orders are only in the order history.
  */
-export const OrderedTab = ({ onOpenProduct }: { onOpenProduct: (product: IMenuProduct) => void }) => {
+export const OrderedList = ({
+  onOpenProduct,
+  onAdded,
+}: {
+  onOpenProduct: (product: IMenuProduct) => void;
+  onAdded: () => void;
+}) => {
   const { t } = useTranslation('language');
   const foreground = useThemeColor('foreground');
-  const { orders, current, ownTableId, loading, refetch, due, toPay } = useTableOrders();
+  const { orders, current, loading, refetch } = useTableOrders();
   const { productOf, addAgain } = useAddAgain(onOpenProduct);
-  const show = useOrderSheet((s) => s.show);
-  // Into the cart, and over to Сагс where it's waiting with the Order button
   const orderAgain = (product: IMenuProduct) => {
-    show('cart');
     addAgain(product);
+    onAdded();
   };
 
   // Fresh statuses every time it opens
@@ -43,78 +46,44 @@ export const OrderedTab = ({ onOpenProduct }: { onOpenProduct: (product: IMenuPr
 
   return (
     <>
-      <ScrollView className="flex-1" contentContainerClassName="gap-4 px-6.5 py-5">
-        {loading && !orders.length && <Spinner className="mt-10 self-center" />}
-        {!loading && !current.length && <Text className="mt-10 text-center text-muted">{t('mainPage.noActiveOrders')}</Text>}
-        {current.map((order) =>
-          isReceivedGift(order, ownTableId) ? (
-            <ReceivedGiftCard key={order.id} order={order} ownTableId={ownTableId!} />
-          ) : (
-            <OrderCard key={order.id} order={order} productOf={productOf} onAddAgain={orderAgain} />
-          ),
-        )}
-        <DessertCard
-          orders={current.filter((order) => !isReceivedGift(order, ownTableId))}
-          onAdd={orderAgain}
-        />
-        {/* Every order today, earlier ones too: for when a guest says they ordered but it isn't here */}
-        {orders.length > 0 && (
-          <Button variant="ghost" className="self-center" onPress={() => router.push('/history')}>
-            <History size={18} color={foreground} />
-            <Button.Label numberOfLines={1}>{t('mainPage.orderHistory')}</Button.Label>
-          </Button>
-        )}
-      </ScrollView>
-
-      {/* Only while something is left to pay: once everything is paid there's no bill to ask for */}
-      {due > 0 && !!toPay && (
-        <View className="gap-4 border-t border-border px-6.5 pb-6.5 pt-4.5">
-          <View className="flex-row items-baseline justify-between">
-            <Text className="text-muted">{t('mainPage.AmountPaid')}</Text>
-            <Text className="text-3xl font-bold tracking-tight">{formatMoney(due)}</Text>
-          </View>
-          {/* Several unpaid orders are paid one at a time, oldest first */}
-          <BillButtons order={toPay} />
-        </View>
+      {loading && !orders.length && <Spinner className="mt-10 self-center" />}
+      {current.length > 0 && (
+        <Text className="mt-1 text-sm font-bold uppercase tracking-wide text-muted" numberOfLines={1}>
+          {t('mainPage.ordered')}
+        </Text>
+      )}
+      {current.map((order) => (
+        <OrderCard key={order.id} order={order} productOf={productOf} onAddAgain={orderAgain} />
+      ))}
+      <DessertCard orders={current} onAdd={orderAgain} />
+      {/* Every order today, earlier ones too: for when a guest says they ordered but it isn't here */}
+      {orders.length > 0 && (
+        <Button variant="ghost" className="self-center" onPress={() => router.push('/history')}>
+          <History size={18} color={foreground} />
+          <Button.Label numberOfLines={1}>{t('mainPage.orderHistory')}</Button.Label>
+        </Button>
       )}
     </>
   );
 };
 
-/** A gift another table sent us: who from, the gifted dishes and how they're coming along. No prices, no paying. */
-const ReceivedGiftCard = ({ order, ownTableId }: { order: IOrder; ownTableId: string }) => {
+/**
+ * The order panel's footer while nothing new is waiting to be sent: the bill, paid here or asked
+ * for from staff. Nothing once everything is paid.
+ */
+export const BillBar = () => {
   const { t } = useTranslation('language');
-  const tone = ORDER_STATE_TONE[order.state] ?? NEUTRAL_TONE;
-  const gift = order.gifts?.find((g) => g.toTableId === ownTableId);
-  const giftedIds = new Set(gift?.itemIds ?? []);
-  const items = order.items.filter((item) => giftedIds.has(item.id ?? '') && item.state !== 'RETURN');
+  const { due, toPay } = useTableOrders();
+  if (!(due > 0 && toPay)) return null;
 
   return (
-    <View className="gap-3 rounded-[22px] bg-gift-soft p-4.5">
-      <View className="flex-row items-center gap-3">
-        {/* White on the red, as a fixed colour: theme text colours on fills were unreliable */}
-        <View className="size-10 items-center justify-center rounded-xl bg-gift">
-          <Gift size={20} color="#FFFFFF" strokeWidth={2.3} />
-        </View>
-        <View className="min-w-0 flex-1">
-          <Text className="text-sm font-semibold text-gift-text" numberOfLines={1}>
-            {t('mainPage.gift_toast_eyebrow')}
-          </Text>
-          <Text className="text-lg font-bold" numberOfLines={1}>
-            {gift?.anonymous || !gift?.fromTableName
-              ? t('mainPage.toast_from_anonymous')
-              : t('mainPage.toast_from_table', { table: gift.fromTableName })}
-          </Text>
-        </View>
-        <Text className={cn('overflow-hidden rounded-full px-3 py-1 text-sm font-semibold', tone)}>
-          {ORDER_STATE_LABEL[order.state] ?? order.state}
-        </Text>
+    <View className="gap-4 border-t border-border px-6.5 pb-6.5 pt-4.5">
+      <View className="flex-row items-baseline justify-between">
+        <Text className="text-muted">{t('mainPage.AmountPaid')}</Text>
+        <Text className="text-3xl font-bold tracking-tight">{formatMoney(due)}</Text>
       </View>
-      {items.map((item) => (
-        <Text key={item.id ?? item.uuid}>
-          {item.quantity} × {item.name}
-        </Text>
-      ))}
+      {/* Several unpaid orders are paid one at a time, oldest first */}
+      <BillButtons order={toPay} />
     </View>
   );
 };
@@ -134,11 +103,12 @@ const OrderCard = ({
     <View className="gap-3 rounded-[22px] border border-border p-4.5">
       <View className="flex-row items-center justify-between gap-2">
         <Text className="text-lg font-bold">#{order.number?.slice(-4)}</Text>
-        <Text className={cn('overflow-hidden rounded-full px-3 py-1 text-sm font-semibold', tone)}>
+        {/* Drawn anew for each state: a changed colour class could keep the old colour on the tablets */}
+        <Text key={order.state} className={cn('overflow-hidden rounded-full px-3 py-1 text-sm font-semibold', tone)}>
           {ORDER_STATE_LABEL[order.state] ?? order.state}
         </Text>
       </View>
-      {/* Like a till's ticket: each line with the time it was ordered, in that order */}
+      {/* Like a till's ticket: each line with the time it was ordered, the latest on top */}
       {itemsByTime(order.items).map((item) => {
         const product = productOf(item);
         return (

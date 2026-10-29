@@ -5,13 +5,13 @@ import { Button, Dialog, Spinner, cn, useThemeColor, useToast } from 'heroui-nat
 import * as Haptics from 'expo-haptics';
 import { Check, ChevronUp, Gift, MapPin, UsersRound, Wine, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import Animated, { ZoomIn } from 'react-native-reanimated';
 import { useCSSVariable } from 'uniwind';
 import { TABLE_MESSAGE_STICKERS } from '@/src/constants';
 import { SEND_TABLE_MESSAGE } from '@/src/graphql/mutations/tableMessage';
 import { SEND_TABLE_REQUEST } from '@/src/graphql/mutations/tableRequest';
 import { GET_ACTIVE_TABLES } from '@/src/graphql/queries/tableMessage';
 import { ITable } from '@/src/types/table';
+import { Appear } from '@/src/ui/Appear';
 import { Text } from '@/src/ui/Text';
 import { IncomingMessage, useSocialStore } from './socialStore';
 import { Sticker } from './Sticker';
@@ -145,8 +145,9 @@ const MessageCard = ({ message, onDone }: { message: IncomingMessage; onDone: ()
             <X size={22} color={muted} />
           </Button>
         )}
-        <Animated.View
-          entering={ZoomIn.duration(380)}
+        <Appear
+          from="zoom"
+          duration={380}
           className="mb-1.5 size-28 items-center justify-center rounded-full bg-surface"
           style={{
             elevation: 8,
@@ -166,7 +167,7 @@ const MessageCard = ({ message, onDone }: { message: IncomingMessage; onDone: ()
               <Gift size={19} color={ON_COLOR} strokeWidth={2.3} />
             </View>
           )}
-        </Animated.View>
+        </Appear>
         <Text className="self-stretch text-center font-bold" style={{ color: invite ? sitText : giftText }}>
           {eyebrow}
         </Text>
@@ -233,7 +234,7 @@ const MessageCard = ({ message, onDone }: { message: IncomingMessage; onDone: ()
               </Button.Label>
             </Button>
             <Button size="lg" className="h-15 flex-1 rounded-[18px]" isDisabled={answering} onPress={() => answer(true)}>
-              {answering ? <Spinner /> : <Check size={20} color={accentForeground} strokeWidth={2.6} />}
+              {answering ? <Spinner color={accentForeground} /> : <Check size={20} color={accentForeground} strokeWidth={2.6} />}
               <Button.Label numberOfLines={1} className="font-bold">
                 {t('mainPage.sit_yes')}
               </Button.Label>
@@ -319,8 +320,9 @@ const AnswerCard = ({ message, onDone }: { message: IncomingMessage; onDone: () 
           sitReply ? (accepted ? 'bg-sit-soft' : 'bg-surface-secondary') : 'bg-gift-soft',
         )}
       >
-        <Animated.View
-          entering={ZoomIn.duration(380)}
+        <Appear
+          from="zoom"
+          duration={380}
           className="mb-1.5 size-28 items-center justify-center rounded-full bg-surface"
           style={{
             elevation: 8,
@@ -339,7 +341,7 @@ const AnswerCard = ({ message, onDone }: { message: IncomingMessage; onDone: () 
           ) : (
             <Sticker id={sticker?.id ?? 'LETTER'} size={76} plays={2} />
           )}
-        </Animated.View>
+        </Appear>
         <Text className="self-stretch text-center font-bold" style={{ color: tone }}>
           {sitReply ? t('mainPage.sit_invite_eyebrow') : t('mainPage.eyebrow_message')}
         </Text>

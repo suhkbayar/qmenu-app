@@ -19,8 +19,8 @@ const FLOAT = { elevation: 8, shadowColor: '#000', shadowOpacity: 0.16, shadowRa
 /**
  * Along the bottom of the menu, the one place the order lives: the cart while there's something in
  * it ("3 · Сагс харах · 45,000₮"), otherwise the table's orders still in the kitchen or unpaid, with
- * Pay. Tapping it opens the order sheet on that tab. Hidden (but kept mounted, so it doesn't reload
- * the orders every time) while the sheet is open.
+ * Pay. Tapping it opens the order sheet, which has both. Hidden (but kept mounted, so it doesn't
+ * reload the orders every time) while the sheet is open.
  */
 export const OrderBar = ({ hidden }: { hidden: boolean }) => {
   const { t } = useTranslation('language');
@@ -38,7 +38,7 @@ export const OrderBar = ({ hidden }: { hidden: boolean }) => {
     return (
       <View className="rounded-3xl bg-accent" style={FLOAT}>
         <PressableFeedback
-          onPress={() => show('cart')}
+          onPress={show}
           accessibilityRole="button"
           className="h-20 flex-row items-center gap-4 rounded-3xl pl-3.5 pr-6"
         >
@@ -64,7 +64,7 @@ export const OrderBar = ({ hidden }: { hidden: boolean }) => {
   return (
     <View className="h-20 flex-row items-center gap-3 rounded-3xl border border-border bg-surface px-3.5" style={FLOAT}>
       <PressableFeedback
-        onPress={() => show('ordered')}
+        onPress={show}
         accessibilityRole="button"
         className="h-16 min-w-0 flex-1 flex-row items-center gap-3.5 rounded-2xl px-1"
       >
@@ -77,6 +77,8 @@ export const OrderBar = ({ hidden }: { hidden: boolean }) => {
         {/* Where it is in the kitchen, so the table needn't ask; gone once everything is served */}
         {!!comingState && (
           <Text
+            // Drawn anew for each state: a changed colour class could keep the old colour on the tablets
+            key={comingState}
             className={cn('overflow-hidden rounded-full px-3 py-1 text-sm font-semibold', ORDER_STATE_TONE[comingState])}
             numberOfLines={1}
           >

@@ -74,7 +74,7 @@ export const MenuScreen = ({ participant }: { participant: IParticipant }) => {
 
   return (
     <View className="flex-1 bg-background">
-      <TopBar onOpenService={openService} onOpenSettings={openSettings} />
+      <TopBar showQuiz={scroll.pastQuiz} onOpenService={openService} onOpenSettings={openSettings} />
 
       <View className="flex-1 flex-row">
         <CategoryRail categories={menu.categories} activeId={scroll.activeId} onSelect={scroll.select} />
@@ -132,6 +132,7 @@ const useCategoryScroll = (
   const gridRef = useRef<ProductGridHandle>(null);
   const [position, setPosition] = useState<Position>({ subcategoryId: null });
   const [pastTitle, setPastTitle] = useState(false);
+  const [pastQuiz, setPastQuiz] = useState(false);
   const jumping = useRef(false);
 
   const jump = useCallback((index: number | undefined, next: Position) => {
@@ -157,6 +158,8 @@ const useCategoryScroll = (
   const onTopRowChange = useCallback((row: GridRow) => {
     // Past the category's own title (and its subcategory buttons): pin them over the products
     setPastTitle(row.type === 'products' || row.type === 'subsection');
+    // The quiz banner (the first row) out of view: the top bar shows the quiz instead
+    setPastQuiz(row.type !== 'quiz');
     if (jumping.current) return;
     setPosition((current) =>
       current.categoryId === row.categoryId && current.subcategoryId === row.subcategoryId
@@ -178,6 +181,8 @@ const useCategoryScroll = (
     activeSubId: known ? position.subcategoryId : null,
     /** The top of the products is past the current category's title */
     pastTitle,
+    /** The quiz banner at the top is scrolled out of view */
+    pastQuiz,
     select,
     selectSub,
     onTopRowChange,

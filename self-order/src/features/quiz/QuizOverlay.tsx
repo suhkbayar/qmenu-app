@@ -4,6 +4,7 @@ import { Button, cn, useThemeColor } from 'heroui-native';
 import { WifiOff, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { WebView } from 'react-native-webview';
+import { useHoldScreensaver } from '@/src/features/kiosk/screensaverHold';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { LogoLoader } from '@/src/ui/LogoLoader';
 import { Text } from '@/src/ui/Text';
@@ -23,6 +24,8 @@ const QuizPage = () => {
   const muted = useThemeColor('muted');
   const visible = useQuizStore((s) => s.visible);
   const closeQuiz = useQuizStore((s) => s.closeQuiz);
+  // Reading a question is no touch either; the screensaver's videos mustn't play under the quiz
+  useHoldScreensaver(visible);
   const branchName = useSessionStore((s) => s.participant?.branch?.name);
   const url = branchName ? `${MBANK_QUIZ_URL}?deviceId=${encodeURIComponent(branchName)}` : MBANK_QUIZ_URL;
   const [loading, setLoading] = useState(true);
@@ -74,6 +77,13 @@ const QuizPage = () => {
           }}
           onHttpError={({ nativeEvent }) => {
             console.warn('[MbankQuiz] http error', nativeEvent.statusCode, nativeEvent.url);
+            setLoading(false);
+          }}
+          // Android shut the page down (low memory): the error screen takes the dead web view's place
+          // at once, as using it can crash the app, and Retry starts a fresh one
+          onRenderProcessGone={({ nativeEvent }) => {
+            console.warn('[MbankQuiz] web view gone', nativeEvent.didCrash);
+            setError('');
             setLoading(false);
           }}
           javaScriptEnabled

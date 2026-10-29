@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { Button, Dialog, PressableFeedback, Spinner, Switch, cn, useThemeColor } from 'heroui-native';
 import { Moon, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { useHoldScreensaver } from '@/src/features/kiosk/screensaverHold';
 import { Flag } from '@/src/ui/Flag';
 import { Text } from '@/src/ui/Text';
 import { useThemeStore } from '@/src/ui/themeStore';
@@ -19,6 +20,7 @@ export const SettingsDialog = ({ isOpen, onOpenChange }: Props) => {
   const foreground = useThemeColor('foreground');
   const isDark = useThemeStore((s) => s.isDark);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
+  useHoldScreensaver(isOpen);
 
   return (
     <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>

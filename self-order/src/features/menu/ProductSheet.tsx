@@ -5,8 +5,10 @@ import * as Haptics from 'expo-haptics';
 import { Check, MessageSquareText, Pencil, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import RenderHtml from 'react-native-render-html';
+import { useCSSVariable } from 'uniwind';
 import { useCartStore } from '@/src/features/cart/cartStore';
 import { NoteDialog } from '@/src/features/cart/NoteDialog';
+import { useHoldScreensaver } from '@/src/features/kiosk/screensaverHold';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { formatMoney } from '@/src/lib/format';
 import { isSoldOut, isUnavailable } from '@/src/lib/menu';
@@ -64,6 +66,7 @@ export const ProductSheet = ({ product, onClose, onConfigured }: Props) => {
 export const MenuProductSheet = () => {
   const product = useProductSheet((s) => s.product);
   const close = useProductSheet((s) => s.close);
+  useHoldScreensaver(!!product);
   return <ProductSheet product={product} onClose={close} />;
 };
 
@@ -73,6 +76,7 @@ type Picked = Record<string, string | true>;
 /** "Required" / "Optional" next to a choice; red when a required choice was skipped. */
 const Tag = ({ required, missed }: { required: boolean; missed?: boolean }) => {
   const { t } = useTranslation('language');
+  const [danger, pending, muted] = useCSSVariable(['--color-danger', '--color-pending', '--color-muted']) as string[];
   return (
     // Dark text on soft fills: always readable, in both themes
     <View
@@ -81,8 +85,10 @@ const Tag = ({ required, missed }: { required: boolean; missed?: boolean }) => {
         missed ? 'bg-danger-soft' : required ? 'bg-pending-soft' : 'bg-surface-secondary',
       )}
     >
+      {/* The colour through style: it changes when a required choice is skipped */}
       <Text
-        className={cn('text-xs font-semibold', missed ? 'text-danger' : required ? 'text-pending' : 'text-muted')}
+        className="text-xs font-semibold"
+        style={{ color: missed ? danger : required ? pending : muted }}
         numberOfLines={1}
       >
         {required ? t('mainPage.Required') : t('mainPage.optional')}
@@ -101,7 +107,14 @@ const ProductDetails = ({
   onConfigured?: (item: IOrderItem) => void;
 }) => {
   const { t } = useTranslation('language');
-  const [foreground, accentForeground, muted] = useThemeColor(['foreground', 'accent-foreground', 'muted']);
+  const [foreground, accentForeground, muted, accent, surface, border] = useThemeColor([
+    'foreground',
+    'accent-foreground',
+    'muted',
+    'accent',
+    'surface',
+    'border',
+  ]);
   const addItem = useCartStore((s) => s.addItem);
   const orderable = useSessionStore((s) => s.participant?.orderable === true);
   const hidePrice = useSessionStore((s) => s.config?.hidePrice === true);
@@ -218,6 +231,9 @@ const ProductDetails = ({
               contentWidth={480}
               source={{ html: product.specification }}
               baseStyle={{ color: muted, fontSize: 15, fontFamily: 'Onest_400Regular' }}
+              // Descriptions pasted into the panel's editor carry black text (and white highlights)
+              // that came out black on black in dark mode: the theme's colours only
+              ignoredStyles={['color', 'backgroundColor', 'fontFamily']}
             />
           )}
 
@@ -232,7 +248,8 @@ const ProductDetails = ({
                   const active = v.id === variant?.id;
                   return (
                     <Pressable
-                      key={v.id}
+                      // Drawn anew when picked or not (see the option pills below)
+                      key={`${v.id}-${active}`}
                       onPress={() => pickVariant(v.id)}
                       android_ripple={RIPPLE}
                       className={cn(
@@ -265,18 +282,17 @@ const ProductDetails = ({
                   const active = picked[option.id] === value;
                   return (
                     <Pressable
-                      key={value}
+                      // Drawn anew when picked or not, with every colour set directly: a pill whose
+                      // fill changed while on screen came out plain yellow, its label gone
+                      key={`${value}-${active}`}
                       onPress={() => toggle(option, value)}
                       android_ripple={RIPPLE}
                       // Selected = brand yellow, like the selected category in the rail
-                      className={cn(
-                        'h-12 justify-center overflow-hidden rounded-full px-5',
-                        active ? 'bg-accent' : 'border border-border bg-surface',
-                      )}
+                      className="h-12 justify-center overflow-hidden rounded-full border px-5"
+                      style={{ backgroundColor: active ? accent : surface, borderColor: active ? accent : border }}
                       accessibilityRole="radio"
                       accessibilityState={{ checked: active }}
                     >
-                      {/* Colour set directly: a changing colour class came out wrong on the tablets */}
                       <Text
                         className={active ? 'font-bold' : 'font-semibold'}
                         style={{ color: active ? accentForeground : foreground }}
@@ -313,6 +329,8 @@ const ProductDetails = ({
                     accessibilityState={{ checked: active }}
                   >
                     <View
+                      // Drawn anew when ticked or not (see the option pills above)
+                      key={`box-${active}`}
                       className={cn(
                         'size-6 items-center justify-center rounded-md',
                         active ? 'bg-accent' : 'border-2 border-separator',
@@ -352,7 +370,7 @@ const ProductDetails = ({
                 )}
               >
                 <MessageSquareText size={20} color={muted} />
-                <Text className={cn('flex-1', !comment && 'text-muted')} numberOfLines={2}>
+                <Text className="flex-1" style={{ color: comment ? foreground : muted }} numberOfLines={2}>
                   {comment || t('mainPage.note_placeholder')}
                 </Text>
                 <Pencil size={18} color={muted} />

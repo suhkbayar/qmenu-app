@@ -89,7 +89,8 @@ export const TableFloorPlan = ({ tables, ownTableId, markedId, color, onSelect, 
             const active = s.id === section?.id;
             return (
               <Pressable
-                key={s.id}
+                // Drawn anew when picked or not: a chip whose fill changed on screen lost its label
+                key={`${s.id}-${active}`}
                 onPress={() => setActiveId(s.id)}
                 android_ripple={RIPPLE}
                 accessibilityRole="tab"
@@ -239,6 +240,7 @@ const PlanTable = ({
   pulse?: boolean;
 }) => {
   const { t } = useTranslation('language');
+  const [foreground, muted] = useThemeColor(['foreground', 'muted']);
   const shape = frame ? 'items-center justify-center px-1' : 'rounded-xl px-4.5 py-3';
   const text = compact ? 'text-base' : 'text-xl';
   const placed = frame ? [frame, { transform: [{ rotate }] }] : undefined;
@@ -259,9 +261,10 @@ const PlanTable = ({
 
   const marked = state === 'marked';
   const body = (
+    // Always the colour through style: one left to a class stayed white after a table was unmarked
     <Text
-      className={cn('self-stretch text-center font-bold', text, !marked && compact && 'text-muted')}
-      style={marked ? { color: ON_COLOR } : undefined}
+      className={cn('self-stretch text-center font-bold', text)}
+      style={{ color: marked ? ON_COLOR : compact ? muted : foreground }}
       numberOfLines={1}
     >
       {table.name}

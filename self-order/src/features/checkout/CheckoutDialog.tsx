@@ -17,6 +17,8 @@ import { useTranslation } from 'react-i18next';
 import QRCode from 'react-native-qrcode-svg';
 import { useCSSVariable } from 'uniwind';
 import { lineTotal } from '@/src/features/cart/totals';
+import { useHoldScreensaver } from '@/src/features/kiosk/screensaverHold';
+import { QuizBanner } from '@/src/features/quiz/QuizBanner';
 import { useServiceRequest } from '@/src/features/service/useServiceRequest';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { GET_TABLET_ORDERS } from '@/src/graphql/queries';
@@ -36,14 +38,16 @@ const BASE64_QR = ['QPay', 'QPay2', 'MPY'];
 
 /**
  * Paying for an order, in one dialog and one column: the amount, the receipt and a method → QR /
- * card → done. An order just sent to be paid later opens on done.
+ * card → done. Only a payment leads to done (with the eBarimt receipt); an order sent to be paid
+ * later just shows in the order panel.
  */
 export const CheckoutDialog = () => {
   const apollo = useApolloClient();
   const window = useWindowDimensions();
   const orderId = useCheckout((s) => s.orderId);
-  const payLater = useCheckout((s) => s.payLater);
   const preview = useCheckout((s) => s.preview);
+  // Scanning the QR with a phone means no touches here: no screensaver over a payment
+  useHoldScreensaver(!!orderId);
 
   const close = () => {
     useCheckout.getState().close();
@@ -63,31 +67,19 @@ export const CheckoutDialog = () => {
           style={{ width: Math.min(820, window.width - 48), height: Math.min(700, window.height - 40) }}
         >
           {/* A fresh checkout per order */}
-          {orderId && (
-            <Checkout key={orderId} orderId={orderId} payLater={payLater} preview={preview} onClose={close} />
-          )}
+          {orderId && <Checkout key={orderId} orderId={orderId} preview={preview} onClose={close} />}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog>
   );
 };
 
-const Checkout = ({
-  orderId,
-  payLater,
-  preview,
-  onClose,
-}: {
-  orderId: string;
-  payLater: boolean;
-  preview: IOrder | null;
-  onClose: () => void;
-}) => {
-  const payment = usePayment(orderId, payLater, preview);
+const Checkout = ({ orderId, preview, onClose }: { orderId: string; preview: IOrder | null; onClose: () => void }) => {
+  const payment = usePayment(orderId, preview);
   const receipt = useReceipt();
   const { order, step } = payment;
 
-  // Paying needs the server's copy; "sent, pay later" doesn't, so it stays up on the tablet's own
+  // Paying needs the server's copy; once paid, the done page stays up even if a reload fails
   if (payment.failed && (step !== 'done' || !order)) return <LoadFailed onRetry={payment.retry} onClose={onClose} />;
 
   if (payment.loading || !order) {
@@ -98,7 +90,7 @@ const Checkout = ({
     );
   }
 
-  if (step === 'done') return <Done order={order} payLater={payLater} onClose={onClose} />;
+  if (step === 'done') return <Done order={order} onClose={onClose} />;
 
   return (
     <View className="flex-1 gap-5.5 px-8 py-7">
@@ -464,10 +456,10 @@ const CardStep = ({ payment }: { payment: Payment }) => {
 };
 
 /**
- * Step 3: thanks, the order number and the eBarimt receipt. Also shown after sending an order to be
- * paid later. Back to the menu by itself after 30 s.
+ * Step 3, once paid: thanks, the order number, the eBarimt receipt and the Mbank quiz. Back to the
+ * menu by itself after 30 s.
  */
-const Done = ({ order, payLater, onClose }: { order: IOrder; payLater: boolean; onClose: () => void }) => {
+const Done = ({ order, onClose }: { order: IOrder; onClose: () => void }) => {
   const { t } = useTranslation('language');
   const positive = useCSSVariable('--color-positive') as string;
   const [seconds, setSeconds] = useState(BACK_TO_MENU_SECONDS);
@@ -490,9 +482,7 @@ const Done = ({ order, payLater, onClose }: { order: IOrder; payLater: boolean; 
           <Check size={52} color={positive} strokeWidth={2.4} />
         </View>
         <Text className="text-[44px] font-bold tracking-tight">{t('mainPage.thanks')}</Text>
-        <Text className="text-xl leading-7 text-muted">
-          {payLater ? t('mainPage.payLaterSent') : t('mainPage.paidSent')}
-        </Text>
+        <Text className="text-xl leading-7 text-muted">{t('mainPage.paidSent')}</Text>
         <View className="flex-row items-baseline gap-3">
           <Text className="text-muted">{t('mainPage.orderNumberLabel')}</Text>
           <Text className="text-[40px] font-bold tracking-tight">#{order.number?.slice(-4)}</Text>
@@ -502,6 +492,10 @@ const Done = ({ order, payLater, onClose }: { order: IOrder; payLater: boolean; 
             {t('mainPage.backToMenuIn', { seconds })}
           </Button.Label>
         </Button>
+        {/* The quiz opens over the menu, so this dialog closes first */}
+        <View className="mt-2">
+          <QuizBanner onPlay={onClose} />
+        </View>
       </View>
 
       {hasReceipt && (
