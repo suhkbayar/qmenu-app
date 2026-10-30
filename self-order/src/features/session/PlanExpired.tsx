@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import { Button, Spinner, useThemeColor } from 'heroui-native';
+import { Button, useThemeColor } from 'heroui-native';
 import { ShieldAlert } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { SecretTap } from '@/src/features/kiosk/AdminExit';
+import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
 
 /** Shown instead of the menu when the branch's QMenu plan has run out (server error PE0001). */

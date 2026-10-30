@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { BarcodeScanningResult, CameraType, CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
-import { Button, useThemeColor, useToast } from 'heroui-native';
+import { Button, useThemeColor } from 'heroui-native';
 import { ArrowLeft, CameraOff, SwitchCamera } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { LogoLoader } from '@/src/ui/LogoLoader';
 import { Text } from '@/src/ui/Text';
+import { useNotify } from '@/src/ui/useNotify';
 import { useTableLogin } from './useTableLogin';
 
 // After a failed scan the same QR is usually still in view; wait before trying again
@@ -15,7 +16,7 @@ const RETRY_AFTER_MS = 3000;
 /** Logs in by scanning the table's QR sticker. The code is the last part of the QR's link. */
 export const QrScanScreen = () => {
   const { t } = useTranslation('language');
-  const { toast } = useToast();
+  const notify = useNotify();
   const [foreground, muted] = useThemeColor(['foreground', 'muted']);
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('back');
@@ -33,7 +34,7 @@ export const QrScanScreen = () => {
     try {
       await login(code);
     } catch (err) {
-      toast.show({ variant: 'warning', label: (err as Error).message });
+      notify('warning', (err as Error).message);
       setTimeout(() => (scanning.current = false), RETRY_AFTER_MS);
     }
   };
@@ -75,7 +76,7 @@ export const QrScanScreen = () => {
         onBarcodeScanned={onScan}
         // The camera didn't start: back to the code field with the reason, rather than a black screen
         onMountError={({ message }) => {
-          toast.show({ variant: 'warning', label: message });
+          notify('warning', message);
           router.back();
         }}
       />

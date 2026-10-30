@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { Button, Dialog, PressableFeedback, Spinner, cn, useThemeColor, useToast } from 'heroui-native';
+import { Button, Dialog, PressableFeedback, cn, useThemeColor } from 'heroui-native';
 import { ArrowLeft, Moon, Plus, RefreshCw, ScanQrCode, Sun } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { SecretTap } from '@/src/features/kiosk/AdminExit';
@@ -10,7 +10,10 @@ import { VersionBadge } from '@/src/features/kiosk/VersionBadge';
 import { checkConnection, useNoInternet } from '@/src/lib/network';
 import { ICustomerTable } from '@/src/types';
 import { Image } from '@/src/ui/Image';
+import { MotionDialog } from '@/src/ui/MotionDialog';
+import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
+import { useNotify } from '@/src/ui/useNotify';
 import { useThemeStore } from '@/src/ui/themeStore';
 import { useSessionStore } from './sessionStore';
 import { useTableLogin } from './useTableLogin';
@@ -38,7 +41,9 @@ export const TableLoginScreen = () => {
         {showForm && tables.length > 0 && (
           <Button variant="secondary" className="h-13 rounded-2xl px-4" onPress={() => setAdding(false)}>
             <ArrowLeft size={22} color={foreground} />
-            <Button.Label numberOfLines={1} className="font-semibold">{t('mainPage.GoBack')}</Button.Label>
+            <Button.Label numberOfLines={1} className="font-semibold">
+              {t('mainPage.GoBack')}
+            </Button.Label>
           </Button>
         )}
         <View className="flex-1" />
@@ -71,7 +76,7 @@ export const TableLoginScreen = () => {
 /** While offline: tries the QMenu server now, rather than at the next automatic check. */
 const CheckConnectionButton = () => {
   const { t } = useTranslation('language');
-  const { toast } = useToast();
+  const notify = useNotify();
   const foreground = useThemeColor('foreground');
   const [checking, setChecking] = useState(false);
 
@@ -79,13 +84,15 @@ const CheckConnectionButton = () => {
     setChecking(true);
     const online = await checkConnection();
     setChecking(false);
-    if (!online) toast.show({ variant: 'warning', label: t('mainPage.no_internet') });
+    if (!online) notify('warning', t('mainPage.no_internet'));
   };
 
   return (
     <Button variant="secondary" className="h-13 rounded-2xl px-4" isDisabled={checking} onPress={check}>
       {checking ? <Spinner size="sm" /> : <RefreshCw size={20} color={foreground} />}
-      <Button.Label numberOfLines={1} className="font-semibold">{t('setup.checkAgain')}</Button.Label>
+      <Button.Label numberOfLines={1} className="font-semibold">
+        {t('setup.checkAgain')}
+      </Button.Label>
     </Button>
   );
 };
@@ -143,7 +150,9 @@ const CodeForm = () => {
           />
           <Button variant="secondary" className="h-12 rounded-xl px-3.5" onPress={scan}>
             <ScanQrCode size={20} color={foreground} />
-            <Button.Label numberOfLines={1} className="font-semibold">{t('setup.scanQr')}</Button.Label>
+            <Button.Label numberOfLines={1} className="font-semibold">
+              {t('setup.scanQr')}
+            </Button.Label>
           </Button>
         </View>
         {!!error && <Text className="text-sm font-medium text-danger">{error}</Text>}
@@ -152,7 +161,9 @@ const CodeForm = () => {
       <Button size="lg" className="h-15 w-full rounded-2xl" isDisabled={loading} onPress={submit}>
         {/* Spinners default to the brand yellow, which vanishes on the yellow button */}
         {loading && <Spinner color={accentForeground} />}
-        <Button.Label numberOfLines={1} className="text-lg font-bold">{t('setup.continue')}</Button.Label>
+        <Button.Label numberOfLines={1} className="text-lg font-bold">
+          {t('setup.continue')}
+        </Button.Label>
       </Button>
     </View>
   );
@@ -160,7 +171,7 @@ const CodeForm = () => {
 
 const SavedTables = ({ tables, onAdd }: { tables: ICustomerTable[]; onAdd: () => void }) => {
   const { t } = useTranslation('language');
-  const { toast } = useToast();
+  const notify = useNotify();
   const accentForeground = useThemeColor('accent-foreground');
   const deleteTable = useSessionStore((s) => s.deleteTable);
   const { login } = useTableLogin();
@@ -168,6 +179,8 @@ const SavedTables = ({ tables, onAdd }: { tables: ICustomerTable[]; onAdd: () =>
   const offline = useNoInternet();
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [removing, setRemoving] = useState<ICustomerTable | null>(null);
+  const lastRemoving = useRef(removing);
+  if (removing) lastRemoving.current = removing;
 
   const open = async (table: ICustomerTable) => {
     if (pendingCode) return;
@@ -176,7 +189,7 @@ const SavedTables = ({ tables, onAdd }: { tables: ICustomerTable[]; onAdd: () =>
       await login(table.code);
     } catch (err) {
       setPendingCode(null);
-      toast.show({ variant: 'warning', label: (err as Error).message });
+      notify('warning', (err as Error).message);
     }
   };
 
@@ -222,10 +235,7 @@ const SavedTables = ({ tables, onAdd }: { tables: ICustomerTable[]; onAdd: () =>
         <PressableFeedback
           onPress={onAdd}
           isDisabled={!!pendingCode || offline}
-          className={cn(
-            'h-56 w-48 items-center justify-center gap-2 rounded-3xl bg-accent',
-            offline && 'opacity-40',
-          )}
+          className={cn('h-56 w-48 items-center justify-center gap-2 rounded-3xl bg-accent', offline && 'opacity-40')}
           accessibilityRole="button"
         >
           <Plus size={48} color={accentForeground} />
@@ -233,35 +243,35 @@ const SavedTables = ({ tables, onAdd }: { tables: ICustomerTable[]; onAdd: () =>
         </PressableFeedback>
       </ScrollView>
 
-      <Dialog isOpen={!!removing} onOpenChange={(isOpen) => !isOpen && setRemoving(null)}>
-        <Dialog.Portal>
-          {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
-              dim backdrop stuck on screen */}
-          <Dialog.Overlay animation={false} />
-          <Dialog.Content animation={false} isSwipeable={false} className="w-110 gap-4 self-center p-7">
-            <Dialog.Title className="text-2xl">{t('setup.removeTitle')}</Dialog.Title>
-            <Dialog.Description className="text-base">
-              {t('setup.removeBody', { table: removing?.tableName })}
-            </Dialog.Description>
-            <View className="mt-2 flex-row gap-3">
-              <Button size="lg" variant="secondary" className="flex-1 rounded-2xl" onPress={() => setRemoving(null)}>
-                <Button.Label numberOfLines={1}>{t('setup.cancel')}</Button.Label>
-              </Button>
-              <Button
-                size="lg"
-                variant="danger"
-                className="flex-1 rounded-2xl"
-                onPress={() => {
-                  if (removing) deleteTable(removing.code);
-                  setRemoving(null);
-                }}
-              >
-                <Button.Label numberOfLines={1} className="font-bold">{t('setup.remove')}</Button.Label>
-              </Button>
-            </View>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog>
+      <MotionDialog
+        isOpen={!!removing}
+        onOpenChange={(isOpen) => !isOpen && setRemoving(null)}
+        className="w-110 gap-4 p-7"
+      >
+        <Dialog.Title className="text-2xl">{t('setup.removeTitle')}</Dialog.Title>
+        <Dialog.Description className="text-base">
+          {/* The table it was about while the dialog fades out */}
+          {t('setup.removeBody', { table: (removing ?? lastRemoving.current)?.tableName })}
+        </Dialog.Description>
+        <View className="mt-2 flex-row gap-3">
+          <Button size="lg" variant="secondary" className="flex-1 rounded-2xl" onPress={() => setRemoving(null)}>
+            <Button.Label numberOfLines={1}>{t('setup.cancel')}</Button.Label>
+          </Button>
+          <Button
+            size="lg"
+            variant="danger"
+            className="flex-1 rounded-2xl"
+            onPress={() => {
+              if (removing) deleteTable(removing.code);
+              setRemoving(null);
+            }}
+          >
+            <Button.Label numberOfLines={1} className="font-bold">
+              {t('setup.remove')}
+            </Button.Label>
+          </Button>
+        </View>
+      </MotionDialog>
     </View>
   );
 };

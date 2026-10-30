@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { Button, Spinner, cn, useThemeColor } from 'heroui-native';
+import { Button, cn, useThemeColor } from 'heroui-native';
 import { router } from 'expo-router';
 import { History, Plus } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +12,9 @@ import { formatMoney, formatTime } from '@/src/lib/format';
 import { getCdnImageUrl } from '@/src/lib/image';
 import { findDesserts } from '@/src/lib/menu';
 import { IMenuProduct, IOrder, IOrderItem } from '@/src/types';
+import { Appear } from '@/src/ui/Appear';
 import { Image } from '@/src/ui/Image';
+import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
 import { BillButtons } from './BillButtons';
 import { NEUTRAL_TONE, ORDER_STATE_LABEL, ORDER_STATE_TONE } from './orderStatus';
@@ -34,6 +36,9 @@ export const OrderedList = ({
   const foreground = useThemeColor('foreground');
   const { orders, current, loading, refetch } = useTableOrders();
   const { productOf, addAgain } = useAddAgain(onOpenProduct);
+  const waiting = loading && !orders.length;
+  // Opened before the orders had loaded: they fade in where the spinner was
+  const [fadeIn] = useState(waiting);
   const orderAgain = (product: IMenuProduct) => {
     addAgain(product);
     onAdded();
@@ -44,9 +49,11 @@ export const OrderedList = ({
     refetch().catch(() => {});
   }, []);
 
-  return (
+  if (waiting) return <Spinner className="mt-10 self-center" />;
+  if (!orders.length) return null;
+
+  const list = (
     <>
-      {loading && !orders.length && <Spinner className="mt-10 self-center" />}
       {current.length > 0 && (
         <Text className="mt-1 text-sm font-bold uppercase tracking-wide text-muted" numberOfLines={1}>
           {t('mainPage.ordered')}
@@ -57,13 +64,19 @@ export const OrderedList = ({
       ))}
       <DessertCard orders={current} onAdd={orderAgain} />
       {/* Every order today, earlier ones too: for when a guest says they ordered but it isn't here */}
-      {orders.length > 0 && (
-        <Button variant="ghost" className="self-center" onPress={() => router.push('/history')}>
-          <History size={18} color={foreground} />
-          <Button.Label numberOfLines={1}>{t('mainPage.orderHistory')}</Button.Label>
-        </Button>
-      )}
+      <Button variant="ghost" className="self-center" onPress={() => router.push('/history')}>
+        <History size={18} color={foreground} />
+        <Button.Label numberOfLines={1}>{t('mainPage.orderHistory')}</Button.Label>
+      </Button>
     </>
+  );
+  // The same gap as the sheet's own list
+  return fadeIn ? (
+    <Appear duration={180} className="gap-4">
+      {list}
+    </Appear>
+  ) : (
+    list
   );
 };
 

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApolloError, useApolloClient, useMutation } from '@apollo/client';
-import { useToast } from 'heroui-native';
 import { useTranslation } from 'react-i18next';
 import { TYPE } from '@/src/constants';
 import { useCheckout } from '@/src/features/checkout/checkoutStore';
@@ -10,6 +9,7 @@ import { ADD_ORDER_ITEMS, CREATE_ORDER, GET_PAY_ORDER } from '@/src/graphql/muta
 import { GET_TABLET_ORDERS } from '@/src/graphql/queries';
 import { findClosedItems } from '@/src/lib/menu';
 import { IOrder } from '@/src/types';
+import { useNotify } from '@/src/ui/useNotify';
 import { useCartStore } from './cartStore';
 import { useOrderSheet } from './orderSheetStore';
 
@@ -22,7 +22,7 @@ import { useOrderSheet } from './orderSheetStore';
  */
 export const usePlaceOrder = () => {
   const { t } = useTranslation('language');
-  const { toast } = useToast();
+  const notify = useNotify();
   const apollo = useApolloClient();
   const participant = useSessionStore((s) => s.participant);
   const giftEnabled = useSessionStore((s) => s.config?.giftOrder === true);
@@ -42,7 +42,7 @@ export const usePlaceOrder = () => {
   const canTakeAway = participant?.services?.includes(TYPE.TAKE_AWAY) ?? false;
   const payLater = !participant?.advancePayment;
 
-  const showError = useCallback((label: string) => toast.show({ variant: 'danger', label }), [toast]);
+  const showError = useCallback((label: string) => notify('danger', label), [notify]);
 
   // Gift orders switched off for this branch: drop gift state left in the cart
   useEffect(() => {
@@ -61,8 +61,8 @@ export const usePlaceOrder = () => {
     await apollo.refetchQueries({ include: [GET_TABLET_ORDERS] }).catch(() => {});
     setFinishing(false);
     clearCart();
-    toast.show({ variant: 'success', label: t('mainPage.orderSent') });
-  }, [apollo, clearCart, toast, t]);
+    notify('success', t('mainPage.orderSent'));
+  }, [apollo, clearCart, notify, t]);
 
   // A new order goes to the kitchen unpaid. The receipt is personal until the guest picks another when paying.
   const [sendUnpaid, { loading: sending }] = useMutation(GET_PAY_ORDER, {

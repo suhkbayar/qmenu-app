@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
-// A dialog's opening animation (HeroUI's 200 ms) and a frame
+// A dialog's opening animation (MotionDialog's 220 ms) and a frame
 const OPEN_ANIMATION_MS = 250;
-// Its closing animation (150 ms) and a frame
+// Its closing animation (160 ms) and a frame
 const CLOSE_ANIMATION_MS = 180;
 
 /**

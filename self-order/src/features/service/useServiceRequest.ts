@@ -1,10 +1,10 @@
 import { useCallback } from 'react';
 import { useMutation } from '@apollo/client';
-import { useToast } from 'heroui-native';
 import i18n from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { create } from 'zustand';
 import { WAITER_CALL } from '@/src/graphql/mutations/waiter';
+import { useNotify } from '@/src/ui/useNotify';
 
 export type ServiceRequest = 'waiter' | 'bill' | 'clean';
 
@@ -35,7 +35,7 @@ const markSent = (request: ServiceRequest) => {
 /** Call waiter / request bill / table cleaning. A toast confirms each one; repeats within a minute aren't sent. */
 export const useServiceRequest = () => {
   const { t } = useTranslation('language');
-  const { toast } = useToast();
+  const notify = useNotify();
   const pending = useRequestStore((s) => s.pending);
   const [call] = useMutation(WAITER_CALL);
 
@@ -45,7 +45,7 @@ export const useServiceRequest = () => {
       const state = useRequestStore.getState();
       if (state.pending) return false;
       if (state.sent[request]) {
-        toast.show({ variant: 'default', label: t('mainPage.requestAlreadySent') });
+        notify('default', t('mainPage.requestAlreadySent'));
         return true;
       }
       useRequestStore.setState({ pending: request });
@@ -53,16 +53,16 @@ export const useServiceRequest = () => {
       try {
         await call({ variables: { message: staffT(STAFF_MESSAGE_KEY[request]) } });
         markSent(request);
-        toast.show({ variant: 'success', label: t('mainPage.requestSentMessage') });
+        notify('success', t('mainPage.requestSentMessage'));
         return true;
       } catch {
-        toast.show({ variant: 'danger', label: t('mainPage.requestFailed') });
+        notify('danger', t('mainPage.requestFailed'));
         return false;
       } finally {
         useRequestStore.setState({ pending: null });
       }
     },
-    [call, toast, t],
+    [call, notify, t],
   );
 
   return { send, pending };

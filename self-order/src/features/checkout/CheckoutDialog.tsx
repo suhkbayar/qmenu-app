@@ -1,7 +1,7 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useApolloClient } from '@apollo/client';
-import { Button, Dialog, Spinner, cn, useThemeColor } from 'heroui-native';
+import { Button, cn, useThemeColor } from 'heroui-native';
 import {
   ArrowLeft,
   Check,
@@ -24,8 +24,11 @@ import { useSessionStore } from '@/src/features/session/sessionStore';
 import { GET_TABLET_ORDERS } from '@/src/graphql/queries';
 import { formatMoney } from '@/src/lib/format';
 import { IOrder, ITransaction } from '@/src/types';
+import { Appear } from '@/src/ui/Appear';
 import { Image } from '@/src/ui/Image';
 import { LogoLoader } from '@/src/ui/LogoLoader';
+import { MotionDialog } from '@/src/ui/MotionDialog';
+import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
 import { useCheckout } from './checkoutStore';
 import { ReceiptPicker, useReceipt } from './ReceiptPicker';
@@ -48,6 +51,10 @@ export const CheckoutDialog = () => {
   const preview = useCheckout((s) => s.preview);
   // Scanning the QR with a phone means no touches here: no screensaver over a payment
   useHoldScreensaver(!!orderId);
+  // The last order stays on the card while it fades out
+  const last = useRef({ orderId, preview });
+  if (orderId) last.current = { orderId, preview };
+  const shown = last.current;
 
   const close = () => {
     useCheckout.getState().close();
@@ -56,25 +63,20 @@ export const CheckoutDialog = () => {
   };
 
   return (
-    <Dialog isOpen={!!orderId} onOpenChange={(open) => !open && close()}>
-      <Dialog.Portal>
-        {/* No closing by tapping outside: it's too easy to lose a payment that way. And no open or
-            close animation: heroui's is a layout animation, and this dialog's content changes while it
-            runs (the methods replace their spinner as the order arrives). That is the likeliest cause
-            of the black screen some merchants' tablets showed on Pay. */}
-        <Dialog.Overlay isCloseOnPress={false} animation={false} />
-        {/* 820×700, smaller on a smaller screen */}
-        <Dialog.Content
-          animation={false}
-          isSwipeable={false}
-          className="self-center overflow-hidden p-0"
-          style={{ width: Math.min(820, window.width - 48), height: Math.min(700, window.height - 40) }}
-        >
-          {/* A fresh checkout per order */}
-          {orderId && <Checkout key={orderId} orderId={orderId} preview={preview} onClose={close} />}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog>
+    // No closing by tapping outside: it's too easy to lose a payment that way. 820×700, smaller on a
+    // smaller screen.
+    <MotionDialog
+      isOpen={!!orderId}
+      onOpenChange={(open) => !open && close()}
+      closeOnBackdrop={false}
+      className="overflow-hidden p-0"
+      style={{ width: Math.min(820, window.width - 48), height: Math.min(700, window.height - 40) }}
+    >
+      {/* A fresh checkout per order */}
+      {shown.orderId && (
+        <Checkout key={shown.orderId} orderId={shown.orderId} preview={shown.preview} onClose={close} />
+      )}
+    </MotionDialog>
   );
 };
 
@@ -84,24 +86,29 @@ const Checkout = ({ orderId, preview, onClose }: { orderId: string; preview: IOr
   const { order, step } = payment;
 
   // Paying needs the server's copy; once paid, the done page stays up even if a reload fails
-  if (payment.failed && (step !== 'done' || !order)) return <LoadFailed onRetry={payment.retry} onClose={onClose} />;
+  const failed = payment.failed && (step !== 'done' || !order);
+  const loading = !failed && (payment.loading || !order);
+  const phase = failed ? 'failed' : loading ? 'loading' : step;
 
-  if (payment.loading || !order) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <LogoLoader />
-      </View>
-    );
-  }
-
-  if (step === 'done') return <Done order={order} onClose={onClose} />;
-
+  // Each step fades in over the last (a shared value on a fresh view, never a layout animation)
   return (
-    <View className="flex-1 gap-5.5 px-8 py-7">
-      {step === 'pay' && <PayStep payment={payment} receipt={receipt} onClose={onClose} />}
-      {step === 'qr' && <QrStep payment={payment} />}
-      {step === 'card' && <CardStep payment={payment} />}
-    </View>
+    <Appear key={phase} duration={180} className="flex-1">
+      {failed ? (
+        <LoadFailed onRetry={payment.retry} onClose={onClose} />
+      ) : loading || !order ? (
+        <View className="flex-1 items-center justify-center">
+          <LogoLoader />
+        </View>
+      ) : step === 'done' ? (
+        <Done order={order} onClose={onClose} />
+      ) : (
+        <View className="flex-1 gap-5.5 px-8 py-7">
+          {step === 'pay' && <PayStep payment={payment} receipt={receipt} onClose={onClose} />}
+          {step === 'qr' && <QrStep payment={payment} />}
+          {step === 'card' && <CardStep payment={payment} />}
+        </View>
+      )}
+    </Appear>
   );
 };
 
@@ -276,7 +283,8 @@ const PayStep = ({
         <View className="gap-3">
           <Text className="text-lg font-bold">{t('mainPage.paymentMethod')}</Text>
           {payment.upToDate ? (
-            <View className="flex-row flex-wrap gap-3">
+            // Fading in over the spinner they replace
+            <Appear duration={180} className="flex-row flex-wrap gap-3">
               {payment.methods.map(({ method, paymentId }) => (
                 <MethodTile
                   key={method}
@@ -286,7 +294,7 @@ const PayStep = ({
                   onPress={() => payment.select(method, paymentId, receipt.receipt)}
                 />
               ))}
-            </View>
+            </Appear>
           ) : (
             <View className="h-36 items-center justify-center rounded-3xl border border-border bg-surface">
               <Spinner />

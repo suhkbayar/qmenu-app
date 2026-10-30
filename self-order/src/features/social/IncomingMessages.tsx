@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useLazyQuery, useMutation } from '@apollo/client';
-import { Button, Dialog, Spinner, cn, useThemeColor, useToast } from 'heroui-native';
+import { Button, Dialog, cn, useThemeColor } from 'heroui-native';
 import * as Haptics from 'expo-haptics';
 import { Check, ChevronUp, Gift, MapPin, UsersRound, Wine, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +12,10 @@ import { SEND_TABLE_REQUEST } from '@/src/graphql/mutations/tableRequest';
 import { GET_ACTIVE_TABLES } from '@/src/graphql/queries/tableMessage';
 import { ITable } from '@/src/types/table';
 import { Appear } from '@/src/ui/Appear';
+import { MotionDialog } from '@/src/ui/MotionDialog';
+import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
+import { useNotify } from '@/src/ui/useNotify';
 import { IncomingMessage, useSocialStore } from './socialStore';
 import { Sticker } from './Sticker';
 import { TableFloorPlan, useOwnTableId } from './TableFloorPlan';
@@ -34,37 +37,35 @@ const isAnswer = (message: IncomingMessage) =>
 export const IncomingMessages = () => {
   const message = useSocialStore((s) => s.inbox[0]);
   const dismiss = useSocialStore((s) => s.dismiss);
-  const answer = !!message && isAnswer(message);
+  // The last one stays on the card while it fades out
+  const last = useRef(message);
+  if (message) last.current = message;
+  const shown = message ?? last.current;
+  const answer = !!shown && isAnswer(shown);
   const mustAnswer = message?.kind === 'sit-request';
 
   return (
-    <Dialog isOpen={!!message} onOpenChange={(open) => !open && message && !mustAnswer && dismiss(message.key)}>
-      <Dialog.Portal>
-        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
-            dim backdrop stuck on screen */}
-        <Dialog.Overlay isCloseOnPress={!mustAnswer} animation={false} />
-        {/* Not swipeable: an invitation can't be swiped away unanswered */}
-        <Dialog.Content
-          animation={false}
-          isSwipeable={false}
-          className={cn('self-center overflow-hidden p-0', answer ? 'w-130' : 'w-150')}
-        >
-          {message &&
-            (answer ? (
-              <AnswerCard key={message.key} message={message} onDone={() => dismiss(message.key)} />
-            ) : (
-              <MessageCard key={message.key} message={message} onDone={() => dismiss(message.key)} />
-            ))}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog>
+    // An invitation can't be closed from outside: it has to be answered
+    <MotionDialog
+      isOpen={!!message}
+      onOpenChange={(open) => !open && message && !mustAnswer && dismiss(message.key)}
+      closeOnBackdrop={!mustAnswer}
+      className={cn('overflow-hidden p-0', answer ? 'w-130' : 'w-150')}
+    >
+      {shown &&
+        (answer ? (
+          <AnswerCard key={shown.key} message={shown} onDone={() => dismiss(shown.key)} />
+        ) : (
+          <MessageCard key={shown.key} message={shown} onDone={() => dismiss(shown.key)} />
+        ))}
+    </MotionDialog>
   );
 };
 
 /** A gift, a message, or an invitation to sit together. */
 const MessageCard = ({ message, onDone }: { message: IncomingMessage; onDone: () => void }) => {
   const { t } = useTranslation('language');
-  const { toast } = useToast();
+  const notify = useNotify();
   const [muted, accentForeground] = useThemeColor(['muted', 'accent-foreground']);
   const [gift, giftText, sit, sitText] = useCSSVariable([
     '--color-gift',
@@ -96,7 +97,7 @@ const MessageCard = ({ message, onDone }: { message: IncomingMessage; onDone: ()
     if (showPlan) loadTables();
   }, [showPlan]);
 
-  const fail = (error: any) => toast.show({ variant: 'danger', label: error?.message ?? String(error) });
+  const fail = (error: any) => notify('danger', error?.message ?? String(error));
 
   // One tap sends the reply sticker straight back
   const reply = async (stickerId: string) => {
@@ -105,7 +106,7 @@ const MessageCard = ({ message, onDone }: { message: IncomingMessage; onDone: ()
       await sendMessage({
         variables: { input: { toTableId: fromTableId, stickerId, giftId: message.giftId ?? undefined } },
       });
-      toast.show({ variant: 'success', label: t('mainPage.message_sent', { table: fromTableName }) });
+      notify('success', t('mainPage.message_sent', { table: fromTableName }));
       onDone();
     } catch (error) {
       fail(error);
@@ -116,12 +117,10 @@ const MessageCard = ({ message, onDone }: { message: IncomingMessage; onDone: ()
     if (!fromTableId) return onDone();
     try {
       await answerRequest({ variables: { input: { toTableId: fromTableId, accepted } } });
-      toast.show({
-        variant: accepted ? 'success' : 'default',
-        label: accepted
-          ? t('mainPage.sit_reply_sent_yes', { table: fromTableName })
-          : t('mainPage.sit_reply_sent_no'),
-      });
+      notify(
+        accepted ? 'success' : 'default',
+        accepted ? t('mainPage.sit_reply_sent_yes', { table: fromTableName }) : t('mainPage.sit_reply_sent_no'),
+      );
     } catch (error) {
       fail(error);
     }

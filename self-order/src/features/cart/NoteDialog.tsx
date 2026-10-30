@@ -3,6 +3,7 @@ import { Pressable, TextInput, View } from 'react-native';
 import { Button, Dialog, useThemeColor } from 'heroui-native';
 import { X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { MotionDialog } from '@/src/ui/MotionDialog';
 import { Text } from '@/src/ui/Text';
 
 const MAX_LENGTH = 100;
@@ -31,18 +32,9 @@ export const NoteDialog = ({ target, onSave, onClose }: Props) => {
   const current = target ?? shown;
 
   return (
-    <Dialog isOpen={!!target} onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Portal>
-        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
-            dim backdrop stuck on screen */}
-        <Dialog.Overlay animation={false} />
-        <Dialog.Content animation={false} isSwipeable={false} className="w-150 gap-5 self-center p-7">
-          {current && (
-            <NoteForm key={target ? 'open' : 'closing'} target={current} onSave={onSave} onClose={onClose} />
-          )}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog>
+    <MotionDialog isOpen={!!target} onOpenChange={(open) => !open && onClose()} className="w-150 gap-5 p-7">
+      {current && <NoteForm key={target ? 'open' : 'closing'} target={current} onSave={onSave} onClose={onClose} />}
+    </MotionDialog>
   );
 };
 

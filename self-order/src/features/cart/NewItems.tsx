@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
-import { Button, PressableFeedback, Spinner, Tabs, useThemeColor } from 'heroui-native';
+import { Button, PressableFeedback, Tabs, useThemeColor } from 'heroui-native';
 import { Gift } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { TABLE_MESSAGE_STICKERS, TYPE } from '@/src/constants';
@@ -8,6 +8,7 @@ import { useSessionStore } from '@/src/features/session/sessionStore';
 import { Sticker } from '@/src/features/social/Sticker';
 import { formatMoney } from '@/src/lib/format';
 import { IOrderItem } from '@/src/types';
+import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
 import { CartLine } from './CartLine';
 import { useCartStore, useCartTotals } from './cartStore';

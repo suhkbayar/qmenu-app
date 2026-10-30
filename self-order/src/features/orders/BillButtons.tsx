@@ -1,11 +1,12 @@
 import { View } from 'react-native';
-import { Button, Spinner, cn, useThemeColor } from 'heroui-native';
+import { Button, cn, useThemeColor } from 'heroui-native';
 import { ReceiptText } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useCheckout } from '@/src/features/checkout/checkoutStore';
 import { useServiceRequest } from '@/src/features/service/useServiceRequest';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { IOrder } from '@/src/types';
+import { Spinner } from '@/src/ui/Spinner';
 
 /**
  * Settling up, the guest's choice: ask staff for the bill, or pay it here (the order's checkout) when

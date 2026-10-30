@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, TextInput, View } from 'react-native';
 import { useApolloClient } from '@apollo/client';
 import { router } from 'expo-router';
-import { Button, Dialog, Spinner, cn, useThemeColor, useToast } from 'heroui-native';
+import { Button, Dialog, cn, useThemeColor } from 'heroui-native';
 import { Armchair, LogOut, Power, RefreshCw, RotateCcw, Settings, Wifi } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,11 @@ import { useSessionStore } from '@/src/features/session/sessionStore';
 import { GET_PARTICIPANT_CONFIGS } from '@/src/graphql/queries';
 import { formatDateTime } from '@/src/lib/format';
 import { IParticipant } from '@/src/types';
+import { MotionDialog } from '@/src/ui/MotionDialog';
+import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
+import { useNotify } from '@/src/ui/useNotify';
+import { whenClosed } from '@/src/ui/useOpened';
 import { useAppUpdate } from './appUpdate';
 import { MAX_PIN_ATTEMPTS, usePinLock } from './pinLock';
 import { useHoldScreensaver } from './screensaverHold';
@@ -149,11 +153,14 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
   }, [isOpen]);
 
   const close = () => {
-    setPin('');
-    setWrong(false);
-    setChecked(false);
-    setUnlocked(false);
     onClose();
+    // Back to the PIN once it has faded out, so the menu doesn't turn into the PIN field as it goes
+    whenClosed(() => {
+      setPin('');
+      setWrong(false);
+      setChecked(false);
+      setUnlocked(false);
+    });
   };
 
   const submit = async () => {
@@ -176,104 +183,92 @@ const AdminDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
   };
 
   return (
-    <Dialog isOpen={isOpen} onOpenChange={(open) => !open && close()}>
-      <Dialog.Portal>
-        {/* A stray tap after the ten on the logo shouldn't close it; Cancel does. No open/close
-            animation: on the tablets it sometimes stalled, leaving the dialog or its backdrop stuck. */}
-        <Dialog.Overlay isCloseOnPress={false} animation={false} />
-        <Dialog.Content
-          animation={false}
-          isSwipeable={false}
-          className={cn('gap-4 self-center p-7', unlocked ? 'w-170' : 'w-110')}
-        >
-          <Dialog.Title className="text-center text-2xl">{t('setup.adminAccess')}</Dialog.Title>
+    // A stray tap after the ten on the logo shouldn't close it; Cancel does
+    <MotionDialog
+      isOpen={isOpen}
+      onOpenChange={(open) => !open && close()}
+      closeOnBackdrop={false}
+      className={cn('gap-4 p-7', unlocked ? 'w-170' : 'w-110')}
+    >
+      <Dialog.Title className="text-center text-2xl">{t('setup.adminAccess')}</Dialog.Title>
 
-          {unlocked ? (
-            <AdminMenu onDone={close} />
-          ) : (
-            <>
-              <View className="gap-2">
-                <TextInput
-                  value={pin}
-                  onChangeText={(value) => {
-                    setPin(value);
-                    setWrong(false);
-                  }}
-                  onSubmitEditing={submit}
-                  placeholder={t('setup.enterPin')}
-                  placeholderTextColor={muted}
-                  secureTextEntry
-                  keyboardType="number-pad"
-                  autoFocus
-                  editable={!locked && !noPin}
-                  className={cn(
-                    'h-15 rounded-2xl border bg-surface px-4 text-center font-normal text-2xl text-foreground',
-                    wrong || locked ? 'border-danger' : 'border-border',
-                    (locked || noPin) && 'opacity-50',
-                  )}
-                  // Typed text in the theme's colour through style; unset, Android draws it black
-                  style={{ letterSpacing: 6, color: foreground }}
-                />
-                {locked ? (
-                  <Text className="text-center text-sm font-medium text-danger">
-                    {t('setup.pinLocked', { time: formatCountdown(lockedFor) })}
-                  </Text>
-                ) : noPin ? (
-                  <Text className="text-center text-sm font-medium text-muted">{t('setup.noPin')}</Text>
-                ) : (
-                  wrong && (
-                    <Text className="text-center text-sm font-medium text-danger">
-                      {t('setup.wrongPin', { count: MAX_PIN_ATTEMPTS - failures })}
-                    </Text>
-                  )
-                )}
-              </View>
-
-              <View className="flex-row gap-3">
-                <Button size="lg" variant="secondary" className="flex-1 rounded-2xl" onPress={close}>
-                  <Button.Label numberOfLines={1}>{t('setup.cancel')}</Button.Label>
-                </Button>
-                <Button
-                  size="lg"
-                  className="flex-1 rounded-2xl"
-                  isDisabled={!pin || locked || verifying}
-                  onPress={submit}
-                >
-                  {/* Spinners default to the brand yellow, which vanishes on the yellow button */}
-                  {verifying && <Spinner size="sm" color={accentForeground} />}
-                  <Button.Label numberOfLines={1} className="font-bold">
-                    {t('setup.continue')}
-                  </Button.Label>
-                </Button>
-              </View>
-            </>
-          )}
-
-          <View className="items-center gap-1.5 border-t border-border pt-4">
-            <Button
-              variant="ghost"
-              isDisabled={isChecking || isDownloading}
-              onPress={() => Promise.all([checkForUpdate(), appUpdate.check()]).finally(() => setChecked(true))}
-            >
-              {isChecking || isDownloading ? <Spinner size="sm" /> : <RefreshCw size={18} color={foreground} />}
-              <Button.Label numberOfLines={1}>{t('setup.checkUpdate')}</Button.Label>
-            </Button>
-            {!!updateStatus && <Text className="text-center text-sm text-muted">{updateStatus}</Text>}
-            {/* A new APK: support can install it right away instead of waiting for the tablet to be idle */}
-            {!!appUpdate.available && (
-              <Button size="sm" variant="secondary" isDisabled={appUpdate.installing} onPress={appUpdate.install}>
-                {appUpdate.installing && <Spinner size="sm" />}
-                <Button.Label numberOfLines={1}>
-                  {t('setup.installBuild', { version: appUpdate.available })}
-                </Button.Label>
-              </Button>
+      {unlocked ? (
+        <AdminMenu onDone={close} />
+      ) : (
+        <>
+          <View className="gap-2">
+            <TextInput
+              value={pin}
+              onChangeText={(value) => {
+                setPin(value);
+                setWrong(false);
+              }}
+              onSubmitEditing={submit}
+              placeholder={t('setup.enterPin')}
+              placeholderTextColor={muted}
+              secureTextEntry
+              keyboardType="number-pad"
+              autoFocus
+              editable={!locked && !noPin}
+              className={cn(
+                'h-15 rounded-2xl border bg-surface px-4 text-center font-normal text-2xl text-foreground',
+                wrong || locked ? 'border-danger' : 'border-border',
+                (locked || noPin) && 'opacity-50',
+              )}
+              // Typed text in the theme's colour through style; unset, Android draws it black
+              style={{ letterSpacing: 6, color: foreground }}
+            />
+            {locked ? (
+              <Text className="text-center text-sm font-medium text-danger">
+                {t('setup.pinLocked', { time: formatCountdown(lockedFor) })}
+              </Text>
+            ) : noPin ? (
+              <Text className="text-center text-sm font-medium text-muted">{t('setup.noPin')}</Text>
+            ) : (
+              wrong && (
+                <Text className="text-center text-sm font-medium text-danger">
+                  {t('setup.wrongPin', { count: MAX_PIN_ATTEMPTS - failures })}
+                </Text>
+              )
             )}
-            {!!appUpdate.error && <Text className="text-center text-sm text-danger">{appUpdate.error}</Text>}
-            <VersionBadge />
           </View>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog>
+
+          <View className="flex-row gap-3">
+            <Button size="lg" variant="secondary" className="flex-1 rounded-2xl" onPress={close}>
+              <Button.Label numberOfLines={1}>{t('setup.cancel')}</Button.Label>
+            </Button>
+            <Button size="lg" className="flex-1 rounded-2xl" isDisabled={!pin || locked || verifying} onPress={submit}>
+              {/* Spinners default to the brand yellow, which vanishes on the yellow button */}
+              {verifying && <Spinner size="sm" color={accentForeground} />}
+              <Button.Label numberOfLines={1} className="font-bold">
+                {t('setup.continue')}
+              </Button.Label>
+            </Button>
+          </View>
+        </>
+      )}
+
+      <View className="items-center gap-1.5 border-t border-border pt-4">
+        <Button
+          variant="ghost"
+          isDisabled={isChecking || isDownloading}
+          onPress={() => Promise.all([checkForUpdate(), appUpdate.check()]).finally(() => setChecked(true))}
+        >
+          {isChecking || isDownloading ? <Spinner size="sm" /> : <RefreshCw size={18} color={foreground} />}
+          <Button.Label numberOfLines={1}>{t('setup.checkUpdate')}</Button.Label>
+        </Button>
+        {!!updateStatus && <Text className="text-center text-sm text-muted">{updateStatus}</Text>}
+        {/* A new APK: support can install it right away instead of waiting for the tablet to be idle */}
+        {!!appUpdate.available && (
+          <Button size="sm" variant="secondary" isDisabled={appUpdate.installing} onPress={appUpdate.install}>
+            {appUpdate.installing && <Spinner size="sm" />}
+            <Button.Label numberOfLines={1}>{t('setup.installBuild', { version: appUpdate.available })}</Button.Label>
+          </Button>
+        )}
+        {!!appUpdate.error && <Text className="text-center text-sm text-danger">{appUpdate.error}</Text>}
+        <VersionBadge />
+      </View>
+    </MotionDialog>
   );
 };
 
@@ -299,7 +294,7 @@ const RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
  */
 const AdminMenu = ({ onDone }: { onDone: () => void }) => {
   const { t } = useTranslation('language');
-  const { toast } = useToast();
+  const notify = useNotify();
   const foreground = useThemeColor('foreground');
   const [busy, setBusy] = useState<AdminAction | null>(null);
   // Restarting the tablet needs the device owner and a build from 2.0.6
@@ -324,7 +319,7 @@ const AdminMenu = ({ onDone }: { onDone: () => void }) => {
       else await Kiosk.stop();
       onDone();
     } catch {
-      toast.show({ variant: 'danger', label: t(action === 'exit' ? 'setup.exitFailed' : 'setup.actionFailed') });
+      notify('danger', t(action === 'exit' ? 'setup.exitFailed' : 'setup.actionFailed'));
     } finally {
       setBusy(null);
     }

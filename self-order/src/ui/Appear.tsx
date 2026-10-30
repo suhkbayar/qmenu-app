@@ -3,8 +3,8 @@ import { StyleProp, ViewStyle, useWindowDimensions } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 type Props = {
-  /** fade (default); zoom: also grows from 85%; right: slides in from the right edge */
-  from?: 'fade' | 'zoom' | 'right';
+  /** fade (default); zoom: also grows from 85%; right: slides in from the right edge; top: fades in sliding down a little */
+  from?: 'fade' | 'zoom' | 'right' | 'top';
   duration?: number;
   className?: string;
   style?: StyleProp<ViewStyle>;
@@ -30,6 +30,7 @@ export const Appear = ({ from = 'fade', duration = 200, className, style, childr
   const animated = useAnimatedStyle(() => {
     if (from === 'right') return { transform: [{ translateX: (1 - shown.value) * width }] };
     if (from === 'zoom') return { opacity: shown.value, transform: [{ scale: 0.85 + 0.15 * shown.value }] };
+    if (from === 'top') return { opacity: shown.value, transform: [{ translateY: (shown.value - 1) * 24 }] };
     return { opacity: shown.value };
   });
 

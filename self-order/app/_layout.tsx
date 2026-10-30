@@ -50,6 +50,12 @@ SplashScreen.preventAutoHideAsync();
 // restarts, never a blank screen
 export { ErrorScreen as ErrorBoundary };
 
+// Toasts appear and go without heroui's slide, a layout animation. Tapping Дахин шалгах offline
+// slid one in as its button's animated spinner went, which put Android's views out of step with
+// React's, and the app crashed ("addViewAt: failed to insert view"). Pay has the same mix: the
+// "order sent" toast, then the payment dialog.
+const HEROUI_CONFIG = { toast: { defaultProps: { animation: false as const } } };
+
 /** True once the saved light/dark choice has been read, so the first frame is drawn in the right theme. */
 const useThemeLoaded = () => {
   const [loaded, setLoaded] = useState(useThemeStore.persist.hasHydrated);
@@ -97,7 +103,7 @@ export default function RootLayout() {
       <ApolloProvider client={client}>
         <AuthProvider>
           <SafeAreaProvider>
-            <HeroUINativeProvider>
+            <HeroUINativeProvider config={HEROUI_CONFIG}>
               <ValidProvider>
                 <NavigationTheme isDark={isDark}>
                   <StatusBar hidden />

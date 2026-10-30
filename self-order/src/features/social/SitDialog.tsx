@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { useMutation, useQuery } from '@apollo/client';
-import { Button, Dialog, Spinner, useThemeColor, useToast } from 'heroui-native';
+import { Button, Dialog, useThemeColor } from 'heroui-native';
 import { Send, UsersRound, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useCSSVariable } from 'uniwind';
@@ -10,7 +10,10 @@ import { SEND_TABLE_REQUEST } from '@/src/graphql/mutations/tableRequest';
 import { GET_ACTIVE_TABLES } from '@/src/graphql/queries/tableMessage';
 import { ITable } from '@/src/types/table';
 import { Appear } from '@/src/ui/Appear';
+import { MotionDialog } from '@/src/ui/MotionDialog';
+import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
+import { useNotify } from '@/src/ui/useNotify';
 import { useOpened } from '@/src/ui/useOpened';
 import { useSocialStore } from './socialStore';
 import { TableFloorPlan, useOwnTableId } from './TableFloorPlan';
@@ -29,28 +32,21 @@ export const SitDialog = () => {
   }, [isOpen]);
 
   return (
-    <Dialog isOpen={isOpen} onOpenChange={(open) => !open && close()}>
-      <Dialog.Portal>
-        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
-            dim backdrop stuck on screen */}
-        <Dialog.Overlay animation={false} />
-        {/* Not swipeable: dragging should not move the dialog. 760×660, smaller on a smaller screen */}
-        <Dialog.Content
-          animation={false}
-          isSwipeable={false}
-          className="gap-5 self-center p-7"
-          style={{ width: Math.min(760, window.width - 48), height: Math.min(660, window.height - 40) }}
-        >
-          {session > 0 && <SitFlow key={session} onClose={close} />}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog>
+    // 760×660, smaller on a smaller screen
+    <MotionDialog
+      isOpen={isOpen}
+      onOpenChange={(open) => !open && close()}
+      className="gap-5 p-7"
+      style={{ width: Math.min(760, window.width - 48), height: Math.min(660, window.height - 40) }}
+    >
+      {session > 0 && <SitFlow key={session} onClose={close} />}
+    </MotionDialog>
   );
 };
 
 const SitFlow = ({ onClose }: { onClose: () => void }) => {
   const { t } = useTranslation('language');
-  const { toast } = useToast();
+  const notify = useNotify();
   const [foreground, accentForeground] = useThemeColor(['foreground', 'accent-foreground']);
   const color = useCSSVariable('--color-sit') as string;
   const [table, setTable] = useState<ITable | null>(null);
@@ -67,10 +63,10 @@ const SitFlow = ({ onClose }: { onClose: () => void }) => {
     if (!table) return;
     try {
       await sendRequest({ variables: { input: { toTableId: table.id } } });
-      toast.show({ variant: 'success', label: t('mainPage.sit_sent', { table: table.name }) });
+      notify('success', t('mainPage.sit_sent', { table: table.name }));
       onClose();
     } catch (error: any) {
-      toast.show({ variant: 'danger', label: error?.message ?? String(error) });
+      notify('danger', error?.message ?? String(error));
     }
   };
 

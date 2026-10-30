@@ -16,6 +16,7 @@ import { IMenuOption, IMenuProduct, IOrderItem } from '@/src/types';
 import { generateUUID } from '@/src/lib/uuid';
 import { getCdnImageUrl } from '@/src/lib/image';
 import { Image } from '@/src/ui/Image';
+import { MotionDialog } from '@/src/ui/MotionDialog';
 import { Stepper } from '@/src/ui/Stepper';
 import { Text } from '@/src/ui/Text';
 import { useOpened, whenClosed } from '@/src/ui/useOpened';
@@ -43,25 +44,17 @@ export const ProductSheet = ({ product, onClose, onConfigured }: Props) => {
   }, [product]);
 
   return (
-    <Dialog isOpen={!!product} onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Portal>
-        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
-            dim backdrop stuck on screen */}
-        <Dialog.Overlay animation={false} />
-        {/* Not swipeable: dragging should scroll the options, not move the dialog */}
-        {/* 980×640, smaller on a smaller screen */}
-        <Dialog.Content
-          animation={false}
-          isSwipeable={false}
-          className="flex-row self-center overflow-hidden p-0"
-          style={{ width: Math.min(980, window.width - 48), height: Math.min(640, window.height - 40) }}
-        >
-          {shown && (
-            <ProductDetails key={shown.session} product={shown.product} onDone={onClose} onConfigured={onConfigured} />
-          )}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog>
+    // 980×640, smaller on a smaller screen
+    <MotionDialog
+      isOpen={!!product}
+      onOpenChange={(open) => !open && onClose()}
+      className="flex-row overflow-hidden p-0"
+      style={{ width: Math.min(980, window.width - 48), height: Math.min(640, window.height - 40) }}
+    >
+      {shown && (
+        <ProductDetails key={shown.session} product={shown.product} onDone={onClose} onConfigured={onConfigured} />
+      )}
+    </MotionDialog>
   );
 };
 

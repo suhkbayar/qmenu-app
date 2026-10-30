@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useLazyQuery } from '@apollo/client';
-import { Spinner, Tabs, cn, useThemeColor, useToast } from 'heroui-native';
+import { Tabs, cn, useThemeColor } from 'heroui-native';
 import { CircleAlert, CircleCheck } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useCSSVariable } from 'uniwind';
 import { GET_VAT_PAYER } from '@/src/graphql/queries/vat';
+import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
+import { useNotify } from '@/src/ui/useNotify';
 import { Receipt } from './usePayment';
 
 // A company's register number is 7 digits
@@ -14,10 +16,10 @@ const COMPANY_REGISTER_LENGTH = 7;
 
 /** Looks up the taxpayer's name once a complete register number is entered. */
 const useVatPayer = (register: string | null) => {
-  const { toast } = useToast();
+  const notify = useNotify();
   const [lookup, { data, loading, variables }] = useLazyQuery(GET_VAT_PAYER, {
     fetchPolicy: 'network-only',
-    onError: (err) => toast.show({ variant: 'warning', label: err.message }),
+    onError: (err) => notify('warning', err.message),
   });
 
   useEffect(() => {

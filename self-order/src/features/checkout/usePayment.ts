@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useSubscription } from '@apollo/client';
-import { useToast } from 'heroui-native';
 import { useTranslation } from 'react-i18next';
 import { launchCardScanner } from '@/modules/card-scanner';
 import { PAYMENT_TYPE } from '@/src/constants';
@@ -9,6 +8,7 @@ import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/src/graphql/mutations/ord
 import { GET_ORDER } from '@/src/graphql/queries';
 import { ON_UPDATED_ORDER } from '@/src/graphql/subscriptions';
 import { IOrder, ITransaction } from '@/src/types';
+import { useNotify } from '@/src/ui/useNotify';
 
 // The order still not here after this long counts as failed; until then the dialog shows loading
 const LOAD_GIVE_UP_MS = 45_000;
@@ -35,7 +35,7 @@ export type Receipt = { vatType: '1' | '3'; register?: string };
  */
 export const usePayment = (orderId: string, preview?: IOrder | null) => {
   const { t } = useTranslation('language');
-  const { toast } = useToast();
+  const notify = useNotify();
   const participant = useSessionStore((s) => s.participant);
 
   const [step, setStep] = useState<CheckoutStep>('pay');
@@ -45,8 +45,8 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
   const [timedOut, setTimedOut] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
-  const warn = useCallback((label: string) => toast.show({ variant: 'warning', label }), [toast]);
-  const fail = useCallback((label: string) => toast.show({ variant: 'danger', label }), [toast]);
+  const warn = useCallback((label: string) => notify('warning', label), [notify]);
+  const fail = useCallback((label: string) => notify('danger', label), [notify]);
 
   // Never cached: the amount, payment state and receipt must be the server's latest
   const { data, previousData, loading, error, refetch } = useQuery(GET_ORDER, {

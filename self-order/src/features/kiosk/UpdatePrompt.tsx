@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
-import { Button, Dialog, Spinner, useThemeColor } from 'heroui-native';
+import { Button, Dialog, useThemeColor } from 'heroui-native';
 import { useTranslation } from 'react-i18next';
 import * as Updates from 'expo-updates';
 import { checkConnection } from '@/src/lib/network';
+import { MotionDialog } from '@/src/ui/MotionDialog';
+import { Spinner } from '@/src/ui/Spinner';
 import { useActivity } from './activity';
 import { useGuestBusy } from './useGuestBusy';
 
@@ -83,21 +85,21 @@ export const UpdatePrompt = () => {
 
   return (
     // Asked only while a guest is at the tablet; an idle one restarts without showing anything
-    <Dialog isOpen={isUpdatePending && !guestBusy && inUse} onOpenChange={() => {}}>
-      <Dialog.Portal>
-        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
-            dim backdrop stuck on screen */}
-        <Dialog.Overlay isCloseOnPress={false} animation={false} />
-        <Dialog.Content animation={false} isSwipeable={false} className="w-110 gap-5 self-center p-7">
-          <Dialog.Title className="text-center text-2xl">{t('mainPage.update_title')}</Dialog.Title>
-          <Dialog.Description className="text-center text-base">{t('mainPage.update_body')}</Dialog.Description>
-          <Button size="lg" className="rounded-2xl" isDisabled={restarting} onPress={restart}>
-            {/* Spinners default to the brand yellow, which vanishes on the yellow button */}
-            {restarting && <Spinner color={accentForeground} />}
-            <Button.Label numberOfLines={1} className="font-bold">{t('mainPage.update_button')}</Button.Label>
-          </Button>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog>
+    <MotionDialog
+      isOpen={isUpdatePending && !guestBusy && inUse}
+      onOpenChange={() => {}}
+      closeOnBackdrop={false}
+      className="w-110 gap-5 p-7"
+    >
+      <Dialog.Title className="text-center text-2xl">{t('mainPage.update_title')}</Dialog.Title>
+      <Dialog.Description className="text-center text-base">{t('mainPage.update_body')}</Dialog.Description>
+      <Button size="lg" className="rounded-2xl" isDisabled={restarting} onPress={restart}>
+        {/* Spinners default to the brand yellow, which vanishes on the yellow button */}
+        {restarting && <Spinner color={accentForeground} />}
+        <Button.Label numberOfLines={1} className="font-bold">
+          {t('mainPage.update_button')}
+        </Button.Label>
+      </Button>
+    </MotionDialog>
   );
 };

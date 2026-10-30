@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useQuery } from '@apollo/client';
-import { Button, Dialog, PressableFeedback, Spinner, Switch, cn, useThemeColor } from 'heroui-native';
+import { Button, Dialog, PressableFeedback, Switch, cn, useThemeColor } from 'heroui-native';
 import { FlashList } from '@shopify/flash-list';
 import { ArrowLeft, Check, EyeOff, Gift, MapPin, Minus, Plus, Send, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,8 @@ import { IMenuCategory, IMenuProduct, IOrderItem } from '@/src/types';
 import { ITable } from '@/src/types/table';
 import { Appear } from '@/src/ui/Appear';
 import { Image } from '@/src/ui/Image';
+import { MotionDialog } from '@/src/ui/MotionDialog';
+import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
 import { useOpened, whenClosed } from '@/src/ui/useOpened';
 import { useSocialStore } from './socialStore';
@@ -50,22 +52,15 @@ export const GiftDialog = () => {
   }, [isOpen]);
 
   return (
-    <Dialog isOpen={isOpen} onOpenChange={(open) => !open && close()}>
-      <Dialog.Portal>
-        {/* No open/close animation: on the tablets it sometimes stalled, leaving the dialog or its
-            dim backdrop stuck on screen */}
-        <Dialog.Overlay animation={false} />
-        {/* Not swipeable: dragging should scroll the dishes, not move the dialog. 1080×660, smaller on a smaller screen */}
-        <Dialog.Content
-          animation={false}
-          isSwipeable={false}
-          className="self-center overflow-hidden p-0"
-          style={{ width: Math.min(1080, window.width - 48), height: Math.min(660, window.height - 40) }}
-        >
-          {session > 0 && <GiftFlow key={session} onClose={close} />}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog>
+    // 1080×660, smaller on a smaller screen
+    <MotionDialog
+      isOpen={isOpen}
+      onOpenChange={(open) => !open && close()}
+      className="overflow-hidden p-0"
+      style={{ width: Math.min(1080, window.width - 48), height: Math.min(660, window.height - 40) }}
+    >
+      {session > 0 && <GiftFlow key={session} onClose={close} />}
+    </MotionDialog>
   );
 };
 
