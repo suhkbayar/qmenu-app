@@ -326,7 +326,7 @@ const useMethodLook = (method: PaymentMethod): MethodLook => {
   switch (method) {
     case 'MPY':
       return {
-        name: 'М Банк',
+        name: 'М банк',
         // The "M pay" wordmark in white with a see-through box, so the green shows inside it. (Tinting
         // the black original turned its white box solid and hid the M.)
         mark: <Image source={require('@/assets/icon/mpay-white.png')} className="h-7 w-15" contentFit="contain" />,

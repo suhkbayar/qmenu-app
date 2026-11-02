@@ -25,7 +25,7 @@ export const QuizBanner = ({ onPlay }: { onPlay?: () => void }) => {
       </View>
       <View className="flex-1 gap-0.5">
         <Text className="text-lg font-bold" style={{ color: TITLE }}>
-          Mbank Quiz
+          M quiz
         </Text>
         <Text style={{ color: BODY }} numberOfLines={1}>
           {t('mainPage.quizBody')}
@@ -62,7 +62,7 @@ export const QuizHeaderButton = () => {
           <Image source={require('@/assets/icon/mbank.png')} className="size-6" contentFit="contain" />
         </View>
         <Text className="font-bold" style={{ color: TITLE }} numberOfLines={1}>
-          Mbank Quiz
+          M quiz
         </Text>
       </PressableFeedback>
     </View>
