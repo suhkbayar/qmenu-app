@@ -36,22 +36,30 @@ const hoursOf = (timetable: ITimeTable, day: Day) => {
   return { open: toMinutes(open), close: toMinutes(close) };
 };
 
+const rangesOf = (timetable: ITimeTable) =>
+  timetable.periods
+    ? timetable.periods.map((p) => ({ day: p.day as Day, open: toMinutes(p.open), close: toMinutes(p.close) }))
+    : DAYS.flatMap((day) => {
+        const hours = hoursOf(timetable, day);
+        return hours ? [{ day, ...hours }] : [];
+      });
+
 /**
  * Whether a category's timetable has it open right now. No timetable means always open.
  * Hours can run past midnight (e.g. 18:00–02:00): at 01:00 the previous day's hours still apply.
+ * The same open and close time means 24 hours.
  */
 export const isCurrentlyOpen = (timetable?: ITimeTable | null, now = new Date()): boolean => {
   if (!timetable) return true;
   const minutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+  const today = DAYS[now.getDay()];
+  const yesterday = DAYS[(now.getDay() + 6) % 7];
 
-  const today = hoursOf(timetable, DAYS[now.getDay()]);
-  if (today) {
-    const overnight = today.close < today.open;
-    if (minutes > today.open && (overnight || minutes < today.close)) return true;
-  }
-
-  const yesterday = hoursOf(timetable, DAYS[(now.getDay() + 6) % 7]);
-  return !!yesterday && yesterday.close < yesterday.open && minutes < yesterday.close;
+  return rangesOf(timetable).some(({ day, open, close }) => {
+    const overnight = close <= open;
+    if (day === today && minutes >= open && (overnight || minutes < close)) return true;
+    return day === yesterday && overnight && minutes < close;
+  });
 };
 
 /** Every product on the menu by its productId, subcategories included. */

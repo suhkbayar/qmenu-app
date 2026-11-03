@@ -1,3 +1,9 @@
+export interface ITimeTablePeriod {
+  day: string;
+  open: string;
+  close: string;
+}
+
 export interface ITimeTable {
   fri: boolean;
   friClose: string;
@@ -20,4 +26,5 @@ export interface ITimeTable {
   wed: boolean;
   wedClose: string;
   wedOpen: string;
+  periods?: ITimeTablePeriod[];
 }

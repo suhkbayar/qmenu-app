@@ -23,5 +23,10 @@ export const TIMETABLE_FIELDS = gql`
     sun
     sunOpen
     sunClose
+    periods {
+      day
+      open
+      close
+    }
   }
 `;
