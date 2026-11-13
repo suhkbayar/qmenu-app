@@ -4,11 +4,11 @@ import type { ErrorBoundaryProps } from 'expo-router';
 import { useThemeColor } from 'heroui-native';
 import { TriangleAlert } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import * as Updates from 'expo-updates';
 import { Kiosk } from '@/modules/kiosk';
 import { Text } from '@/src/ui/Text';
 import { SecretTap } from './AdminExit';
 import { handOverIfStarting } from './crash';
+import { restartApp } from './restartApp';
 
 // Unattended tablets restart by themselves, so none is left on this page
 const AUTO_RESTART_S = 30;
@@ -35,7 +35,7 @@ export const ErrorScreen = ({ error, retry }: ErrorBoundaryProps) => {
   const restart = () => {
     if (restarting) return;
     setRestarting(true);
-    (Kiosk.canRestartApp() ? Kiosk.restartApp() : Updates.reloadAsync()).catch(() => {
+    restartApp().catch(() => {
       setRestarting(false);
       setSeconds(AUTO_RESTART_S);
       retry();

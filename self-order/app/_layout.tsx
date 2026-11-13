@@ -56,6 +56,11 @@ export { ErrorScreen as ErrorBoundary };
 // "order sent" toast, then the payment dialog.
 const HEROUI_CONFIG = { toast: { defaultProps: { animation: false as const } } };
 
+// The theme and fonts are normally there within a moment. Storage that fails leaves zustand's persist
+// never finished, which kept the app blank for good: after this long it starts anyway, light and,
+// should the fonts still be loading, in the font the build has built in
+const STARTUP_WAIT_MS = 3000;
+
 /** True once the saved light/dark choice has been read, so the first frame is drawn in the right theme. */
 const useThemeLoaded = () => {
   const [loaded, setLoaded] = useState(useThemeStore.persist.hasHydrated);
@@ -76,7 +81,13 @@ export default function RootLayout() {
   // Builds from 2.0.5 on embed Onest too; loading it here also covers older builds via OTA.
   // A font that fails to load falls back to the system font rather than blocking the app.
   const [fontsLoaded, fontError] = useFonts({ Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold });
-  const ready = themeLoaded && (fontsLoaded || !!fontError);
+  const [waited, setWaited] = useState(false);
+  const ready = waited || (themeLoaded && (fontsLoaded || !!fontError));
+
+  useEffect(() => {
+    const id = setTimeout(() => setWaited(true), STARTUP_WAIT_MS);
+    return () => clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     Uniwind.setTheme(isDark ? 'dark' : 'light');

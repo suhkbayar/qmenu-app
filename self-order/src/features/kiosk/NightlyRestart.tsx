@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as Updates from 'expo-updates';
 import { checkConnection } from '@/src/lib/network';
 import { useActivity } from './activity';
+import { restartApp } from './restartApp';
 import { useGuestBusy } from './useGuestBusy';
 
 // Restart between these hours (tablet time), when restaurants are closed
@@ -32,7 +33,7 @@ export const NightlyRestart = () => {
       if (busy.current || Date.now() - useActivity.getState().lastTouch < IDLE_MS) return;
       // Restarted offline, the app couldn't load the menu until the internet came back
       checkConnection().then((online) => {
-        if (online) Updates.reloadAsync().catch(() => {});
+        if (online) restartApp().catch(() => {});
       });
     }, CHECK_EVERY_MS);
     return () => clearInterval(id);

@@ -7,6 +7,7 @@ import { checkConnection } from '@/src/lib/network';
 import { MotionDialog } from '@/src/ui/MotionDialog';
 import { Spinner } from '@/src/ui/Spinner';
 import { useActivity } from './activity';
+import { restartApp } from './restartApp';
 import { useGuestBusy } from './useGuestBusy';
 
 const CHECK_INTERVAL_MS = 30 * 60 * 1000;
@@ -56,7 +57,7 @@ export const UpdatePrompt = () => {
 
   const restart = () => {
     setRestarting(true);
-    Updates.reloadAsync().catch(() => setRestarting(false));
+    restartApp().catch(() => setRestarting(false));
   };
 
   // While an update waits: restart once nobody has touched the tablet for a minute, and only while

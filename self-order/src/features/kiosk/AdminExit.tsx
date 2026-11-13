@@ -20,6 +20,7 @@ import { useNotify } from '@/src/ui/useNotify';
 import { whenClosed } from '@/src/ui/useOpened';
 import { useAppUpdate } from './appUpdate';
 import { MAX_PIN_ATTEMPTS, usePinLock } from './pinLock';
+import { restartApp } from './restartApp';
 import { useHoldScreensaver } from './screensaverHold';
 import { checkForUpdate } from './UpdatePrompt';
 import { VersionBadge } from './VersionBadge';
@@ -311,7 +312,7 @@ const AdminMenu = ({ onDone }: { onDone: () => void }) => {
     setBusy(action);
     try {
       // A fresh process where the build can, otherwise the JavaScript reloaded
-      if (action === 'restart') await (Kiosk.canRestartApp() ? Kiosk.restartApp() : Updates.reloadAsync());
+      if (action === 'restart') await restartApp();
       else if (action === 'reboot') await Kiosk.reboot();
       else if (action === 'wifi') await openSettings('android.settings.WIFI_SETTINGS');
       else if (action === 'settings') await openSettings('android.settings.SETTINGS');
