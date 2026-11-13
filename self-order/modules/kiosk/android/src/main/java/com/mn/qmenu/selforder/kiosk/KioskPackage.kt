@@ -29,7 +29,7 @@ class KioskPackage : Package {
         listOf(object : ReactActivityLifecycleListener {
             // Kiosk comes back on whenever the app returns to the screen, e.g. staff press Home after using Settings
             override fun onResume(activity: Activity) {
-                if (DeviceOwner.isActive(activity)) activity.startLockTask()
+                if (DeviceOwner.isActive(activity)) LockTask.start(activity)
             }
         })
 

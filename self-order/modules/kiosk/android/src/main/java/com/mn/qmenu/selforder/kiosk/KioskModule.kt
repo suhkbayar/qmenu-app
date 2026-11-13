@@ -23,10 +23,11 @@ class KioskModule : Module() {
         }
 
         // Pins the screen to the app. As device owner this is the full lock (see DeviceOwner.lockDown);
-        // without it Android asks the user to confirm screen pinning instead.
+        // without it Android asks the user to confirm screen pinning instead. Never fails on a screen
+        // that isn't on top yet (see LockTask), so hiding the other apps after it always runs.
         AsyncFunction("startKioskMode") {
             if (DeviceOwner.isActive(context)) DeviceOwner.lockDown(context)
-            appContext.throwingActivity.startLockTask()
+            LockTask.start(appContext.throwingActivity)
         }.runOnQueue(Queues.MAIN)
 
         // Hides every other app with a home-screen icon; see DeviceOwner.setAllowedApps
