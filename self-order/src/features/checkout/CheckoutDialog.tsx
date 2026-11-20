@@ -2,20 +2,11 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useApolloClient } from '@apollo/client';
 import { Button, cn, useThemeColor } from 'heroui-native';
-import {
-  ArrowLeft,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  CreditCard,
-  QrCode,
-  ReceiptText,
-  X,
-} from 'lucide-react-native';
+import { Check, ChevronDown, ChevronUp, Clock, CreditCard, QrCode, ReceiptText } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'react-native-qrcode-svg';
 import { useCSSVariable } from 'uniwind';
+import { PAYMENT_TYPE } from '@/src/constants';
 import { lineTotal } from '@/src/features/cart/totals';
 import { useHoldScreensaver } from '@/src/features/kiosk/screensaverHold';
 import { QuizBanner } from '@/src/features/quiz/QuizBanner';
@@ -32,7 +23,9 @@ import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
 import { useCheckout } from './checkoutStore';
 import { ReceiptPicker, useReceipt } from './ReceiptPicker';
-import { PaymentMethod, usePayment } from './usePayment';
+import { StepHeader } from './StepHeader';
+import { UPOINT_LOGO, UpointCouponStep, UpointStep } from './UpointSteps';
+import { PaymentMethod, amountDue, usePayment } from './usePayment';
 
 // After paying, the menu comes back by itself for the next guest
 const BACK_TO_MENU_SECONDS = 30;
@@ -106,6 +99,8 @@ const Checkout = ({ orderId, preview, onClose }: { orderId: string; preview: IOr
           {step === 'pay' && <PayStep payment={payment} receipt={receipt} onClose={onClose} />}
           {step === 'qr' && <QrStep payment={payment} />}
           {step === 'card' && <CardStep payment={payment} />}
+          {step === 'upoint' && <UpointStep payment={payment} receipt={receipt.receipt} />}
+          {step === 'coupon' && <UpointCouponStep payment={payment} receipt={receipt.receipt} />}
         </View>
       )}
     </Appear>
@@ -158,10 +153,13 @@ const LoadFailed = ({ onRetry, onClose }: { onRetry: () => void; onClose: () => 
 
 // A charge in effect (A = active; inactive, pending and cancelled ones aren't in the total)
 const ACTIVE_CHARGE = 'A';
+// Parts of the order paid with U-Point points or a U-Point coupon
+const REWARD_PAYMENTS = [PAYMENT_TYPE.UPT, PAYMENT_TYPE.UPC];
 
 /**
  * What there is to pay, big, with the charges and city tax in it always in view (fees out of sight
- * are what guests distrust); the dishes only when the guest asks (Дэлгэрэнгүй).
+ * are what guests distrust); the dishes only when the guest asks (Дэлгэрэнгүй). Once part is paid
+ * with U-Point, the total and that part show too, and the big amount is what's left.
  */
 const AmountCard = ({ order }: { order: IOrder }) => {
   const { t } = useTranslation('language');
@@ -171,6 +169,9 @@ const AmountCard = ({ order }: { order: IOrder }) => {
   const charges = (order.charges ?? [])
     .filter((charge) => charge.state === ACTIVE_CHARGE)
     .reduce((sum, charge) => sum + Number(charge.amount), 0);
+  const rewardsPaid = (order.transactions ?? []).filter(
+    (tx) => tx.state === 'PAID' && REWARD_PAYMENTS.includes(tx.type),
+  );
   const Chevron = details ? ChevronUp : ChevronDown;
 
   return (
@@ -178,7 +179,7 @@ const AmountCard = ({ order }: { order: IOrder }) => {
       <View className="flex-row items-end justify-between gap-4">
         <View className="gap-1">
           <Text className="text-muted">{t('mainPage.AmountPaid')}</Text>
-          <Text className="text-5xl font-bold tracking-tight">{formatMoney(order.grandTotal)}</Text>
+          <Text className="text-5xl font-bold tracking-tight">{formatMoney(amountDue(order))}</Text>
         </View>
         <Button variant="outline" className="h-12 rounded-2xl px-4" onPress={() => setDetails((open) => !open)}>
           <Button.Label numberOfLines={1}>{t('mainPage.details')}</Button.Label>
@@ -213,52 +214,35 @@ const AmountCard = ({ order }: { order: IOrder }) => {
           {order.cityTax > 0 && <SummaryRow label={t('mainPage.cityTax')} amount={order.cityTax} />}
         </View>
       )}
+      {/* Paid with U-Point: the whole total, then each part paid */}
+      {rewardsPaid.length > 0 && (
+        <View className="gap-1.5 border-t border-border pt-3">
+          <SummaryRow label={t('mainPage.Total')} amount={order.grandTotal} />
+          {rewardsPaid.map((tx) => (
+            <SummaryRow
+              key={tx.id}
+              label={tx.type === PAYMENT_TYPE.UPC ? t('mainPage.upointCoupon') : 'U-Point'}
+              amount={Number(tx.amount)}
+              minus
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 };
 
-const SummaryRow = ({ label, amount }: { label: string; amount: number }) => (
+const SummaryRow = ({ label, amount, minus }: { label: string; amount: number; minus?: boolean }) => (
   <View className="flex-row justify-between gap-3">
     <Text className="min-w-0 flex-1 text-muted" numberOfLines={2}>
       {label}
     </Text>
-    <Text className="font-semibold">{formatMoney(amount)}</Text>
+    <Text className="font-semibold">
+      {minus ? '−' : ''}
+      {formatMoney(amount)}
+    </Text>
   </View>
 );
-
-const StepHeader = ({ title, onBack, onClose }: { title: string; onBack?: () => void; onClose?: () => void }) => {
-  const { t } = useTranslation('language');
-  const foreground = useThemeColor('foreground');
-  return (
-    <View className="flex-row items-center gap-3.5">
-      {onBack && (
-        <Button
-          isIconOnly
-          variant="secondary"
-          className="size-12 rounded-full"
-          onPress={onBack}
-          accessibilityLabel={t('mainPage.GoBack')}
-        >
-          <ArrowLeft size={22} color={foreground} />
-        </Button>
-      )}
-      <Text className="flex-1 text-3xl font-bold tracking-tight" numberOfLines={1}>
-        {title}
-      </Text>
-      {onClose && (
-        <Button
-          isIconOnly
-          variant="secondary"
-          className="size-12 rounded-full"
-          onPress={onClose}
-          accessibilityLabel={t('mainPage.close')}
-        >
-          <X size={22} color={foreground} />
-        </Button>
-      )}
-    </View>
-  );
-};
 
 /** Step 1: the eBarimt receipt and how to pay. Tapping a method starts the payment. */
 const PayStep = ({
@@ -301,8 +285,55 @@ const PayStep = ({
             </View>
           )}
         </View>
+        {payment.upToDate && <Rewards payment={payment} disabled={!receipt.ready} />}
       </ScrollView>
     </>
+  );
+};
+
+/**
+ * U-Point points (spend or collect) and U-Point coupons, under the methods, each only when the branch
+ * has it set up. Points can be spent once; while collecting, the tile says so.
+ */
+const Rewards = ({ payment, disabled }: { payment: Payment; disabled: boolean }) => {
+  const { t } = useTranslation('language');
+  const { upoint, coupon } = payment.rewards;
+  if (!upoint && !coupon) return null;
+  const busy = !!payment.pendingMethod || disabled;
+  const logo = <Image source={UPOINT_LOGO} className="size-12" contentFit="contain" />;
+  const upointState = payment.upointSpent ? 'spent' : payment.collect ? 'collect' : 'none';
+
+  return (
+    <Appear duration={180} className="gap-3">
+      <Text className="text-lg font-bold">{t('mainPage.rewards')}</Text>
+      <View className="flex-row flex-wrap gap-3">
+        {!!upoint && (
+          <Tile
+            // Drawn anew when it changes: a fill or border changed in place can hide the label
+            key={`upoint-${upointState}`}
+            name={
+              upointState === 'spent'
+                ? t('mainPage.upointSpent')
+                : upointState === 'collect'
+                  ? t('mainPage.upointCollecting')
+                  : 'U-Point'
+            }
+            mark={logo}
+            selected={upointState !== 'none'}
+            disabled={busy || upointState === 'spent'}
+            onPress={() => payment.openReward('upoint')}
+          />
+        )}
+        {!!coupon && (
+          <Tile
+            name={t('mainPage.upointCoupon')}
+            mark={logo}
+            disabled={busy}
+            onPress={() => payment.openReward('coupon')}
+          />
+        )}
+      </View>
+    </Appear>
   );
 };
 
@@ -359,29 +390,45 @@ const MethodTile = ({
   onPress: () => void;
 }) => {
   const look = useMethodLook(method);
+  return <Tile {...look} loading={loading} disabled={disabled} onPress={onPress} />;
+};
+
+/** A payment method or reward: its mark on top and its name under it. */
+const Tile = ({
+  name,
+  mark,
+  markColor,
+  loading,
+  selected,
+  disabled,
+  onPress,
+}: MethodLook & { loading?: boolean; selected?: boolean; disabled: boolean; onPress: () => void }) => {
+  const accent = useThemeColor('accent');
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       android_ripple={RIPPLE}
       accessibilityRole="button"
-      accessibilityLabel={look.name}
-      accessibilityState={{ disabled }}
+      accessibilityLabel={name}
+      accessibilityState={{ disabled, selected }}
       // Mark on top and the name under it, so the logo can be big and the text still has the full width
       className={cn(
         'h-36 w-[31.8%] items-center justify-center gap-3 overflow-hidden rounded-3xl border border-border bg-surface px-3',
-        disabled && !loading && 'opacity-50',
+        disabled && !loading && !selected && 'opacity-50',
       )}
+      // A chosen tile's border through style, as a toggled colour class can go missing on the tablets
+      style={selected ? { borderColor: accent, borderWidth: 2 } : undefined}
     >
       <View
         className="size-17 items-center justify-center overflow-hidden rounded-[20px] bg-surface-secondary"
-        style={look.markColor ? { backgroundColor: look.markColor } : undefined}
+        style={markColor ? { backgroundColor: markColor } : undefined}
       >
-        {loading ? <Spinner /> : look.mark}
+        {loading ? <Spinner /> : mark}
       </View>
       {/* Full card width: Android cuts off a centred label sized to its own text */}
       <Text className="self-stretch text-center text-lg font-bold" numberOfLines={1}>
-        {look.name}
+        {name}
       </Text>
     </Pressable>
   );
@@ -415,7 +462,7 @@ const QrStep = ({ payment }: { payment: Payment }) => {
     <>
       <StepHeader title={look.name} onBack={payment.back} />
       <View className="flex-1 items-center justify-center gap-4.5">
-        <Text className="text-4xl font-bold tracking-tight">{formatMoney(payment.order?.grandTotal ?? 0)}</Text>
+        <Text className="text-4xl font-bold tracking-tight">{formatMoney(payment.amountDue)}</Text>
         {/* QR codes need a white background to scan, also in dark mode */}
         <View className="rounded-3xl border border-border bg-white p-4">
           {qr ? (
@@ -456,7 +503,7 @@ const CardStep = ({ payment }: { payment: Payment }) => {
     <>
       <StepHeader title={t('mainPage.card')} onBack={payment.back} />
       <View className="flex-1 items-center justify-center gap-4.5">
-        <Text className="text-4xl font-bold tracking-tight">{formatMoney(payment.order?.grandTotal ?? 0)}</Text>
+        <Text className="text-4xl font-bold tracking-tight">{formatMoney(payment.amountDue)}</Text>
         <View className="size-64 items-center justify-center rounded-[28px] bg-background">
           <CreditCard size={110} color={foreground} strokeWidth={1.2} />
         </View>

@@ -10,6 +10,7 @@ export const PAYMENT_TYPE = {
   Kart: 'Card',
   Upoint: 'Upoint',
   UPT: 'UPT', //Upoint
+  UPC: 'UPC', //Upoint coupon
   CTE: 'CTE',
   MNQ: 'MNQ',
   UNP: 'UNP',
@@ -20,6 +21,10 @@ export const PAYMENT_TYPE = {
   MCS: 'MCS', //Card Scanner
   MPY: 'MPY',
   MST: 'MST', //Most Money
+};
+
+export const LOYALTY_TYPE = {
+  Upoint: 'U',
 };
 
 export const TYPE = {

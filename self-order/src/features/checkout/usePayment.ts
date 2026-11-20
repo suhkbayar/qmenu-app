@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useSubscription } from '@apollo/client';
 import { useTranslation } from 'react-i18next';
 import { launchCardScanner } from '@/modules/card-scanner';
-import { PAYMENT_TYPE } from '@/src/constants';
+import { LOYALTY_TYPE, PAYMENT_TYPE } from '@/src/constants';
 import { useSessionStore } from '@/src/features/session/sessionStore';
+import { ADD_ORDER_LOYALTY } from '@/src/graphql/mutations/loyalty';
 import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/src/graphql/mutations/order';
 import { GET_ORDER } from '@/src/graphql/queries';
 import { ON_UPDATED_ORDER } from '@/src/graphql/subscriptions';
@@ -23,11 +24,21 @@ const PAID_CHECK_MS = 5_000;
  */
 export type PaymentMethod = 'MPY' | 'MCS' | 'Toki' | 'MST' | 'QPay';
 
-/** The checkout dialog's steps: choose receipt and method → scan a QR / tap a card → done. */
-export type CheckoutStep = 'pay' | 'qr' | 'card' | 'done';
+/**
+ * The checkout dialog's steps: choose receipt and method → scan a QR / tap a card → done. U-Point
+ * points and coupons are steps of their own, back to choosing a method once used.
+ */
+export type CheckoutStep = 'pay' | 'qr' | 'card' | 'upoint' | 'coupon' | 'done';
 
 /** The eBarimt receipt: personal ('1'), or for a registered taxpayer ('3') with its register number. */
 export type Receipt = { vatType: '1' | '3'; register?: string };
+
+/** What payOrder answers: the order as it is now, and the payment just made */
+export type PayResult = { order?: IOrder; transaction?: ITransaction };
+
+/** What's left to pay: the whole total, or what remains once part is paid (with U-Point, say). */
+export const amountDue = (order: IOrder) =>
+  Number(order.paidAmount) > 0 ? Number(order.debtAmount) : Number(order.grandTotal);
 
 /**
  * Paying one order inside the checkout dialog. `preview` is the order as the tablet already has it,
@@ -44,6 +55,9 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
   const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // The guest chose to collect U-Point points; they go on the order when it's paid, once
+  const [collect, setCollect] = useState(false);
+  const collectSaved = useRef(false);
 
   const warn = useCallback((label: string) => notify('warning', label), [notify]);
   const fail = useCallback((label: string) => notify('danger', label), [notify]);
@@ -141,6 +155,8 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
     },
   });
 
+  const [addOrderLoyalty] = useMutation(ADD_ORDER_LOYALTY);
+
   // Card payments: hand the amount to the card reader app, then report its result to the server
   useEffect(() => {
     if (step !== 'card' || !transaction?.id || !order) return;
@@ -155,8 +171,9 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
         },
       });
 
-    // Charge the amount the guest sees on screen (after discounts, taxes and charges)
-    launchCardScanner(order.grandTotal.toString())
+    // Charge what the server put on the payment: what's left to pay, after discounts, taxes, charges
+    // and any part already paid with U-Point
+    launchCardScanner(String(Number(transaction.amount) || amountDue(order)))
       .then((result) => {
         if (!cancelled) report(result.payment_status, result.response_body || {});
       })
@@ -189,6 +206,20 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
       .filter((m): m is { method: PaymentMethod; paymentId: string } => !!m.paymentId);
   }, [participant]);
 
+  /** U-Point points and U-Point coupons, each when the branch has it set up */
+  const rewards = useMemo(
+    () => ({
+      upoint: participant?.payments?.find((p) => p.type === PAYMENT_TYPE.UPT)?.id,
+      coupon: participant?.payments?.find((p) => p.type === PAYMENT_TYPE.UPC)?.id,
+    }),
+    [participant],
+  );
+
+  // Points can be spent once per order
+  const upointSpent = !!order?.transactions?.some(
+    (tx) => tx.type === PAYMENT_TYPE.UPT && tx.state === 'PAID',
+  );
+
   /** The eBarimt fields of every payOrder call; a branch without VAT sends 0 */
   const vatInput = (receipt: Receipt) => ({
     register: receipt.vatType === '3' ? receipt.register : undefined,
@@ -196,13 +227,47 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
   });
 
   /** A payment method was tapped: the payment starts right away. */
-  const select = (picked: PaymentMethod, paymentId: string, receipt: Receipt) => {
+  const select = async (picked: PaymentMethod, paymentId: string, receipt: Receipt) => {
     setMethod(picked);
     setPendingMethod(picked);
+    // U-Point points to collect go on the order before it's paid
+    if (collect && !collectSaved.current) {
+      try {
+        await addOrderLoyalty({ variables: { id: orderId, input: { type: LOYALTY_TYPE.Upoint } } });
+        collectSaved.current = true;
+      } catch (err) {
+        setPendingMethod(null);
+        return warn((err as Error).message);
+      }
+    }
     payOnline({ variables: { input: { order: orderId, ...vatInput(receipt), confirm: false, payment: paymentId } } });
   };
 
+  /** The payOrder input for paying with U-Point points or a coupon (the step adds the code) */
+  const rewardInput = (paymentId: string, receipt: Receipt) => ({
+    order: orderId,
+    ...vatInput(receipt),
+    confirm: false,
+    payment: paymentId,
+  });
+
+  /**
+   * Points or a coupon were used. Paid in full: validating issues the receipt and leads to done.
+   * Otherwise back to the methods, with what's left to pay.
+   */
+  const rewardPaid = (result?: PayResult) => {
+    // Spent instead of collected
+    if (result?.transaction?.type === PAYMENT_TYPE.UPT) setCollect(false);
+    if (result?.order?.paymentState === 'PAID' && result.transaction?.id) {
+      validateTransaction({ variables: { id: result.transaction.id } });
+      return;
+    }
+    setStep('pay');
+    refetch().catch(() => {});
+  };
+
   return {
+    orderId,
     order,
     loading: loading && !order,
     /** The server's latest copy is here: the amount to charge is the server's, so paying can start */
@@ -223,5 +288,20 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
     /** "Check payment": ask the server whether the payment went through */
     checkPaid: () => transaction?.id && validateTransaction({ variables: { id: transaction.id } }),
     checking,
+    /** What's left to pay */
+    amountDue: order ? amountDue(order) : 0,
+    rewards,
+    upointSpent,
+    /** The guest will collect U-Point points with this order */
+    collect,
+    /** Open the U-Point or the coupon step */
+    openReward: (reward: 'upoint' | 'coupon') => setStep(reward),
+    /** Collect U-Point points instead of spending them, and pick a method */
+    collectPoints: () => {
+      setCollect(true);
+      setStep('pay');
+    },
+    rewardInput,
+    rewardPaid,
   };
 };

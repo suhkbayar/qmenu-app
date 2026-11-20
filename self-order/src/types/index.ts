@@ -6,5 +6,6 @@ export * from './participant';
 export * from './payment';
 export * from './time-table';
 export * from './transaction';
+export * from './upoint';
 export * from './channel.config';
 export * from './config';
