@@ -1,8 +1,8 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ScrollView, View, useWindowDimensions } from 'react-native';
 import { useApolloClient } from '@apollo/client';
-import { Button, cn, useThemeColor } from 'heroui-native';
-import { Check, ChevronDown, ChevronUp, Clock, CreditCard, QrCode, ReceiptText } from 'lucide-react-native';
+import { Button, useThemeColor } from 'heroui-native';
+import { Check, ChevronDown, ChevronUp, CircleAlert, Clock, CreditCard, ReceiptText } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'react-native-qrcode-svg';
 import { useCSSVariable } from 'uniwind';
@@ -22,10 +22,12 @@ import { MotionDialog } from '@/src/ui/MotionDialog';
 import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
 import { useCheckout } from './checkoutStore';
+import { MethodTile, Tile, useMethodLook } from './MethodTile';
 import { ReceiptPicker, useReceipt } from './ReceiptPicker';
 import { StepHeader } from './StepHeader';
-import { UPOINT_LOGO, UpointCouponStep, UpointStep } from './UpointSteps';
-import { PaymentMethod, amountDue, usePayment } from './usePayment';
+import { UPOINT_LOGO, UpointSignIn } from './UpointSignIn';
+import { UpointSpend } from './UpointSpend';
+import { amountDue, usePayment } from './usePayment';
 
 // After paying, the menu comes back by itself for the next guest
 const BACK_TO_MENU_SECONDS = 30;
@@ -42,6 +44,7 @@ export const CheckoutDialog = () => {
   const window = useWindowDimensions();
   const orderId = useCheckout((s) => s.orderId);
   const preview = useCheckout((s) => s.preview);
+  const wide = useCheckout((s) => s.wide);
   // Scanning the QR with a phone means no touches here: no screensaver over a payment
   useHoldScreensaver(!!orderId);
   // The last order stays on the card while it fades out
@@ -56,14 +59,17 @@ export const CheckoutDialog = () => {
   };
 
   return (
-    // No closing by tapping outside: it's too easy to lose a payment that way. 820×700, smaller on a
-    // smaller screen.
+    // No closing by tapping outside: it's too easy to lose a payment that way. 820×700, or 1200×740 for
+    // the U-Point discounts beside the payment; smaller on a smaller screen.
     <MotionDialog
       isOpen={!!orderId}
       onOpenChange={(open) => !open && close()}
       closeOnBackdrop={false}
       className="overflow-hidden p-0"
-      style={{ width: Math.min(820, window.width - 48), height: Math.min(700, window.height - 40) }}
+      style={{
+        width: Math.min(wide ? 1200 : 820, window.width - 48),
+        height: Math.min(wide ? 740 : 700, window.height - 40),
+      }}
     >
       {/* A fresh checkout per order */}
       {shown.orderId && (
@@ -83,6 +89,11 @@ const Checkout = ({ orderId, preview, onClose }: { orderId: string; preview: IOr
   const loading = !failed && (payment.loading || !order);
   const phase = failed ? 'failed' : loading ? 'loading' : step;
 
+  // The discounts beside the payment need the wide dialog; every other step the usual one
+  useEffect(() => {
+    useCheckout.getState().setWide(phase === 'spend');
+  }, [phase]);
+
   // Each step fades in over the last (a shared value on a fresh view, never a layout animation)
   return (
     <Appear key={phase} duration={180} className="flex-1">
@@ -94,13 +105,15 @@ const Checkout = ({ orderId, preview, onClose }: { orderId: string; preview: IOr
         </View>
       ) : step === 'done' ? (
         <Done order={order} onClose={onClose} />
+      ) : step === 'spend' ? (
+        // Its own padding: the coupon code dialog covers the whole checkout
+        <UpointSpend payment={payment} receipt={receipt} onClose={onClose} />
       ) : (
         <View className="flex-1 gap-5.5 px-8 py-7">
           {step === 'pay' && <PayStep payment={payment} receipt={receipt} onClose={onClose} />}
           {step === 'qr' && <QrStep payment={payment} />}
           {step === 'card' && <CardStep payment={payment} />}
-          {step === 'upoint' && <UpointStep payment={payment} receipt={receipt.receipt} />}
-          {step === 'coupon' && <UpointCouponStep payment={payment} receipt={receipt.receipt} />}
+          {step === 'upoint' && <UpointSignIn payment={payment} />}
         </View>
       )}
     </Appear>
@@ -221,7 +234,7 @@ const AmountCard = ({ order }: { order: IOrder }) => {
           {rewardsPaid.map((tx) => (
             <SummaryRow
               key={tx.id}
-              label={tx.type === PAYMENT_TYPE.UPC ? t('mainPage.upointCoupon') : 'U-Point'}
+              label={tx.type === PAYMENT_TYPE.UPC ? t('mainPage.coupon') : 'U-Point'}
               amount={Number(tx.amount)}
               minus
             />
@@ -244,7 +257,11 @@ const SummaryRow = ({ label, amount, minus }: { label: string; amount: number; m
   </View>
 );
 
-/** Step 1: the eBarimt receipt and how to pay. Tapping a method starts the payment. */
+/**
+ * Step 1: what there is to pay, U-Point before anything else ("use it before paying"), the eBarimt
+ * receipt and how to pay. Tapping a method starts the payment. Signed in to U-Point by phone, the
+ * guest only collects points: the U-Point part goes, and what's left to pay shows by the methods.
+ */
 const PayStep = ({
   payment,
   receipt,
@@ -256,6 +273,7 @@ const PayStep = ({
 }) => {
   const { t } = useTranslation('language');
   const vatBranch = useSessionStore((s) => s.participant?.vat === true);
+  const collectOnly = payment.upoint?.via === 'phone';
 
   return (
     <>
@@ -263,9 +281,18 @@ const PayStep = ({
       {/* Scrolls if the details, a taxpayer's register and the methods don't fit */}
       <ScrollView className="flex-1" contentContainerClassName="gap-6" keyboardShouldPersistTaps="handled">
         {!!payment.order && <AmountCard order={payment.order} />}
+        {payment.upToDate && !collectOnly && <Rewards payment={payment} disabled={!receipt.ready} />}
         {vatBranch && <ReceiptPicker receipt={receipt} />}
         <View className="gap-3">
-          <Text className="text-lg font-bold">{t('mainPage.paymentMethod')}</Text>
+          <View className="flex-row items-center justify-between gap-3">
+            <Text className="text-lg font-bold">{t('mainPage.paymentMethod')}</Text>
+            {collectOnly && (
+              <View className="flex-row items-baseline gap-1.5">
+                <Text className="text-muted">{t('mainPage.toPayShort')}</Text>
+                <Text className="font-bold">{formatMoney(payment.amountDue)}</Text>
+              </View>
+            )}
+          </View>
           {payment.upToDate ? (
             // Fading in over the spinner they replace
             <Appear duration={180} className="flex-row flex-wrap gap-3">
@@ -275,7 +302,7 @@ const PayStep = ({
                   method={method}
                   loading={payment.pendingMethod === method}
                   disabled={!!payment.pendingMethod || !receipt.ready}
-                  onPress={() => payment.select(method, paymentId, receipt.receipt)}
+                  onPress={() => payment.pay(method, paymentId, receipt.receipt)}
                 />
               ))}
             </Appear>
@@ -285,152 +312,44 @@ const PayStep = ({
             </View>
           )}
         </View>
-        {payment.upToDate && <Rewards payment={payment} disabled={!receipt.ready} />}
       </ScrollView>
     </>
   );
 };
 
 /**
- * U-Point points (spend or collect) and U-Point coupons, under the methods, each only when the branch
- * has it set up. Points can be spent once; while collecting, the tile says so.
+ * U-Point, above the payment methods, with a reminder to use it before paying (coupons and points come
+ * off first). One tile: signing in, or back to the discounts once signed in. Points spent on the order
+ * already can't be spent again.
  */
 const Rewards = ({ payment, disabled }: { payment: Payment; disabled: boolean }) => {
   const { t } = useTranslation('language');
-  const { upoint, coupon } = payment.rewards;
-  if (!upoint && !coupon) return null;
-  const busy = !!payment.pendingMethod || disabled;
-  const logo = <Image source={UPOINT_LOGO} className="size-12" contentFit="contain" />;
-  const upointState = payment.upointSpent ? 'spent' : payment.collect ? 'collect' : 'none';
+  const foreground = useThemeColor('foreground');
+  if (!payment.rewards.upoint) return null;
+  const state = payment.upointSpent ? 'spent' : payment.upoint ? 'signed' : 'none';
 
   return (
     <Appear duration={180} className="gap-3">
-      <Text className="text-lg font-bold">{t('mainPage.rewards')}</Text>
-      <View className="flex-row flex-wrap gap-3">
-        {!!upoint && (
-          <Tile
-            // Drawn anew when it changes: a fill or border changed in place can hide the label
-            key={`upoint-${upointState}`}
-            name={
-              upointState === 'spent'
-                ? t('mainPage.upointSpent')
-                : upointState === 'collect'
-                  ? t('mainPage.upointCollecting')
-                  : 'U-Point'
-            }
-            mark={logo}
-            selected={upointState !== 'none'}
-            disabled={busy || upointState === 'spent'}
-            onPress={() => payment.openReward('upoint')}
-          />
-        )}
-        {!!coupon && (
-          <Tile
-            name={t('mainPage.upointCoupon')}
-            mark={logo}
-            disabled={busy}
-            onPress={() => payment.openReward('coupon')}
-          />
-        )}
+      <View className="flex-row items-center justify-between gap-3">
+        <Text className="text-lg font-bold">{t('mainPage.rewards')}</Text>
+        <View className="flex-row items-center gap-2 rounded-full bg-pending-soft px-3.5 py-1.5">
+          <CircleAlert size={16} color={foreground} />
+          <Text className="text-sm font-semibold">{t('mainPage.rewardsHint')}</Text>
+        </View>
+      </View>
+      <View className="flex-row">
+        <Tile
+          // Drawn anew when it changes: a fill or border changed in place can hide the label
+          key={`upoint-${state}`}
+          name={state === 'spent' ? t('mainPage.upointSpent') : state === 'signed' ? 'U-Point ✓' : 'U-Point'}
+          mark={<Image source={UPOINT_LOGO} className="size-12" contentFit="contain" />}
+          // Outlined in yellow to catch the eye, as long as it can be used
+          selected={state !== 'spent'}
+          disabled={disabled || !!payment.pendingMethod || state === 'spent'}
+          onPress={payment.openUpoint}
+        />
       </View>
     </Appear>
-  );
-};
-
-// М Банк's brand green, behind its wordmark
-const MBANK_GREEN = '#21CDA8';
-// Android's own touch ripple: the tiles are plain views, so the dialog has less to set up as it opens
-const RIPPLE = { color: 'rgba(0,0,0,0.08)', foreground: true };
-
-type MethodLook = {
-  name: string;
-  mark: ReactNode;
-  /** The mark's background when it's a brand colour; otherwise the neutral surface */
-  markColor?: string;
-};
-
-/** How each payment method is shown: its name and its mark (brand logo or an icon). */
-const useMethodLook = (method: PaymentMethod): MethodLook => {
-  const { t } = useTranslation('language');
-  const foreground = useThemeColor('foreground');
-  const icon = (Icon: typeof QrCode) => <Icon size={36} color={foreground} />;
-  switch (method) {
-    case 'MPY':
-      return {
-        name: 'М банк',
-        // The "M pay" wordmark in white with a see-through box, so the green shows inside it. (Tinting
-        // the black original turned its white box solid and hid the M.)
-        mark: <Image source={require('@/assets/icon/mpay-white.png')} className="h-7 w-15" contentFit="contain" />,
-        markColor: MBANK_GREEN,
-      };
-    case 'Toki':
-      return {
-        name: 'Toki',
-        // Already a yellow square: it fills the whole mark
-        mark: <Image source={require('@/assets/icon/new_toki.png')} className="size-full" contentFit="cover" />,
-      };
-    case 'MST':
-      return { name: 'QR Pay', mark: icon(QrCode) };
-    case 'QPay':
-      return { name: 'QPay', mark: icon(QrCode) };
-    case 'MCS':
-      return { name: t('mainPage.card'), mark: icon(CreditCard) };
-  }
-};
-
-const MethodTile = ({
-  method,
-  loading,
-  disabled,
-  onPress,
-}: {
-  method: PaymentMethod;
-  loading: boolean;
-  disabled: boolean;
-  onPress: () => void;
-}) => {
-  const look = useMethodLook(method);
-  return <Tile {...look} loading={loading} disabled={disabled} onPress={onPress} />;
-};
-
-/** A payment method or reward: its mark on top and its name under it. */
-const Tile = ({
-  name,
-  mark,
-  markColor,
-  loading,
-  selected,
-  disabled,
-  onPress,
-}: MethodLook & { loading?: boolean; selected?: boolean; disabled: boolean; onPress: () => void }) => {
-  const accent = useThemeColor('accent');
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      android_ripple={RIPPLE}
-      accessibilityRole="button"
-      accessibilityLabel={name}
-      accessibilityState={{ disabled, selected }}
-      // Mark on top and the name under it, so the logo can be big and the text still has the full width
-      className={cn(
-        'h-36 w-[31.8%] items-center justify-center gap-3 overflow-hidden rounded-3xl border border-border bg-surface px-3',
-        disabled && !loading && !selected && 'opacity-50',
-      )}
-      // A chosen tile's border through style, as a toggled colour class can go missing on the tablets
-      style={selected ? { borderColor: accent, borderWidth: 2 } : undefined}
-    >
-      <View
-        className="size-17 items-center justify-center overflow-hidden rounded-[20px] bg-surface-secondary"
-        style={markColor ? { backgroundColor: markColor } : undefined}
-      >
-        {loading ? <Spinner /> : mark}
-      </View>
-      {/* Full card width: Android cuts off a centred label sized to its own text */}
-      <Text className="self-stretch text-center text-lg font-bold" numberOfLines={1}>
-        {name}
-      </Text>
-    </Pressable>
   );
 };
 
@@ -462,7 +381,10 @@ const QrStep = ({ payment }: { payment: Payment }) => {
     <>
       <StepHeader title={look.name} onBack={payment.back} />
       <View className="flex-1 items-center justify-center gap-4.5">
-        <Text className="text-4xl font-bold tracking-tight">{formatMoney(payment.amountDue)}</Text>
+        {/* The payment's own amount: what's left after any U-Point discounts */}
+        <Text className="text-4xl font-bold tracking-tight">
+          {formatMoney(Number(payment.transaction?.amount) || payment.amountDue)}
+        </Text>
         {/* QR codes need a white background to scan, also in dark mode */}
         <View className="rounded-3xl border border-border bg-white p-4">
           {qr ? (
@@ -503,7 +425,9 @@ const CardStep = ({ payment }: { payment: Payment }) => {
     <>
       <StepHeader title={t('mainPage.card')} onBack={payment.back} />
       <View className="flex-1 items-center justify-center gap-4.5">
-        <Text className="text-4xl font-bold tracking-tight">{formatMoney(payment.amountDue)}</Text>
+        <Text className="text-4xl font-bold tracking-tight">
+          {formatMoney(Number(payment.transaction?.amount) || payment.amountDue)}
+        </Text>
         <View className="size-64 items-center justify-center rounded-[28px] bg-background">
           <CreditCard size={110} color={foreground} strokeWidth={1.2} />
         </View>

@@ -19,6 +19,18 @@ export const GET_UPOINT_QR = gql`
   }
 `;
 
+/** A coupon code checked for this order without using it: its amount, product and expiry. */
+export const CHECK_UPOINT_COUPON = gql`
+  query checkUpointCoupon($input: UpointCouponInput!) {
+    checkUpointCoupon(input: $input) {
+      code
+      amount
+      name
+      expireDate
+    }
+  }
+`;
+
 export const CHECK_UPOINT_QR = gql`
   query checkUpointQr($input: UpointQrCheckInput!) {
     checkUpointQr(input: $input) {

@@ -6,3 +6,12 @@ export interface IUpointBalance {
   code: string;
   balance: number;
 }
+
+/** A U-Point coupon checked against the order (not used yet): what it takes off, and until when. */
+export interface IUpointCoupon {
+  code: string;
+  amount: number;
+  /** The product it's for, when it's for one product; none for an amount voucher */
+  name?: string | null;
+  expireDate?: string | null;
+}

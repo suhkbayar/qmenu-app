@@ -8,7 +8,7 @@ import { ADD_ORDER_LOYALTY } from '@/src/graphql/mutations/loyalty';
 import { GET_PAY_ORDER, VALIDATE_TRANSACTION } from '@/src/graphql/mutations/order';
 import { GET_ORDER } from '@/src/graphql/queries';
 import { ON_UPDATED_ORDER } from '@/src/graphql/subscriptions';
-import { IOrder, ITransaction } from '@/src/types';
+import { IOrder, ITransaction, IUpointBalance, IUpointCoupon } from '@/src/types';
 import { useNotify } from '@/src/ui/useNotify';
 
 // The order still not here after this long counts as failed; until then the dialog shows loading
@@ -17,6 +17,8 @@ const LOAD_GIVE_UP_MS = 45_000;
 const LOAD_RETRY_MS = 5_000;
 // While the bank QR is up, the order is also checked this often, in case the "paid" message is missed
 const PAID_CHECK_MS = 5_000;
+// Points pay for at most half of what's left after the coupons (U-Point's rule; the server's too)
+const SPEND_RATE = 0.5;
 
 /**
  * Ways to pay, each shown only when the branch has it set up. Paying at the cashier needs nothing
@@ -25,10 +27,17 @@ const PAID_CHECK_MS = 5_000;
 export type PaymentMethod = 'MPY' | 'MCS' | 'Toki' | 'MST' | 'QPay';
 
 /**
- * The checkout dialog's steps: choose receipt and method → scan a QR / tap a card → done. U-Point
- * points and coupons are steps of their own, back to choosing a method once used.
+ * The checkout dialog's steps: choose receipt and method → scan a QR / tap a card → done. Before
+ * paying, the guest can sign in to U-Point; by QR or card that leads to the discounts beside the
+ * payment ('spend'), by phone straight back to paying (points are only collected).
  */
-export type CheckoutStep = 'pay' | 'qr' | 'card' | 'upoint' | 'coupon' | 'done';
+export type CheckoutStep = 'pay' | 'upoint' | 'spend' | 'qr' | 'card' | 'done';
+
+/** How the guest signed in to U-Point. By phone, points can only be collected (U-Point's rule). */
+export type UpointVia = 'qr' | 'card' | 'phone';
+
+/** One payment either spends the guest's points or collects new ones, never both */
+export type UpointMode = 'collect' | 'spend';
 
 /** The eBarimt receipt: personal ('1'), or for a registered taxpayer ('3') with its register number. */
 export type Receipt = { vatType: '1' | '3'; register?: string };
@@ -39,6 +48,12 @@ export type PayResult = { order?: IOrder; transaction?: ITransaction };
 /** What's left to pay: the whole total, or what remains once part is paid (with U-Point, say). */
 export const amountDue = (order: IOrder) =>
   Number(order.paidAmount) > 0 ? Number(order.debtAmount) : Number(order.grandTotal);
+
+/** What the order's paid transactions of one type add up to */
+const paidOf = (order: IOrder | undefined, type: string) =>
+  (order?.transactions ?? [])
+    .filter((tx) => tx.type === type && tx.state === 'PAID')
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
 /**
  * Paying one order inside the checkout dialog. `preview` is the order as the tablet already has it,
@@ -53,10 +68,19 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [transaction, setTransaction] = useState<ITransaction>();
   const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null>(null);
+  // Paying is under way: coupons and points being applied, or the method's payment being started
+  const [paying, setPaying] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  // The guest chose to collect U-Point points; they go on the order when it's paid, once
-  const [collect, setCollect] = useState(false);
+
+  // The guest's U-Point account, once signed in, and what they chose to do with it. Nothing is
+  // applied until they pay: a coupon used is used for good.
+  const [upoint, setUpoint] = useState<{ account: IUpointBalance; via: UpointVia } | null>(null);
+  const [mode, setMode] = useState<UpointMode>('collect');
+  const [coupons, setCoupons] = useState<IUpointCoupon[]>([]);
+  const [selectedCoupons, setSelectedCoupons] = useState<string[]>([]);
+  // Coupons already used on this order (paid), so a retry after a failure doesn't use them again
+  const [appliedCoupons, setAppliedCoupons] = useState<string[]>([]);
   const collectSaved = useRef(false);
 
   const warn = useCallback((label: string) => notify('warning', label), [notify]);
@@ -144,6 +168,7 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
   const [payOnline] = useMutation(GET_PAY_ORDER, {
     onCompleted(result) {
       setPendingMethod(null);
+      setPaying(false);
       if (!result?.payOrder) return;
       const tx: ITransaction = result.payOrder.transaction;
       setTransaction(tx);
@@ -151,10 +176,13 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
     },
     onError(err) {
       setPendingMethod(null);
+      setPaying(false);
       warn(err.message);
     },
   });
 
+  // Coupons and points, each awaited in turn before the method's payment
+  const [payReward] = useMutation(GET_PAY_ORDER);
   const [addOrderLoyalty] = useMutation(ADD_ORDER_LOYALTY);
 
   // Card payments: hand the amount to the card reader app, then report its result to the server
@@ -216,9 +244,40 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
   );
 
   // Points can be spent once per order
-  const upointSpent = !!order?.transactions?.some(
-    (tx) => tx.type === PAYMENT_TYPE.UPT && tx.state === 'PAID',
-  );
+  const upointSpent = paidOf(order, PAYMENT_TYPE.UPT) > 0;
+
+  /**
+   * The amounts shown while the guest chooses: coupons first, then points on half of what's left
+   * (all of them if that's less). Coupons and points already paid on the order count too.
+   */
+  const discounts = useMemo(() => {
+    const total = Number(order?.grandTotal ?? 0);
+    const due = order ? amountDue(order) : 0;
+    const couponsPaid = paidOf(order, PAYMENT_TYPE.UPC);
+    const pointsPaid = paidOf(order, PAYMENT_TYPE.UPT);
+    const couponsNew = Math.min(
+      due,
+      coupons
+        .filter((coupon) => selectedCoupons.includes(coupon.code) && !appliedCoupons.includes(coupon.code))
+        .reduce((sum, coupon) => sum + Number(coupon.amount), 0),
+    );
+    const spending = !!upoint && upoint.via !== 'phone' && mode === 'spend' && pointsPaid === 0;
+    const pointsNew = spending
+      ? Math.max(
+          0,
+          Math.floor(
+            Math.min(Number(upoint.account.balance), (total - couponsPaid - couponsNew) * SPEND_RATE, due - couponsNew),
+          ),
+        )
+      : 0;
+    return {
+      total,
+      coupons: couponsPaid + couponsNew,
+      points: pointsPaid + pointsNew,
+      pointsNew,
+      toPay: Math.max(0, due - couponsNew - pointsNew),
+    };
+  }, [order, coupons, selectedCoupons, appliedCoupons, upoint, mode]);
 
   /** The eBarimt fields of every payOrder call; a branch without VAT sends 0 */
   const vatInput = (receipt: Receipt) => ({
@@ -226,25 +285,8 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
     vatType: participant?.vat ? receipt.vatType : 0,
   });
 
-  /** A payment method was tapped: the payment starts right away. */
-  const select = async (picked: PaymentMethod, paymentId: string, receipt: Receipt) => {
-    setMethod(picked);
-    setPendingMethod(picked);
-    // U-Point points to collect go on the order before it's paid
-    if (collect && !collectSaved.current) {
-      try {
-        await addOrderLoyalty({ variables: { id: orderId, input: { type: LOYALTY_TYPE.Upoint } } });
-        collectSaved.current = true;
-      } catch (err) {
-        setPendingMethod(null);
-        return warn((err as Error).message);
-      }
-    }
-    payOnline({ variables: { input: { order: orderId, ...vatInput(receipt), confirm: false, payment: paymentId } } });
-  };
-
-  /** The payOrder input for paying with U-Point points or a coupon (the step adds the code) */
-  const rewardInput = (paymentId: string, receipt: Receipt) => ({
+  /** The payOrder input for one payment (the method's, a coupon's or the points') */
+  const payInput = (paymentId: string, receipt: Receipt) => ({
     order: orderId,
     ...vatInput(receipt),
     confirm: false,
@@ -252,18 +294,90 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
   });
 
   /**
-   * Points or a coupon were used. Paid in full: validating issues the receipt and leads to done.
-   * Otherwise back to the methods, with what's left to pay.
+   * U-Point's part of paying, in its order: points to collect put on the order (first, while it's still
+   * open), the chosen coupons, then the points spent. Answers the last payment made, to tell whether
+   * that paid it all.
    */
-  const rewardPaid = (result?: PayResult) => {
-    // Spent instead of collected
-    if (result?.transaction?.type === PAYMENT_TYPE.UPT) setCollect(false);
-    if (result?.order?.paymentState === 'PAID' && result.transaction?.id) {
-      validateTransaction({ variables: { id: result.transaction.id } });
+  const applyUpoint = async (receipt: Receipt): Promise<PayResult | null> => {
+    if (!upoint) return null;
+    let last: PayResult | null = null;
+    const spending = upoint.via !== 'phone' && mode === 'spend';
+
+    if (!spending && !collectSaved.current) {
+      await addOrderLoyalty({ variables: { id: orderId, input: { type: LOYALTY_TYPE.Upoint } } });
+      collectSaved.current = true;
+    }
+
+    const pending = coupons.filter(
+      (coupon) => selectedCoupons.includes(coupon.code) && !appliedCoupons.includes(coupon.code),
+    );
+    for (const coupon of pending) {
+      if (!rewards.coupon) break;
+      const { data: result } = await payReward({
+        variables: {
+          input: { ...payInput(rewards.coupon, receipt), code: coupon.code, phone: upoint.account.phone },
+        },
+      });
+      setAppliedCoupons((codes) => [...codes, coupon.code]);
+      last = result?.payOrder ?? last;
+    }
+
+    // The server works out the points the same way, from what's left after the coupons
+    if (spending && discounts.pointsNew > 0 && !upointSpent && rewards.upoint) {
+      const { data: result } = await payReward({
+        variables: { input: { ...payInput(rewards.upoint, receipt), code: upoint.account.code } },
+      });
+      last = result?.payOrder ?? last;
+    }
+    return last;
+  };
+
+  /**
+   * Paying: U-Point first (if signed in), then the method for what's left. No method is needed when
+   * the coupons and points cover it all.
+   */
+  const pay = async (picked: PaymentMethod | null, paymentId: string | null, receipt: Receipt) => {
+    setMethod(picked);
+    setPendingMethod(picked);
+    setPaying(true);
+
+    let last: PayResult | null = null;
+    try {
+      last = await applyUpoint(receipt);
+    } catch (err) {
+      setPendingMethod(null);
+      setPaying(false);
+      // Part may have gone through (a coupon): the server's copy shows what's left
+      refetch().catch(() => {});
+      return warn((err as Error).message);
+    }
+
+    // Paid in full by U-Point: validating issues the receipt and leads to done
+    if (last?.order?.paymentState === 'PAID' && last.transaction?.id) {
+      setPendingMethod(null);
+      setPaying(false);
+      validateTransaction({ variables: { id: last.transaction.id } });
       return;
     }
-    setStep('pay');
-    refetch().catch(() => {});
+    // The QR and card steps show what's left after the discounts
+    if (last) refetch().catch(() => {});
+
+    if (!paymentId) {
+      setPendingMethod(null);
+      setPaying(false);
+      return warn(t('mainPage.choosePaymentMethod'));
+    }
+    payOnline({ variables: { input: payInput(paymentId, receipt) } });
+  };
+
+  /** Signed in to U-Point: by phone back to paying (collecting), by QR or card on to the discounts. */
+  const signedIn = (account: IUpointBalance, via: UpointVia) => {
+    setUpoint({ account, via });
+    setMode('collect');
+    // Coupons were checked for the previous account, if any
+    setCoupons((list) => list.filter((coupon) => appliedCoupons.includes(coupon.code)));
+    setSelectedCoupons((codes) => codes.filter((code) => appliedCoupons.includes(code)));
+    setStep(via === 'phone' ? 'pay' : 'spend');
   };
 
   return {
@@ -282,8 +396,9 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
     method,
     back: () => setStep('pay'),
     methods,
-    select,
+    pay,
     pendingMethod,
+    paying,
     transaction,
     /** "Check payment": ask the server whether the payment went through */
     checkPaid: () => transaction?.id && validateTransaction({ variables: { id: transaction.id } }),
@@ -292,16 +407,26 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
     amountDue: order ? amountDue(order) : 0,
     rewards,
     upointSpent,
-    /** The guest will collect U-Point points with this order */
-    collect,
-    /** Open the U-Point or the coupon step */
-    openReward: (reward: 'upoint' | 'coupon') => setStep(reward),
-    /** Collect U-Point points instead of spending them, and pick a method */
-    collectPoints: () => {
-      setCollect(true);
-      setStep('pay');
+    /** The guest's U-Point account and how they signed in, once they have */
+    upoint,
+    signedIn,
+    /** The U-Point tile: sign in, or back to the discounts when already signed in by QR or card */
+    openUpoint: () => setStep(upoint && upoint.via !== 'phone' ? 'spend' : 'upoint'),
+    mode,
+    setMode,
+    coupons,
+    selectedCoupons,
+    appliedCoupons,
+    /** A coupon checked by its code: added to the list and chosen */
+    addCoupon: (coupon: IUpointCoupon) => {
+      setCoupons((list) => [...list.filter((c) => c.code !== coupon.code), coupon]);
+      setSelectedCoupons((codes) => (codes.includes(coupon.code) ? codes : [...codes, coupon.code]));
     },
-    rewardInput,
-    rewardPaid,
+    /** Use a coupon, or not; one already used on the order stays */
+    toggleCoupon: (code: string) => {
+      if (appliedCoupons.includes(code)) return;
+      setSelectedCoupons((codes) => (codes.includes(code) ? codes.filter((c) => c !== code) : [...codes, code]));
+    },
+    discounts,
   };
 };
