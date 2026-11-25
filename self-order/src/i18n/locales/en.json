@@ -184,7 +184,12 @@
     "payNow": "Pay",
     "payWithAmount": "Pay · {{amount}}",
     "toPayShort": "To pay:",
-    "choosePaymentMethod": "Choose a payment method"
+    "choosePaymentMethod": "Choose a payment method",
+    "payAtCashier": "Pay at the cashier",
+    "orderSentPayAtCashier": "Order sent. Please pay at the cashier",
+    "fromWaiter": "Cashier",
+    "fromKiosk": "Kiosk",
+    "fromPhone": "From a phone"
   },
   "setup": {
     "tableCode": "Table code",
@@ -207,6 +212,8 @@
     "allowCamera": "Allow camera",
     "planExpiredTitle": "Service plan is not active",
     "planExpiredBody": "This tablet has no active service plan. Please contact staff to continue.",
+    "branchClosedTitle": "Closed for now",
+    "branchClosedBody": "We're not taking orders right now. The menu will come back by itself when we open.",
     "checkAgain": "Check again",
     "errorTitle": "Something went wrong",
     "restartApp": "Restart",

@@ -95,6 +95,10 @@ export const qmenuConfigs = [
     name: 'bannerSound',
     value: 'BANNER_SOUND',
   },
+  {
+    name: 'cashierPayment',
+    value: 'CASHIER_PAYMENT',
+  },
 ];
 
 export const CURRENCY = '₮';

@@ -16,6 +16,7 @@ import { ORDER_STATE_LABEL, PAYMENT_STATE_LABEL } from '@/src/features/orders/or
 import { LogoLoader } from '@/src/ui/LogoLoader';
 import { ScreenHeader } from '@/src/ui/ScreenHeader';
 import { Text } from '@/src/ui/Text';
+import { ItemSource } from './ItemSource';
 import { NEUTRAL_TONE, ORDER_STATE_TONE, PAYMENT_STATE_TONE } from './orderStatus';
 import { lineTotal } from '@/src/features/cart/totals';
 
@@ -174,6 +175,7 @@ const OrderCard = ({ order, ownTableId }: { order: IOrder; ownTableId: string | 
                   {item.options.map((o) => o.value || o.name).join(', ')}
                 </Text>
               )}
+              <ItemSource channel={item.channel} />
             </View>
             {!received && <Text className="font-semibold">{formatMoney(item.total ?? lineTotal(item))}</Text>}
           </View>

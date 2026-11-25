@@ -82,6 +82,7 @@ export const ORDER_ITEM_FIELDS = gql`
     name
     price
     type
+    channel
     discount
     createdAt
     updatedAt

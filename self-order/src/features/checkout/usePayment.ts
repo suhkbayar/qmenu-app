@@ -21,10 +21,23 @@ const PAID_CHECK_MS = 5_000;
 const SPEND_RATE = 0.5;
 
 /**
- * Ways to pay, each shown only when the branch has it set up. Paying at the cashier needs nothing
- * here: an order sent to be paid later is already in the kitchen, and the guest asks for the bill.
+ * Ways to pay, each shown only when the branch has it set up. 'Cashier' is no payment: on a branch
+ * that takes payment first but lets the guest pay at the cashier (CASHIER_PAYMENT), it sends the order
+ * to the kitchen unpaid. Anywhere else an order to be paid later is already in the kitchen.
  */
-export type PaymentMethod = 'MPY' | 'MCS' | 'Toki' | 'MST' | 'QPay';
+export type PaymentMethod = 'MPY' | 'MCS' | 'Toki' | 'MST' | 'QPay' | 'Cashier';
+
+/** The ways to pay here and their payment types, shown in this order: М Банк, Toki, QR Pay (Most), QPay, card */
+const ONLINE_METHODS: [PaymentMethod, string[]][] = [
+  ['MPY', [PAYMENT_TYPE.MPY]],
+  ['Toki', [PAYMENT_TYPE.Toki]],
+  ['MST', [PAYMENT_TYPE.MST]],
+  ['QPay', [PAYMENT_TYPE.QPay, PAYMENT_TYPE.QPay2]],
+  ['MCS', [PAYMENT_TYPE.MCS]],
+];
+
+/** A branch with one of these can be paid on the tablet (U-Point and coupons alone can't pay a bill) */
+export const ONLINE_PAYMENT_TYPES = ONLINE_METHODS.flatMap(([, types]) => types);
 
 /**
  * The checkout dialog's steps: choose receipt and method → scan a QR / tap a card → done. Before
@@ -57,12 +70,16 @@ const paidOf = (order: IOrder | undefined, type: string) =>
 
 /**
  * Paying one order inside the checkout dialog. `preview` is the order as the tablet already has it,
- * shown until the server's copy arrives; paying waits for that copy.
+ * shown until the server's copy arrives; paying waits for that copy. `onSent` closes the checkout once
+ * the order went to the kitchen to be paid at the cashier.
  */
-export const usePayment = (orderId: string, preview?: IOrder | null) => {
+export const usePayment = (orderId: string, preview?: IOrder | null, onSent?: () => void) => {
   const { t } = useTranslation('language');
   const notify = useNotify();
   const participant = useSessionStore((s) => s.participant);
+  const cashierAllowed = useSessionStore(
+    (s) => s.participant?.advancePayment === true && s.config?.cashierPayment === true,
+  );
 
   const [step, setStep] = useState<CheckoutStep>('pay');
   const [method, setMethod] = useState<PaymentMethod | null>(null);
@@ -181,6 +198,22 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
     },
   });
 
+  // Pay at the cashier: the order goes to the kitchen unpaid, the same as on a branch that pays later
+  const [sendToCashier] = useMutation(GET_PAY_ORDER, {
+    onCompleted(result) {
+      setPendingMethod(null);
+      setPaying(false);
+      if (!result?.payOrder) return;
+      notify('success', t('mainPage.orderSentPayAtCashier'));
+      onSent?.();
+    },
+    onError(err) {
+      setPendingMethod(null);
+      setPaying(false);
+      warn(err.message);
+    },
+  });
+
   // Coupons and points, each awaited in turn before the method's payment
   const [payReward] = useMutation(GET_PAY_ORDER);
   const [addOrderLoyalty] = useMutation(ADD_ORDER_LOYALTY);
@@ -221,18 +254,13 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
   const methods = useMemo(() => {
     // A branch with no payments set up has none in its list, or no list at all
     const find = (...types: string[]) => participant?.payments?.find((p) => types.includes(p.type));
-    // Shown in this order: М Банк, Toki, QR Pay (Most), QPay, then card
-    const online: [PaymentMethod, string[]][] = [
-      ['MPY', [PAYMENT_TYPE.MPY]],
-      ['Toki', [PAYMENT_TYPE.Toki]],
-      ['MST', [PAYMENT_TYPE.MST]],
-      ['QPay', [PAYMENT_TYPE.QPay, PAYMENT_TYPE.QPay2]],
-      ['MCS', [PAYMENT_TYPE.MCS]],
-    ];
-    return online
+    const available = ONLINE_METHODS
       .map(([method, types]) => ({ method, paymentId: find(...types)?.id }))
       .filter((m): m is { method: PaymentMethod; paymentId: string } => !!m.paymentId);
-  }, [participant]);
+    // Last, and only while the order isn't in the kitchen yet: sending it twice would print it twice
+    if (cashierAllowed && order?.state === 'DRAFT') available.push({ method: 'Cashier', paymentId: '' });
+    return available;
+  }, [participant, cashierAllowed, order?.state]);
 
   /** U-Point points and U-Point coupons, each when the branch has it set up */
   const rewards = useMemo(
@@ -362,6 +390,12 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
     // The QR and card steps show what's left after the discounts
     if (last) refetch().catch(() => {});
 
+    // What's left is paid at the cashier: the order goes to the kitchen now
+    if (picked === 'Cashier') {
+      sendToCashier({ variables: { input: { order: orderId, ...vatInput(receipt), confirm: true, payment: '' } } });
+      return;
+    }
+
     if (!paymentId) {
       setPendingMethod(null);
       setPaying(false);
@@ -400,6 +434,13 @@ export const usePayment = (orderId: string, preview?: IOrder | null) => {
     pendingMethod,
     paying,
     transaction,
+    /** Money moved on the order: a payment started, coupons or points used, or it's paid */
+    settled:
+      !!transaction ||
+      appliedCoupons.length > 0 ||
+      paidOf(order, PAYMENT_TYPE.UPT) > 0 ||
+      paidOf(order, PAYMENT_TYPE.UPC) > 0 ||
+      order?.paymentState === 'PAID',
     /** "Check payment": ask the server whether the payment went through */
     checkPaid: () => transaction?.id && validateTransaction({ variables: { id: transaction.id } }),
     checking,

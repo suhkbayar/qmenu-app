@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import QRCode from 'react-native-qrcode-svg';
 import { useCSSVariable } from 'uniwind';
 import { PAYMENT_TYPE } from '@/src/constants';
+import { useCartStore } from '@/src/features/cart/cartStore';
 import { lineTotal } from '@/src/features/cart/totals';
 import { useHoldScreensaver } from '@/src/features/kiosk/screensaverHold';
 import { QuizBanner } from '@/src/features/quiz/QuizBanner';
@@ -53,6 +54,9 @@ export const CheckoutDialog = () => {
   const shown = last.current;
 
   const close = () => {
+    const { cart, settled } = useCheckout.getState();
+    // Left before paying anything: the order isn't going ahead, so its items go back in the cart
+    if (cart && !settled) useCartStore.getState().restore(cart);
     useCheckout.getState().close();
     // The order bar and sheet show the new state
     apollo.refetchQueries({ include: [GET_TABLET_ORDERS] }).catch(() => {});
@@ -80,9 +84,18 @@ export const CheckoutDialog = () => {
 };
 
 const Checkout = ({ orderId, preview, onClose }: { orderId: string; preview: IOrder | null; onClose: () => void }) => {
-  const payment = usePayment(orderId, preview);
+  // Sent to be paid at the cashier: the checkout closes, the order panel shows it unpaid
+  const payment = usePayment(orderId, preview, () => {
+    useCheckout.getState().setSettled();
+    onClose();
+  });
   const receipt = useReceipt();
   const { order, step } = payment;
+
+  // Money moved on the order, or it's paid: closing no longer puts its items back in the cart
+  useEffect(() => {
+    if (payment.settled || step === 'done') useCheckout.getState().setSettled();
+  }, [payment.settled, step]);
 
   // Paying needs the server's copy; once paid, the done page stays up even if a reload fails
   const failed = payment.failed && (step !== 'done' || !order);

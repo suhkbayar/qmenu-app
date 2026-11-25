@@ -125,6 +125,8 @@ export interface IOrderItem {
   productId?: string;
   // variant: IVariant;
   variantName?: string;
+  /** Where it was ordered: TB a tablet, P the waiter (POS), K a kiosk, others a guest's phone (QR menu, app) */
+  channel?: string;
   options: any[];
   createdAt?: Date;
   updatedAt?: Date;

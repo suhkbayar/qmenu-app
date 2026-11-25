@@ -3,6 +3,7 @@ import { Button, PressableFeedback, cn, useThemeColor } from 'heroui-native';
 import { ChevronRight, ReceiptText } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useCheckout } from '@/src/features/checkout/checkoutStore';
+import { ONLINE_PAYMENT_TYPES } from '@/src/features/checkout/usePayment';
 import { ORDER_STATE_LABEL, ORDER_STATE_TONE } from '@/src/features/orders/orderStatus';
 import { useTableOrders } from '@/src/features/orders/useTableOrders';
 import { useSessionStore } from '@/src/features/session/sessionStore';
@@ -28,7 +29,10 @@ export const OrderBar = ({ hidden }: { hidden: boolean }) => {
   const cart = useCartTotals();
   // Always on screen, so it's the one that loads the table's orders for the sheet and the rest
   const { activeItems, due, toPay, comingState } = useTableOrders({ fresh: true });
-  const canPayHere = useSessionStore((s) => (s.participant?.payments?.length ?? 0) > 0);
+  // A real way to pay here: with only U-Point or coupons the checkout would have nothing to pay with
+  const canPayHere = useSessionStore(
+    (s) => s.participant?.payments?.some((p) => ONLINE_PAYMENT_TYPES.includes(p.type)) ?? false,
+  );
   const show = useOrderSheet((s) => s.show);
   const openCheckout = useCheckout((s) => s.open);
 

@@ -13,7 +13,7 @@ import { LoadingScreen } from '@/src/ui/LoadingScreen';
 /** The menu, behind the screensaver. Android's back opens the table-code screen. */
 export default function MenuRoute() {
   const { pid } = useLocalSearchParams<{ pid?: string }>();
-  const { participant, planExpired, retry, screensaverBanners } = useTableSession(pid);
+  const { participant, blocked, retry, screensaverBanners } = useTableSession(pid);
   const bannerSound = useSessionStore((s) => s.config?.bannerSound === true);
   // Only over the menu itself: not while the order history is open on top of it
   useHoldScreensaver(!useIsFocused());
@@ -28,7 +28,7 @@ export default function MenuRoute() {
     }, []),
   );
 
-  if (planExpired) return <PlanExpired onRetry={() => retry()} />;
+  if (blocked) return <PlanExpired reason={blocked} onRetry={() => retry()} />;
   if (!participant) return <LoadingScreen />;
 
   return (

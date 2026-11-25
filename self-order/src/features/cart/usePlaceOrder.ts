@@ -10,7 +10,7 @@ import { GET_TABLET_ORDERS } from '@/src/graphql/queries';
 import { findClosedItems } from '@/src/lib/menu';
 import { IOrder } from '@/src/types';
 import { useNotify } from '@/src/ui/useNotify';
-import { useCartStore } from './cartStore';
+import { takeCart, useCartStore } from './cartStore';
 import { useOrderSheet } from './orderSheetStore';
 
 /**
@@ -64,27 +64,48 @@ export const usePlaceOrder = () => {
     notify('success', t('mainPage.orderSent'));
   }, [apollo, clearCart, notify, t]);
 
+  /**
+   * A new order whose "send" got no answer: it may be in the kitchen already. Ordering the same cart
+   * again sends that same order once more, which the server does only once, rather than a new order
+   * that would be cooked twice.
+   */
+  const unsent = useRef<{ orderId: string; cart: string } | null>(null);
+  // The cart being ordered, as compared above
+  const cartKey = useRef('');
+
   // A new order goes to the kitchen unpaid. The receipt is personal until the guest picks another when paying.
   const [sendUnpaid, { loading: sending }] = useMutation(GET_PAY_ORDER, {
     onCompleted(data) {
-      if (data?.payOrder) sent();
+      if (!data?.payOrder) return;
+      unsent.current = null;
+      sent();
     },
     onError(err) {
       showError(err.message);
     },
   });
 
+  const send = (orderId: string) =>
+    sendUnpaid({
+      variables: { input: { order: orderId, confirm: true, payment: '', vatType: participant?.vat ? 1 : 0 } },
+    });
+
   const [createOrder, { loading: creating }] = useMutation(CREATE_ORDER, {
     onCompleted(data) {
-      const orderId = data.createOrder.id;
+      const created: IOrder = data.createOrder;
+      // Added to the table's open order (auto-merge): it's in the kitchen already, nothing to send
+      if (created.state !== 'DRAFT') {
+        sent();
+        return;
+      }
       if (payLater) {
-        sendUnpaid({
-          variables: { input: { order: orderId, confirm: true, payment: '', vatType: participant?.vat ? 1 : 0 } },
-        });
+        unsent.current = { orderId: created.id!, cart: cartKey.current };
+        send(created.id!);
       } else {
-        // Paid first: checkout opens over the sheet, which then shows the order under Захиалсан
+        // Paid first: checkout opens over the sheet, which then shows the order under Захиалсан. The
+        // cart goes with it, and comes back if the guest leaves without paying.
         useOrderSheet.getState().show();
-        useCheckout.getState().open(orderId, { order: data.createOrder });
+        useCheckout.getState().open(created.id!, { order: created, cart: takeCart() });
         clearCart();
       }
     },
@@ -132,6 +153,13 @@ export const usePlaceOrder = () => {
         ? { giftToTableId, giftStickerId: giftStickerId || undefined, giftAnonymous: giftAnonymous || undefined }
         : {}),
     }));
+
+    // The same cart as an order whose send got no answer: send that order again (see `unsent`)
+    cartKey.current = JSON.stringify([serviceType, lines]);
+    if (payLater && unsent.current?.cart === cartKey.current) {
+      send(unsent.current.orderId);
+      return;
+    }
 
     // Rounds are eat-in and carry no gifts; a take-away or a gift is an order of its own
     if (payLater && serviceType === TYPE.DINIG && !hasGift) {

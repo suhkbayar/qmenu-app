@@ -3,6 +3,7 @@ import { Button, cn, useThemeColor } from 'heroui-native';
 import { ReceiptText } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useCheckout } from '@/src/features/checkout/checkoutStore';
+import { ONLINE_PAYMENT_TYPES } from '@/src/features/checkout/usePayment';
 import { useServiceRequest } from '@/src/features/service/useServiceRequest';
 import { useSessionStore } from '@/src/features/session/sessionStore';
 import { IOrder } from '@/src/types';
@@ -16,7 +17,10 @@ import { Spinner } from '@/src/ui/Spinner';
 export const BillButtons = ({ order, stacked = false }: { order: IOrder; stacked?: boolean }) => {
   const { t } = useTranslation('language');
   const foreground = useThemeColor('foreground');
-  const canPayHere = useSessionStore((s) => (s.participant?.payments?.length ?? 0) > 0);
+  // A real way to pay here: with only U-Point or coupons the checkout would have nothing to pay with
+  const canPayHere = useSessionStore(
+    (s) => s.participant?.payments?.some((p) => ONLINE_PAYMENT_TYPES.includes(p.type)) ?? false,
+  );
   const { send, pending } = useServiceRequest();
   const openCheckout = useCheckout((s) => s.open);
 

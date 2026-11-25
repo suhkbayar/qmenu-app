@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { cn, useThemeColor } from 'heroui-native';
-import { CreditCard, QrCode } from 'lucide-react-native';
+import { CreditCard, QrCode, Store } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Image } from '@/src/ui/Image';
 import { Spinner } from '@/src/ui/Spinner';
@@ -46,6 +46,8 @@ export const useMethodLook = (method: PaymentMethod): MethodLook => {
       return { name: 'QPay', mark: icon(QrCode) };
     case 'MCS':
       return { name: t('mainPage.card'), mark: icon(CreditCard) };
+    case 'Cashier':
+      return { name: t('mainPage.payAtCashier'), mark: icon(Store) };
   }
 };
 

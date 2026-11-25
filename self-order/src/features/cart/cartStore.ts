@@ -27,6 +27,8 @@ interface CartState {
   setComment: (uuid: string, comment: string) => void;
   /** Empties the cart after an order is placed. */
   clear: () => void;
+  /** Puts back a cart taken earlier (takeCart). */
+  restore: (snapshot: CartSnapshot) => void;
 
   setGiftTarget: (target: IGiftTarget | null) => void;
   setGiftSticker: (stickerId: string | null) => void;
@@ -44,6 +46,14 @@ const emptyCart = {
   giftTarget: null,
   giftStickerId: null,
   giftAnonymous: false,
+};
+
+/** What's in the cart, kept to put back: an order to be paid first that the guest left unpaid */
+export type CartSnapshot = Pick<CartState, 'items' | 'giftTarget' | 'giftStickerId' | 'giftAnonymous'>;
+
+export const takeCart = (): CartSnapshot => {
+  const { items, giftTarget, giftStickerId, giftAnonymous } = useCartStore.getState();
+  return { items, giftTarget, giftStickerId, giftAnonymous };
 };
 
 // A cart line for a simple product's only variant
@@ -96,6 +106,7 @@ export const useCartStore = create<CartState>()((set) => ({
     set((state) => ({ items: state.items.map((item) => (item.uuid === uuid ? { ...item, comment } : item)) })),
 
   clear: () => set(emptyCart),
+  restore: (snapshot) => set(snapshot),
 
   setGiftTarget: (giftTarget) => set({ giftTarget }),
   setGiftSticker: (giftStickerId) => set({ giftStickerId }),

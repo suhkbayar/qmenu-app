@@ -18,6 +18,7 @@ import { Spinner } from '@/src/ui/Spinner';
 import { Text } from '@/src/ui/Text';
 import { BillButtons } from './BillButtons';
 import { NEUTRAL_TONE, ORDER_STATE_LABEL, ORDER_STATE_TONE } from './orderStatus';
+import { ItemSource } from './ItemSource';
 import { itemsByTime, useTableOrders } from './useTableOrders';
 
 /**
@@ -133,6 +134,7 @@ const OrderCard = ({
               <Text>
                 {item.quantity} × {item.name}
               </Text>
+              <ItemSource channel={item.channel} />
               {!!item.comment && (
                 <Text className="text-sm italic text-muted" numberOfLines={2}>
                   {item.comment}

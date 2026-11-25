@@ -184,7 +184,12 @@
     "payNow": "Төлбөр төлөх",
     "payWithAmount": "Төлбөр төлөх · {{amount}}",
     "toPayShort": "Төлөх:",
-    "choosePaymentMethod": "Төлбөрийн хэлбэрээ сонгоно уу"
+    "choosePaymentMethod": "Төлбөрийн хэлбэрээ сонгоно уу",
+    "payAtCashier": "Кассанд төлөх",
+    "orderSentPayAtCashier": "Захиалга илгээгдлээ. Кассанд төлнө үү",
+    "fromWaiter": "Касс",
+    "fromKiosk": "Киоск",
+    "fromPhone": "Утаснаас"
   },
   "setup": {
     "tableCode": "Ширээний код",
@@ -207,6 +212,8 @@
     "allowCamera": "Камер зөвшөөрөх",
     "planExpiredTitle": "Үйлчилгээний эрх идэвхгүй байна",
     "planExpiredBody": "Энэ төхөөрөмжид идэвхтэй үйлчилгээний багц алга байна. Үйлчилгээг үргэлжлүүлэхийн тулд ажилтантай холбогдоно уу.",
+    "branchClosedTitle": "Түр хаалттай байна",
+    "branchClosedBody": "Захиалга одоогоор авахгүй байна. Нээгдмэгц цэс өөрөө гарч ирнэ.",
     "checkAgain": "Дахин шалгах",
     "errorTitle": "Алдаа гарлаа",
     "restartApp": "Дахин эхлүүлэх",
