@@ -343,7 +343,7 @@ export const usePayment = (orderId: string, preview?: IOrder | null, onSent?: ()
       if (!rewards.coupon) break;
       const { data: result } = await payReward({
         variables: {
-          input: { ...payInput(rewards.coupon, receipt), code: coupon.code, phone: upoint.account.phone },
+          input: { ...payInput(rewards.coupon, receipt), code: coupon.code, phone: coupon.phone ?? upoint.account.phone },
         },
       });
       setAppliedCoupons((codes) => [...codes, coupon.code]);
@@ -408,8 +408,13 @@ export const usePayment = (orderId: string, preview?: IOrder | null, onSent?: ()
   const signedIn = (account: IUpointBalance, via: UpointVia) => {
     setUpoint({ account, via });
     setMode('collect');
-    // Coupons were checked for the previous account, if any
-    setCoupons((list) => list.filter((coupon) => appliedCoupons.includes(coupon.code)));
+    // The guest's own coupons (none by phone), listed but not chosen, after any already used on the
+    // order. Coupons checked for a previous account go.
+    const own = via === 'phone' ? [] : (account.coupons ?? []).map((coupon) => ({ ...coupon, phone: account.phone }));
+    setCoupons((list) => [
+      ...list.filter((coupon) => appliedCoupons.includes(coupon.code)),
+      ...own.filter((coupon) => !appliedCoupons.includes(coupon.code)),
+    ]);
     setSelectedCoupons((codes) => codes.filter((code) => appliedCoupons.includes(code)));
     setStep(via === 'phone' ? 'pay' : 'spend');
   };

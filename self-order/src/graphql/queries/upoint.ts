@@ -1,5 +1,15 @@
 import { gql } from '@apollo/client';
 
+/** The guest's own coupons that fit this order (none when signed in by phone) */
+const ACCOUNT_COUPONS = `
+  coupons {
+    code
+    amount
+    name
+    expireDate
+  }
+`;
+
 export const GET_BALANCE_UPOINT = gql`
   query getBalanceUpoint($input: BalanceInput!) {
     getBalanceUpoint(input: $input) {
@@ -7,6 +17,7 @@ export const GET_BALANCE_UPOINT = gql`
       phone
       code
       balance
+      ${ACCOUNT_COUPONS}
     }
   }
 `;
@@ -38,6 +49,7 @@ export const CHECK_UPOINT_QR = gql`
       phone
       code
       balance
+      ${ACCOUNT_COUPONS}
     }
   }
 `;

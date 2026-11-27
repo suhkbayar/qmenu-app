@@ -326,7 +326,7 @@ const PinSignIn = ({ via, payment, paymentId }: { via: 'phone' | 'card'; payment
 };
 
 /** A field the pad types into; the one being typed into has a dark border. */
-const PadField = ({
+export const PadField = ({
   label,
   value,
   placeholder,

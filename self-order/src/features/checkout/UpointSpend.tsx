@@ -17,10 +17,12 @@ import { CodeKeyboard, applyKey } from './Keypad';
 import { MethodTile } from './MethodTile';
 import { ReceiptPicker, useReceipt } from './ReceiptPicker';
 import { StepHeader } from './StepHeader';
-import { Note, StepBadge, UPOINT_LOGO, maskTail } from './UpointSignIn';
+import { Note, PadField, StepBadge, UPOINT_LOGO, maskTail } from './UpointSignIn';
 import { PaymentMethod, UpointMode, usePayment } from './usePayment';
 
 const COUPON_MAX_LENGTH = 32;
+const PHONE_LENGTH = 8;
+const PHONE = /^\d{8}$/;
 
 type Payment = ReturnType<typeof usePayment>;
 
@@ -119,6 +121,7 @@ export const UpointSpend = ({
                           key={`${coupon.code}-${selected}`}
                           coupon={coupon}
                           selected={selected}
+                          applied={payment.appliedCoupons.includes(coupon.code)}
                           locked={payment.appliedCoupons.includes(coupon.code) || payment.paying}
                           onToggle={() => payment.toggleCoupon(coupon.code)}
                         />
@@ -249,15 +252,20 @@ const ModeSwitch = ({
 /** "2026-12-31…" → "2026.12.31" */
 const shortDate = (date?: string | null) => (date ? date.slice(0, 10).replace(/-/g, '.') : '');
 
-/** A coupon: its amount, what it's for and until when; "Use" or "✓ Applied" (tap again to undo). */
+/**
+ * A coupon: its amount, what it's for and until when; "Use", then "✓ Will be used" once chosen (tap
+ * again to undo) and "✓ Used" once paid.
+ */
 const CouponRow = ({
   coupon,
   selected,
+  applied,
   locked,
   onToggle,
 }: {
   coupon: IUpointCoupon;
   selected: boolean;
+  applied: boolean;
   locked: boolean;
   onToggle: () => void;
 }) => {
@@ -302,7 +310,7 @@ const CouponRow = ({
         >
           <Check size={16} color={foreground} />
           <Button.Label numberOfLines={1} className="font-bold">
-            {t('mainPage.couponUsed')}
+            {applied ? t('mainPage.couponUsed') : t('mainPage.couponChosen')}
           </Button.Label>
         </Button>
       ) : (
@@ -331,29 +339,47 @@ const AmountLine = ({ label, amount, off }: { label: string; amount: number; off
 };
 
 /**
- * Typing a coupon code on the screen's keyboard. "Check" asks the server about the code without using
- * it: a good one joins the list, chosen; a bad or expired one says so.
+ * Typing a coupon code, and its owner's phone (the signed-in guest's to start with; a friend's or a
+ * family member's can be typed instead), on the screen's keyboard. "Check" asks the server about the
+ * code without using it: a good one joins the list, chosen; a bad or expired one says so.
  */
 const CouponDialog = ({ payment, onClose }: { payment: Payment; onClose: () => void }) => {
   const { t } = useTranslation('language');
   const apollo = useApolloClient();
-  const [foreground, muted, accentForeground] = useThemeColor(['foreground', 'muted', 'accent-foreground']);
+  const [foreground, accentForeground] = useThemeColor(['foreground', 'accent-foreground']);
+  const ownPhone = payment.upoint?.account.phone ?? '';
+  const [phone, setPhone] = useState(PHONE.test(ownPhone) ? ownPhone : '');
   const [code, setCode] = useState('');
+  const [field, setField] = useState<'phone' | 'code'>('code');
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
 
+  const onKey = (key: string) => {
+    setError(null);
+    if (field === 'code') return setCode(applyKey(code, key, COUPON_MAX_LENGTH));
+    // The phone takes digits only
+    if (/^[A-Z]$/.test(key)) return;
+    const next = applyKey(phone, key, PHONE_LENGTH);
+    setPhone(next);
+    if (next.length === PHONE_LENGTH && phone.length < PHONE_LENGTH) setField('code');
+  };
+
   const check = async () => {
     if (!code || checking || !payment.upoint) return;
+    if (!PHONE.test(phone)) {
+      setField('phone');
+      return setError(t('mainPage.couponPhoneInvalid'));
+    }
     setChecking(true);
     setError(null);
     try {
       const { data } = await apollo.query<{ checkUpointCoupon: IUpointCoupon }>({
         query: CHECK_UPOINT_COUPON,
-        variables: { input: { order: payment.orderId, code, phone: payment.upoint.account.phone } },
+        variables: { input: { order: payment.orderId, code, phone } },
         fetchPolicy: 'no-cache',
       });
       if (!data?.checkUpointCoupon) throw new Error(t('mainPage.couponInvalid'));
-      payment.addCoupon(data.checkUpointCoupon);
+      payment.addCoupon({ ...data.checkUpointCoupon, phone });
       onClose();
     } catch (err) {
       // The server's answer means the code is no good; anything else is the connection
@@ -385,22 +411,28 @@ const CouponDialog = ({ payment, onClose }: { payment: Payment; onClose: () => v
           </Button>
         </View>
         <Text className="text-muted">{t('mainPage.enterCouponHint')}</Text>
-        <View className="h-15 justify-center rounded-2xl border-2 px-5" style={{ borderColor: foreground }}>
-          <Text
-            className="text-3xl font-bold tracking-[4px]"
-            style={{ color: code ? foreground : muted }}
-            numberOfLines={1}
-          >
-            {code || t('mainPage.couponCode')}
-          </Text>
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <PadField
+              label={t('mainPage.couponPhone')}
+              value={phone}
+              placeholder={t('mainPage.upointPhonePlaceholder')}
+              active={field === 'phone'}
+              onPress={() => setField('phone')}
+            />
+          </View>
+          <View className="flex-[1.4]">
+            <PadField
+              label={t('mainPage.couponCode')}
+              value={code}
+              placeholder={t('mainPage.couponCode')}
+              active={field === 'code'}
+              onPress={() => setField('code')}
+            />
+          </View>
         </View>
         {!!error && <Note tone="danger" message={error} />}
-        <CodeKeyboard
-          onKey={(key) => {
-            setError(null);
-            setCode(applyKey(code, key, COUPON_MAX_LENGTH));
-          }}
-        />
+        <CodeKeyboard onKey={onKey} />
         <View className="flex-row gap-3">
           <Button
             size="lg"
